@@ -2,6 +2,8 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Journal from './pages/Journal';
+import QuickEntryPage from './pages/QuickEntryPage';
+import TalkEntryPage from './pages/TalkEntryPage';
 import Growth from './pages/Growth';
 import MyLife from './pages/MyLife';
 import Learn from './pages/Learn';
@@ -14,6 +16,8 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="journal" element={<Journal />} />
+        <Route path="journal/quick" element={<QuickEntryPage />} />
+        <Route path="journal/talk/:id?" element={<TalkEntryPage />} />
         <Route path="growth" element={<Growth />} />
         <Route path="my-life" element={<MyLife />} />
         <Route path="learn" element={<Learn />} />
