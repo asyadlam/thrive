@@ -340,3 +340,99 @@ textarea.input.talk-body {
   border: 1px dashed var(--stone);
   cursor: not-allowed;
 }
+
+/* ---------- Milestone 3: Look back calendar, entry reader, delete confirm ---------- */
+.look-back-card { margin-top: 12px; }
+.look-back-icon { background: var(--green-50); color: var(--green-700); border: 1px solid var(--green-100); }
+
+.calendar { padding: 14px 12px 12px; }
+.calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.calendar-title { font-size: 1.05rem; font-weight: 650; margin: 0; }
+.month-nav {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 0;
+  background: transparent;
+  color: var(--green-700);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.month-nav:hover:not(:disabled) { background: var(--green-50); }
+.month-nav:disabled { color: var(--stone); cursor: default; }
+.month-nav:focus-visible { outline: 2px solid var(--green-500); }
+
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.weekday { text-align: center; font-size: 0.75rem; font-weight: 600; color: var(--ink-soft); padding: 4px 0 6px; }
+.day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.day:hover { background: var(--green-50); }
+.day:focus-visible { outline: 2px solid var(--green-500); outline-offset: -2px; }
+.day-number { font-size: 0.95rem; line-height: 1; }
+.day-dot { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+.day-dot.visible { background: var(--green-500); }
+.day.today .day-number { color: var(--green-700); font-weight: 700; }
+.day.today { box-shadow: inset 0 0 0 1.5px var(--green-300); }
+.day.selected { background: var(--green-700); color: #fff; }
+.day.selected .day-number { color: #fff; }
+.day.selected .day-dot.visible { background: #fff; }
+
+.day-entries { margin-top: 20px; }
+.day-hint { text-align: center; padding: 8px 0; }
+.entry-item-main { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.mood-pill.small { padding: 3px 10px; font-size: 0.85rem; }
+.untitled { font-style: italic; color: var(--ink-soft); }
+
+.talk-view-title { font-size: 1.15rem; margin: 0; }
+.talk-view-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+
+.entry-actions { display: flex; gap: 8px; }
+.btn-danger, .btn-danger-outline {
+  font: inherit;
+  font-weight: 600;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.btn-danger { background: var(--help-dark); color: #fff; border: 0; }
+.btn-danger:disabled { opacity: 0.6; }
+.btn-danger-outline { background: #fff; color: var(--help-dark); border: 1px solid #E3C1B8; }
+.btn-danger:focus-visible, .btn-danger-outline:focus-visible { outline: 2px solid var(--help); outline-offset: 2px; }
+
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(61, 58, 53, 0.45);
+}
+.dialog {
+  width: 100%;
+  max-width: 360px;
+  background: #fff;
+  border-radius: var(--radius);
+  padding: 22px 20px 18px;
+  box-shadow: 0 12px 40px rgba(61, 58, 53, 0.25);
+}
+.dialog h2 { margin: 0 0 8px; font-size: 1.15rem; }
+.dialog p { margin: 0 0 20px; color: var(--ink-soft); line-height: 1.45; }
+.dialog-actions { display: flex; gap: 10px; }
+.dialog-actions button { flex: 1; }

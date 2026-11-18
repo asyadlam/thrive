@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { LIMITS, formatDay, formatTime, getTalkEntry, saveTalkEntry, todayKey, type TalkEntry } from '../lib/journal';
 
@@ -8,6 +8,8 @@ type Status = 'loading' | 'ready' | 'not-found' | 'error';
 export default function TalkEntryPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  const back = from ? { to: from, label: 'Back' } : { to: '/journal', label: 'Journal' };
 
   const [status, setStatus] = useState<Status>(id ? 'loading' : 'ready');
   const [loadError, setLoadError] = useState('');
@@ -59,7 +61,7 @@ export default function TalkEntryPage() {
       setEntry(saved);
       setTitle(saved.title);
       setJustSaved(true);
-      if (!id) navigate(`/journal/talk/${saved.id}`, { replace: true });
+      if (!id) navigate(`/journal/talk/${saved.id}`, { replace: true, state: from ? { from } : null });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong while saving.');
     } finally {
@@ -70,7 +72,7 @@ export default function TalkEntryPage() {
   const subtitle = formatDay(entry?.date ?? todayKey());
 
   return (
-    <PageShell title="Need to talk about it" subtitle={subtitle} back={{ to: '/journal', label: 'Journal' }}>
+    <PageShell title="Need to talk about it" subtitle={subtitle} back={back}>
       {status === 'loading' && <div className="card placeholder">Loading…</div>}
 
       {status === 'not-found' && <div className="card placeholder">This journal page couldn't be found on this device.</div>}

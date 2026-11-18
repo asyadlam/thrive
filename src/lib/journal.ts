@@ -1,4 +1,4 @@
-import { JOURNAL_STORE, TYPE_DATE_INDEX, idbGet, idbGetAllFromIndex, idbPut } from './db';
+import { JOURNAL_STORE, TYPE_DATE_INDEX, idbDelete, idbGet, idbGetAllFromIndex, idbPut } from './db';
 
 export const MOODS = ['Rough', 'Low', 'Okay', 'Good', 'Great', 'Stressed', 'Tired', 'Excited'] as const;
 export type Mood = (typeof MOODS)[number];
@@ -119,7 +119,31 @@ export async function listTalkEntries(date: string): Promise<TalkEntry[]> {
 }
 
 export function talkEntryLabel(entry: TalkEntry): string {
-  if (entry.title) return entry.title;
-  const firstLine = entry.body.trim().split('\n')[0] ?? '';
-  return firstLine.length > 60 ? `${firstLine.slice(0, 60)}…` : firstLine || 'Untitled';
+  return entry.title || 'Untitled';
+}
+
+/* ---------- Any entry type (used by Look back) ---------- */
+
+export function getEntry(id: string): Promise<JournalEntry | undefined> {
+  return idbGet<JournalEntry>(JOURNAL_STORE, id);
+}
+
+export function deleteEntry(id: string): Promise<undefined> {
+  return idbDelete(JOURNAL_STORE, id);
+}
+
+/** All entries (both types) whose date falls between two YYYY-MM-DD keys, inclusive. */
+export async function listEntriesBetween(start: string, end: string): Promise<JournalEntry[]> {
+  const range = (type: JournalEntry['type']) => IDBKeyRange.bound([type, start], [type, end]);
+  const [quick, talk] = await Promise.all([
+    idbGetAllFromIndex<QuickEntry>(JOURNAL_STORE, TYPE_DATE_INDEX, range('quick')),
+    idbGetAllFromIndex<TalkEntry>(JOURNAL_STORE, TYPE_DATE_INDEX, range('talk')),
+  ]);
+  return [...quick, ...talk];
+}
+
+/** Short date like "Wed, Nov 18". */
+export function formatShortDay(key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
 }

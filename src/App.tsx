@@ -4,6 +4,8 @@ import Home from './pages/Home';
 import Journal from './pages/Journal';
 import QuickEntryPage from './pages/QuickEntryPage';
 import TalkEntryPage from './pages/TalkEntryPage';
+import LookBackPage from './pages/LookBackPage';
+import EntryDetailPage from './pages/EntryDetailPage';
 import Growth from './pages/Growth';
 import MyLife from './pages/MyLife';
 import Learn from './pages/Learn';
@@ -18,6 +20,8 @@ export default function App() {
         <Route path="journal" element={<Journal />} />
         <Route path="journal/quick" element={<QuickEntryPage />} />
         <Route path="journal/talk/:id?" element={<TalkEntryPage />} />
+        <Route path="journal/look-back" element={<LookBackPage />} />
+        <Route path="journal/entry/:id" element={<EntryDetailPage />} />
         <Route path="growth" element={<Growth />} />
         <Route path="my-life" element={<MyLife />} />
         <Route path="learn" element={<Learn />} />

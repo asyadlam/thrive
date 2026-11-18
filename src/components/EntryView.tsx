@@ -1,10 +1,10 @@
 import { formatTime, type QuickEntry } from '../lib/journal';
 
-type Props = { entry: QuickEntry; onEdit: () => void };
+type Props = { entry: QuickEntry; onEdit: () => void; onDelete?: () => void };
 
-export default function EntryView({ entry, onEdit }: Props) {
+export default function EntryView({ entry, onEdit, onDelete }: Props) {
   return (
-    <article className="card saved-entry" aria-label="Today's quick entry">
+    <article className="card saved-entry" aria-label="Quick entry">
       <div className="saved-row">
         <span className="saved-label">Mood</span>
         <span className="mood-pill">{entry.mood}</span>
@@ -37,9 +37,16 @@ export default function EntryView({ entry, onEdit }: Props) {
 
       <div className="saved-footer">
         <span className="hint">Last saved at {formatTime(entry.updatedAt)}</span>
-        <button type="button" className="btn-secondary" onClick={onEdit}>
-          Edit
-        </button>
+        <div className="entry-actions">
+          {onDelete && (
+            <button type="button" className="btn-danger-outline" onClick={onDelete}>
+              Delete
+            </button>
+          )}
+          <button type="button" className="btn-secondary" onClick={onEdit}>
+            Edit
+          </button>
+        </div>
       </div>
     </article>
   );

@@ -77,3 +77,6 @@ export const idbPut = <T>(storeName: string, value: T) =>
 
 export const idbGetAllFromIndex = <T>(storeName: string, indexName: string, query: IDBValidKey | IDBKeyRange) =>
   run<T[]>(storeName, 'readonly', (s) => s.index(indexName).getAll(query));
+
+export const idbDelete = (storeName: string, key: IDBValidKey) =>
+  run<undefined>(storeName, 'readwrite', (s) => s.delete(key));

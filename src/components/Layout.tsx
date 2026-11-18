@@ -1,8 +1,16 @@
-import { Link, NavLink, Outlet } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
 import { GearIcon, HelpIcon } from './icons';
 
 export default function Layout() {
+  const { pathname } = useLocation();
+
+  // Start each new screen at the top instead of keeping the last screen's scroll position.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
   return (
     <div className="app">
       <header className="app-header">
