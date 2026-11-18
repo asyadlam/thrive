@@ -23,15 +23,19 @@ function toCompanion(v: unknown): Companion {
   return value === 'none' || PET_KINDS.includes(value as PetKind) ? (value as Companion) : DEFAULTS.companion;
 }
 
+/** Turn anything (saved JSON, a backup file) into valid settings, using defaults for bad values. */
+export function normalizeSettings(value: unknown): AppSettings {
+  const parsed = (value && typeof value === 'object' ? value : {}) as Partial<AppSettings>;
+  return {
+    companion: toCompanion(parsed.companion),
+    petName: typeof parsed.petName === 'string' ? parsed.petName.slice(0, PET_NAME_MAX) : DEFAULTS.petName,
+  };
+}
+
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(KEY);
-    if (!raw) return { ...DEFAULTS };
-    const parsed = JSON.parse(raw) as Partial<AppSettings>;
-    return {
-      companion: toCompanion(parsed.companion),
-      petName: typeof parsed.petName === 'string' ? parsed.petName.slice(0, PET_NAME_MAX) : DEFAULTS.petName,
-    };
+    return raw ? normalizeSettings(JSON.parse(raw)) : { ...DEFAULTS };
   } catch {
     return { ...DEFAULTS };
   }
@@ -44,5 +48,26 @@ export function saveSettings(settings: AppSettings): boolean {
     return true;
   } catch {
     return false;
+  }
+}
+
+/* ---------- Last backup date (device info, not part of the backup itself) ---------- */
+
+const LAST_BACKUP_KEY = 'thrive.lastBackupAt';
+
+export function getLastBackupAt(): string | null {
+  try {
+    const v = localStorage.getItem(LAST_BACKUP_KEY);
+    return v && !Number.isNaN(Date.parse(v)) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function setLastBackupAt(iso: string): void {
+  try {
+    localStorage.setItem(LAST_BACKUP_KEY, iso);
+  } catch {
+    /* storage blocked: nothing else to do */
   }
 }

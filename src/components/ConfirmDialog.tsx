@@ -5,12 +5,14 @@ type Props = {
   message: string;
   confirmLabel: string;
   busy?: boolean;
+  /** Button text while busy (default "Deleting…"). */
+  busyLabel?: string;
   onConfirm: () => void;
   onCancel: () => void;
 };
 
 /** Small in-app "are you sure?" dialog. Render it only while it should be open. */
-export default function ConfirmDialog({ title, message, confirmLabel, busy, onConfirm, onCancel }: Props) {
+export default function ConfirmDialog({ title, message, confirmLabel, busy, busyLabel = 'Deleting…', onConfirm, onCancel }: Props) {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
@@ -43,7 +45,7 @@ export default function ConfirmDialog({ title, message, confirmLabel, busy, onCo
             Cancel
           </button>
           <button type="button" className="btn-danger" onClick={onConfirm} disabled={busy}>
-            {busy ? 'Deleting…' : confirmLabel}
+            {busy ? busyLabel : confirmLabel}
           </button>
         </div>
       </div>

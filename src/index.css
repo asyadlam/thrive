@@ -526,3 +526,9 @@ textarea.input.talk-body {
   color: var(--ink-soft);
   font-size: 1.4rem;
 }
+
+/* ---------- Settings: My data ---------- */
+.settings-section + .settings-section { margin-top: 16px; }
+.backup-status { display: flex; flex-direction: column; gap: 4px; }
+.data-actions { display: flex; flex-direction: column; gap: 10px; }
+.data-actions .btn-primary { flex: none; }

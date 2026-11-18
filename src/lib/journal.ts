@@ -1,4 +1,4 @@
-import { JOURNAL_STORE, TYPE_DATE_INDEX, idbDelete, idbGet, idbGetAllFromIndex, idbPut } from './db';
+import { JOURNAL_STORE, TYPE_DATE_INDEX, idbDelete, idbGet, idbGetAll, idbGetAllFromIndex, idbPut, idbReplaceAll } from './db';
 
 export const MOODS = ['Rough', 'Low', 'Okay', 'Good', 'Great', 'Stressed', 'Tired', 'Excited'] as const;
 export type Mood = (typeof MOODS)[number];
@@ -53,7 +53,7 @@ export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 }
 
-function newId(): string {
+export function newId(): string {
   return typeof crypto !== 'undefined' && 'randomUUID' in crypto
     ? crypto.randomUUID()
     : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -66,7 +66,7 @@ function keepStorage() {
 
 /* ---------- Quick entries ---------- */
 
-const quickId = (date: string) => `quick-${date}`;
+export const quickId = (date: string) => `quick-${date}`;
 
 export function getQuickEntry(date: string): Promise<QuickEntry | undefined> {
   return idbGet<QuickEntry>(JOURNAL_STORE, quickId(date));
@@ -146,4 +146,56 @@ export async function listEntriesBetween(start: string, end: string): Promise<Jo
 export function formatShortDay(key: string): string {
   const [y, m, d] = key.split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+/** Long date with year, e.g. "Wednesday, November 18, 2026". */
+export function formatLongDay(key: string): string {
+  const [y, m, d] = key.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/* ---------- Whole journal (backup / restore) ---------- */
+
+/** Every entry of both types, oldest day first (then oldest written first). */
+export async function listAllEntries(): Promise<JournalEntry[]> {
+  const all = await idbGetAll<JournalEntry>(JOURNAL_STORE);
+  return all.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
+}
+
+/** Replace the whole journal with these entries, all at once. */
+export function replaceAllEntries(entries: JournalEntry[]): Promise<void> {
+  return idbReplaceAll(JOURNAL_STORE, entries);
+}
+
+/**
+ * Fill in createdAt / updatedAt on any entry that is missing them (e.g. very early
+ * entries), leaving every other field exactly as it was. Ids always exist: the
+ * database requires one for every entry.
+ */
+export function withMetadata<T extends Partial<EntryBase> & { date: string }>(entry: T): T & EntryBase {
+  const fallback = new Date(`${entry.date}T12:00:00`).toISOString();
+  const createdAt = isIsoTime(entry.createdAt) ? entry.createdAt : isIsoTime(entry.updatedAt) ? entry.updatedAt : fallback;
+  const updatedAt = isIsoTime(entry.updatedAt) ? entry.updatedAt : createdAt;
+  return { ...entry, id: entry.id as string, createdAt, updatedAt };
+}
+
+export function isIsoTime(v: unknown): v is string {
+  return typeof v === 'string' && !Number.isNaN(Date.parse(v));
+}
+
+/** Runs once at startup; only writes entries that actually needed fixing. */
+export async function ensureEntryMetadata(): Promise<number> {
+  const all = await idbGetAll<JournalEntry>(JOURNAL_STORE);
+  let fixed = 0;
+  for (const entry of all) {
+    if (isIsoTime(entry.createdAt) && isIsoTime(entry.updatedAt)) continue;
+    await idbPut(JOURNAL_STORE, withMetadata(entry));
+    fixed++;
+  }
+  return fixed;
 }

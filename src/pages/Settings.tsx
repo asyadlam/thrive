@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import PageShell from '../components/PageShell';
+import MyDataSection from '../components/MyDataSection';
 import { PET_ART, PetThumb } from '../components/PetCompanion';
 import { PET_KINDS, PET_NAME_MAX, loadSettings, saveSettings, type AppSettings, type Companion } from '../lib/settings';
 
@@ -73,6 +74,13 @@ export default function Settings() {
           {status === 'error' && "Couldn't save settings in this browser."}
         </p>
       </section>
+
+      <MyDataSection
+        onRestored={() => {
+          setSettings(loadSettings());
+          setStatus('idle');
+        }}
+      />
     </PageShell>
   );
 }

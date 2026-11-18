@@ -80,3 +80,21 @@ export const idbGetAllFromIndex = <T>(storeName: string, indexName: string, quer
 
 export const idbDelete = (storeName: string, key: IDBValidKey) =>
   run<undefined>(storeName, 'readwrite', (s) => s.delete(key));
+
+export const idbGetAll = <T>(storeName: string) => run<T[]>(storeName, 'readonly', (s) => s.getAll());
+
+/** Replace everything in a store in ONE transaction: if any write fails, nothing changes. */
+export function idbReplaceAll<T>(storeName: string, values: T[]): Promise<void> {
+  return openDb().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(storeName, 'readwrite');
+        const store = tx.objectStore(storeName);
+        store.clear();
+        for (const v of values) store.put(v);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
+        tx.onabort = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
+      }),
+  );
+}
