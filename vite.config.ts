@@ -24,7 +24,17 @@ export default defineConfig({
           { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: { navigateFallback: '/index.html' },
+      workbox: {
+        navigateFallback: '/index.html',
+        // Keep companion images available offline after they've been seen once.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => url.pathname.startsWith('/pets/'),
+            handler: 'CacheFirst',
+            options: { cacheName: 'thrive-pets', expiration: { maxEntries: 10 } },
+          },
+        ],
+      },
     }),
   ],
 });
