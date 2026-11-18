@@ -9,6 +9,8 @@
   --stone: #E8DCC8;
   --ink: #3D3A35;
   --ink-soft: #7A736A;
+  --help: #A9533D;
+  --help-dark: #8E4433;
   --radius: 18px;
   --nav-h: 64px;
   --safe-b: env(safe-area-inset-bottom, 0px);
@@ -39,8 +41,45 @@ body { background: var(--cream); }
   padding: calc(var(--safe-t) + 14px) 20px 12px;
   background: color-mix(in srgb, var(--cream) 88%, transparent);
   backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
-.brand { font-weight: 700; font-size: 1.15rem; color: var(--green-700); letter-spacing: 0.02em; }
+.brand { font-weight: 700; font-size: 1.15rem; color: var(--green-700); letter-spacing: 0.02em; text-decoration: none; }
+
+.header-actions { display: flex; align-items: center; gap: 6px; }
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  background: var(--help);
+  color: #fff;
+  font-weight: 650;
+  font-size: 0.9rem;
+  text-decoration: none;
+  box-shadow: 0 2px 8px rgba(169, 83, 61, 0.25);
+}
+.help-button svg { width: 20px; height: 20px; }
+.help-button:hover, .help-button.active { background: var(--help-dark); }
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  color: var(--ink-soft);
+}
+.icon-button:hover { background: var(--sand); }
+.icon-button.active { color: var(--green-700); background: var(--green-100); }
+.help-button:focus-visible, .icon-button:focus-visible, .brand:focus-visible {
+  outline: 2px solid var(--green-500);
+  outline-offset: 2px;
+}
 
 .app-main {
   flex: 1;

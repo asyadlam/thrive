@@ -1,20 +1,24 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
-import Today from './pages/Today';
-import History from './pages/History';
-import Trends from './pages/Trends';
-import Goals from './pages/Goals';
+import Home from './pages/Home';
+import Journal from './pages/Journal';
+import Growth from './pages/Growth';
+import MyLife from './pages/MyLife';
+import Learn from './pages/Learn';
 import Settings from './pages/Settings';
+import Help from './pages/Help';
 
 export default function App() {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<Today />} />
-        <Route path="history" element={<History />} />
-        <Route path="trends" element={<Trends />} />
-        <Route path="goals" element={<Goals />} />
+        <Route index element={<Home />} />
+        <Route path="journal" element={<Journal />} />
+        <Route path="growth" element={<Growth />} />
+        <Route path="my-life" element={<MyLife />} />
+        <Route path="learn" element={<Learn />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="help" element={<Help />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
