@@ -15,16 +15,18 @@ import { formatLongDay, listAllEntries, todayKey } from '../lib/journal';
 import { getLastBackupAt, setLastBackupAt } from '../lib/settings';
 import { listAllGoals } from '../lib/goals';
 import { listStandalonePositives } from '../lib/positives';
+import { listAllLetterIds } from '../lib/letters';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Message = { kind: 'ok' | 'error'; text: string } | null;
+type Current = { currentCount: number; currentGoals: number; currentPositives: number; currentLetters: number };
 
 export default function MyDataSection({ onRestored }: { onRestored: () => void }) {
   const [lastBackupAt, setLastBackup] = useState(getLastBackupAt);
   const [busy, setBusy] = useState<'backup' | 'readable' | 'reading' | 'restoring' | null>(null);
   const [message, setMessage] = useState<Message>(null);
-  const [pending, setPending] = useState<(CheckedBackup & { currentCount: number; currentGoals: number; currentPositives: number }) | null>(null);
+  const [pending, setPending] = useState<(CheckedBackup & Current) | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const overdue = lastBackupAt !== null && Date.now() - Date.parse(lastBackupAt) > 30 * DAY_MS;
@@ -67,13 +69,20 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('reading');
     setMessage(null);
     try {
-      const [checked, current, goals, positives] = await Promise.all([
+      const [checked, current, goals, positives, letters] = await Promise.all([
         readBackupFile(file),
         listAllEntries(),
         listAllGoals(),
         listStandalonePositives(),
+        listAllLetterIds(),
       ]);
-      setPending({ ...checked, currentCount: current.length, currentGoals: goals.length, currentPositives: positives.length });
+      setPending({
+        ...checked,
+        currentCount: current.length,
+        currentGoals: goals.length,
+        currentPositives: positives.length,
+        currentLetters: letters.length,
+      });
     } catch (err) {
       setMessage({
         kind: 'error',
@@ -96,9 +105,12 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
       const positivesText = pending.positives
         ? `, ${pending.positives.length} saved ${pending.positives.length === 1 ? 'positive' : 'positives'}`
         : '';
+      const lettersText = pending.letters
+        ? `, ${pending.letters.length} ${pending.letters.length === 1 ? 'letter' : 'letters'}`
+        : '';
       setMessage({
         kind: 'ok',
-        text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${goalsText}${positivesText} and your settings.`,
+        text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${goalsText}${positivesText}${lettersText} and your settings.`,
       });
       onRestored();
     } catch {
@@ -111,15 +123,19 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
-  function restoreMessage(b: CheckedBackup & { currentCount: number; currentGoals: number; currentPositives: number }) {
+  function restoreMessage(b: CheckedBackup & Current) {
     const has = [plural(b.quickCount, 'quick entry', 'quick entries'), plural(b.talkCount, 'journal page', 'journal pages')];
     if (b.goals) has.push(plural(b.goals.length, 'goal', 'goals'));
     if (b.positives) has.push(plural(b.positives.length, 'saved positive', 'saved positives'));
+    if (b.letters) has.push(plural(b.letters.length, 'Time Capsule letter', 'Time Capsule letters'));
     const saved = b.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(b.exportedAt)))}` : '';
     const replaced = [plural(b.currentCount, 'entry', 'entries')];
     if (b.goals) replaced.push(plural(b.currentGoals, 'goal', 'goals'));
     if (b.positives) replaced.push(plural(b.currentPositives, 'saved positive', 'saved positives'));
-    const missing = [!b.goals && 'goals', !b.positives && 'saved positives'].filter(Boolean).join(' or ');
+    if (b.letters) replaced.push(plural(b.currentLetters, 'letter', 'letters'));
+    const missing = [!b.goals && 'goals', !b.positives && 'saved positives', !b.letters && 'Time Capsule letters']
+      .filter(Boolean)
+      .join(' or ');
     const goalsNote = missing ? ` This older backup has no ${missing}, so your current ones will stay as they are.` : '';
     return `This backup has ${has.join(', ')}${saved}. Restoring will replace everything currently in Thrive on this device — ${replaced.join(', ')} and your settings.${goalsNote} This can't be undone, so download a backup of what's here first if you might want it.`;
   }

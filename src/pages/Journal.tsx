@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
-import { CalendarIcon, JournalIcon, MyLifeIcon } from '../components/icons';
+import { CalendarIcon, JournalIcon, LetterIcon, MyLifeIcon } from '../components/icons';
 import { formatTime, getQuickEntry, listTalkEntries, talkEntryLabel, todayKey, type TalkEntry } from '../lib/journal';
 
 export default function Journal() {
@@ -59,6 +59,17 @@ export default function Journal() {
         <span className="quick-action-text">
           <strong>Look back</strong>
           <span>See past entries on a calendar.</span>
+        </span>
+        <span className="quick-action-arrow" aria-hidden="true">›</span>
+      </Link>
+
+      <Link to="/journal/time-capsule" className="card choice-card look-back-card">
+        <span className="quick-action-icon look-back-icon">
+          <LetterIcon />
+        </span>
+        <span className="quick-action-text">
+          <strong>Time Capsule</strong>
+          <span>Write a letter to future me.</span>
         </span>
         <span className="quick-action-arrow" aria-hidden="true">›</span>
       </Link>
