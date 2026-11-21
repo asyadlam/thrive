@@ -16,11 +16,18 @@ import { getLastBackupAt, setLastBackupAt } from '../lib/settings';
 import { listAllGoals } from '../lib/goals';
 import { listStandalonePositives } from '../lib/positives';
 import { listAllLetterIds } from '../lib/letters';
+import { listCustomAffirmations } from '../lib/affirmations';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Message = { kind: 'ok' | 'error'; text: string } | null;
-type Current = { currentCount: number; currentGoals: number; currentPositives: number; currentLetters: number };
+type Current = {
+  currentCount: number;
+  currentGoals: number;
+  currentPositives: number;
+  currentLetters: number;
+  currentAffirmations: number;
+};
 
 export default function MyDataSection({ onRestored }: { onRestored: () => void }) {
   const [lastBackupAt, setLastBackup] = useState(getLastBackupAt);
@@ -69,12 +76,13 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('reading');
     setMessage(null);
     try {
-      const [checked, current, goals, positives, letters] = await Promise.all([
+      const [checked, current, goals, positives, letters, affirmations] = await Promise.all([
         readBackupFile(file),
         listAllEntries(),
         listAllGoals(),
         listStandalonePositives(),
         listAllLetterIds(),
+        listCustomAffirmations(),
       ]);
       setPending({
         ...checked,
@@ -82,6 +90,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         currentGoals: goals.length,
         currentPositives: positives.length,
         currentLetters: letters.length,
+        currentAffirmations: affirmations.length,
       });
     } catch (err) {
       setMessage({
@@ -110,7 +119,11 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         : '';
       setMessage({
         kind: 'ok',
-        text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${goalsText}${positivesText}${lettersText} and your settings.`,
+        text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${goalsText}${positivesText}${lettersText}${
+          pending.affirmations
+            ? `, ${pending.affirmations.length} ${pending.affirmations.length === 1 ? 'affirmation' : 'affirmations'} of your own`
+            : ''
+        } and your settings.`,
       });
       onRestored();
     } catch {
@@ -128,12 +141,19 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     if (b.goals) has.push(plural(b.goals.length, 'goal', 'goals'));
     if (b.positives) has.push(plural(b.positives.length, 'saved positive', 'saved positives'));
     if (b.letters) has.push(plural(b.letters.length, 'Time Capsule letter', 'Time Capsule letters'));
+    if (b.affirmations) has.push(plural(b.affirmations.length, 'affirmation of your own', 'affirmations of your own'));
     const saved = b.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(b.exportedAt)))}` : '';
     const replaced = [plural(b.currentCount, 'entry', 'entries')];
     if (b.goals) replaced.push(plural(b.currentGoals, 'goal', 'goals'));
     if (b.positives) replaced.push(plural(b.currentPositives, 'saved positive', 'saved positives'));
     if (b.letters) replaced.push(plural(b.currentLetters, 'letter', 'letters'));
-    const missing = [!b.goals && 'goals', !b.positives && 'saved positives', !b.letters && 'Time Capsule letters']
+    if (b.affirmations) replaced.push(plural(b.currentAffirmations, 'affirmation of your own', 'affirmations of your own'));
+    const missing = [
+      !b.goals && 'goals',
+      !b.positives && 'saved positives',
+      !b.letters && 'Time Capsule letters',
+      !b.affirmations && 'affirmations of your own',
+    ]
       .filter(Boolean)
       .join(' or ');
     const goalsNote = missing ? ` This older backup has no ${missing}, so your current ones will stay as they are.` : '';

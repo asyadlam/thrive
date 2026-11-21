@@ -1,6 +1,6 @@
 // Minimal promise wrapper around IndexedDB (no extra dependencies).
 const DB_NAME = 'thrive';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 /** All journal entries (quick and talk) live in this one store, keyed by `id`. */
 export const JOURNAL_STORE = 'journal';
@@ -12,6 +12,8 @@ export const GOALS_STORE = 'goals';
 export const POSITIVES_STORE = 'positives';
 /** Time Capsule letters (added in version 5), keyed by `id`. */
 export const LETTERS_STORE = 'letters';
+/** My own affirmations (added in version 6), keyed by `id`. Built-in ones live in code. */
+export const AFFIRMATIONS_STORE = 'affirmations';
 /** Version 1 kept quick entries in "entries", keyed by date. */
 const LEGACY_ENTRIES_STORE = 'entries';
 
@@ -40,6 +42,9 @@ function openDb(): Promise<IDBDatabase> {
         }
         if (!db.objectStoreNames.contains(LETTERS_STORE)) {
           db.createObjectStore(LETTERS_STORE, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(AFFIRMATIONS_STORE)) {
+          db.createObjectStore(AFFIRMATIONS_STORE, { keyPath: 'id' });
         }
         // Move quick entries saved by version 1 into the new store, then drop the old one.
         if (event.oldVersion < 2 && db.objectStoreNames.contains(LEGACY_ENTRIES_STORE)) {

@@ -13,7 +13,8 @@ import {
 } from './journal';
 import { loadSettings, normalizeSettings, saveSettings, type AppSettings } from './settings';
 import { goalFromBackup, listAllGoals, type Goal } from './goals';
-import { GOALS_STORE, JOURNAL_STORE, LETTERS_STORE, POSITIVES_STORE, idbReplaceStores } from './db';
+import { AFFIRMATIONS_STORE, GOALS_STORE, JOURNAL_STORE, LETTERS_STORE, POSITIVES_STORE, idbReplaceStores } from './db';
+import { affirmationFromBackup, listCustomAffirmations, type CustomAffirmation } from './affirmations';
 import { letterFromBackup, lettersForBackup, type BackupLetter, type Letter } from './letters';
 import { listStandalonePositives, positiveFromBackup, type StandalonePositive } from './positives';
 
@@ -21,8 +22,10 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
    version 1: { app: "thrive", kind: "backup", version: 1, exportedAt, settings, entries: [...] }
    version 2: same, plus goals: [...]
    version 3: same, plus positives: [...] (positives saved on their own)
-   version 4: same, plus letters: [...] (Time Capsule; sealed ones keep their text encoded in "sealedBody") */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 4 } as const;
+   version 4: same, plus letters: [...] (Time Capsule; sealed ones keep their text encoded in "sealedBody")
+   version 5: letters may have sealType "milestone" with a milestone (event text) and unsealedAt, instead of an unlockDate
+   version 6: same, plus affirmations: [...] (my own; built-in ones aren't included) */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 6 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
@@ -32,6 +35,7 @@ export type Backup = typeof FORMAT & {
   goals: Goal[];
   positives: StandalonePositive[];
   letters: BackupLetter[];
+  affirmations: CustomAffirmation[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -43,6 +47,7 @@ export async function buildBackup(): Promise<Backup> {
     goals: await listAllGoals(),
     positives: await listStandalonePositives(),
     letters: await lettersForBackup(),
+    affirmations: await listCustomAffirmations(),
   };
 }
 
@@ -105,6 +110,8 @@ export type CheckedBackup = {
   positives: StandalonePositive[] | null;
   /** null = an older backup made before the Time Capsule existed (current letters are kept). */
   letters: Letter[] | null;
+  /** null = an older backup made before custom affirmations existed (current ones are kept). */
+  affirmations: CustomAffirmation[] | null;
 };
 
 export async function readBackupFile(file: File): Promise<CheckedBackup> {
@@ -165,11 +172,24 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     const lettersById = new Map<string, Letter>();
     d.letters.forEach((raw, i) => {
       const letter = letterFromBackup(raw);
-      if (!letter) throw new BackupError(`Letter ${i + 1} in this backup isn't valid (missing text or unlock date).`);
+      if (!letter) throw new BackupError(`Letter ${i + 1} in this backup isn't valid (missing text, or its date or event).`);
       const existing = lettersById.get(letter.id);
       if (!existing || existing.updatedAt < letter.updatedAt) lettersById.set(letter.id, letter);
     });
     letters = [...lettersById.values()];
+  }
+
+  let affirmations: CustomAffirmation[] | null = null;
+  if (d.affirmations !== undefined) {
+    if (!Array.isArray(d.affirmations)) throw new BackupError("This backup's affirmations list isn't valid.");
+    const affirmationsById = new Map<string, CustomAffirmation>();
+    d.affirmations.forEach((raw, i) => {
+      const affirmation = affirmationFromBackup(raw);
+      if (!affirmation) throw new BackupError(`Affirmation ${i + 1} in this backup isn't valid (missing text).`);
+      const existing = affirmationsById.get(affirmation.id);
+      if (!existing || existing.updatedAt < affirmation.updatedAt) affirmationsById.set(affirmation.id, affirmation);
+    });
+    affirmations = [...affirmationsById.values()];
   }
   return {
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
@@ -180,15 +200,17 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     goals,
     positives,
     letters,
+    affirmations,
   };
 }
 
-/** Replace everything in the app with a checked backup. Entries, goals, positives and letters are swapped in one step. */
+/** Replace everything in the app with a checked backup. Entries, goals, positives, letters and affirmations are swapped in one step. */
 export async function applyBackup(backup: CheckedBackup): Promise<void> {
   const stores: Record<string, unknown[]> = { [JOURNAL_STORE]: backup.entries };
   if (backup.goals) stores[GOALS_STORE] = backup.goals;
   if (backup.positives) stores[POSITIVES_STORE] = backup.positives;
   if (backup.letters) stores[LETTERS_STORE] = backup.letters;
+  if (backup.affirmations) stores[AFFIRMATIONS_STORE] = backup.affirmations;
   await idbReplaceStores(stores);
   saveSettings(backup.settings);
 }

@@ -685,3 +685,70 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .letter-delete:focus-visible { outline: 2px solid var(--help); outline-offset: -2px; }
 .letter-read { display: flex; flex-direction: column; gap: 18px; }
 .letter-read-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; font-size: 1.05rem; }
+
+/* ---------- Time Capsule: seal types ---------- */
+.seal-options { display: flex; flex-direction: column; gap: 8px; }
+.seal-option { position: relative; }
+.seal-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.seal-option span {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--stone);
+  border-radius: 12px;
+  background: var(--cream);
+  cursor: pointer;
+}
+.seal-option span::before {
+  content: '';
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--green-300);
+  background: #fff;
+}
+.seal-option input:checked + span { border-color: var(--green-500); background: var(--green-50); font-weight: 600; }
+.seal-option input:checked + span::before { border: 5px solid var(--green-500); }
+.seal-option input:focus-visible + span { outline: 2px solid var(--green-700); outline-offset: 2px; }
+.milestone-open { align-self: flex-start; margin-top: 8px; }
+.milestone-error { margin-top: 6px; font-size: 0.85rem; }
+.milestone-sealed { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.milestone-sealed .milestone-open { align-self: center; }
+
+.dialog { text-align: left; }
+
+/* ---------- Growth: affirmations ---------- */
+.affirmations { margin-bottom: 28px; }
+.affirmation-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 22px 20px 18px;
+  background: var(--cream);
+  border-color: var(--stone);
+}
+.affirmation-text {
+  margin: 0;
+  font-size: 1.4rem;
+  line-height: 1.4;
+  font-weight: 550;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.affirmation-mine { font-size: 0.8rem; font-weight: 600; color: var(--green-700); margin-top: -4px; }
+.affirmations-add { margin: 16px 0 4px; }
+.my-affirmations { margin-top: 8px; }
+.affirmation-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.affirmation-item {
+  display: flex;
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: 14px;
+  overflow: hidden;
+}
+.affirmation-item-text { flex: 1; min-width: 0; padding: 12px 14px; overflow-wrap: anywhere; }

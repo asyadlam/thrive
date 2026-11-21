@@ -5,6 +5,8 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { formatLongDay, todayKey } from '../lib/journal';
 import { deleteLetter, openLetter, type OpenResult } from '../lib/letters';
 import { letterTitle } from './TimeCapsulePage';
+import MilestoneOpenButton from '../components/MilestoneOpenButton';
+import { sealTypeOf } from '../lib/letters';
 
 export default function LetterPage() {
   const { id = '' } = useParams();
@@ -64,7 +66,14 @@ export default function LetterPage() {
     // The text was never loaded: openLetter() leaves it out before the unlock date.
     return (
       <PageShell title={letterTitle(result.letter)} subtitle="Still sealed" back={back}>
-        <div className="card placeholder">This letter opens on {formatLongDay(result.letter.unlockDate)}.</div>
+        {result.letter.sealType === 'milestone' ? (
+          <div className="card placeholder milestone-sealed">
+            <span>This letter opens when: {result.letter.milestone}</span>
+            <MilestoneOpenButton id={result.letter.id} milestone={result.letter.milestone} />
+          </div>
+        ) : (
+          <div className="card placeholder">This letter opens on {formatLongDay(result.letter.unlockDate)}.</div>
+        )}
       </PageShell>
     );
   }
@@ -79,7 +88,11 @@ export default function LetterPage() {
       <article className="card letter-read">
         <p className="letter-read-body">{letter.body}</p>
         <div className="saved-footer">
-          <span className="hint">Sealed until {formatLongDay(letter.unlockDate)}</span>
+          <span className="hint">
+            {sealTypeOf(letter) === 'milestone'
+              ? `Sealed until: ${letter.milestone ?? ''}`
+              : `Sealed until ${formatLongDay(letter.unlockDate)}`}
+          </span>
           <button type="button" className="btn-danger-outline" onClick={() => setConfirming(true)}>
             Delete
           </button>

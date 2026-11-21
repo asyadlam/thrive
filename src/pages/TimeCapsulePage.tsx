@@ -3,14 +3,17 @@ import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { LetterIcon } from '../components/icons';
+import MilestoneOpenButton from '../components/MilestoneOpenButton';
 import { formatLongDay, formatShortDay, todayKey } from '../lib/journal';
 import {
   LETTER_TITLE_MAX,
+  MILESTONE_MAX,
   deleteLetter,
   listLetterSummaries,
   sealLetter,
   tomorrowKey,
   type LetterSummary,
+  type SealType,
 } from '../lib/letters';
 
 type Status = 'loading' | 'ready' | 'error';
@@ -23,7 +26,9 @@ export default function TimeCapsulePage() {
   const [writing, setWriting] = useState(false);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [sealType, setSealType] = useState<SealType>('date');
   const [unlockDate, setUnlockDate] = useState('');
+  const [milestone, setMilestone] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -49,21 +54,33 @@ export default function TimeCapsulePage() {
     setWriting(false);
     setTitle('');
     setBody('');
+    setSealType('date');
     setUnlockDate('');
+    setMilestone('');
     setError(null);
   }
 
   async function handleSeal(e: FormEvent) {
     e.preventDefault();
     if (!body.trim()) return setError('Write a few words to your future self first.');
-    if (!unlockDate) return setError('Pick the day this letter should open.');
-    if (unlockDate < minDate) return setError('Pick a day after today.');
+    if (sealType === 'date') {
+      if (!unlockDate) return setError('Pick the day this letter should open.');
+      if (unlockDate < minDate) return setError('Pick a day after today.');
+    } else if (!milestone.trim()) {
+      return setError("Write what you're waiting for, so you'll know when to open it.");
+    }
     setSaving(true);
     setError(null);
     try {
-      const letter = await sealLetter({ title, body, unlockDate });
+      const letter = await sealLetter(
+        sealType === 'date' ? { title, body, sealType, unlockDate } : { title, body, sealType, milestone },
+      );
       resetForm();
-      setMessage(`Sealed. It opens on ${formatLongDay(letter.unlockDate)}.`);
+      setMessage(
+        letter.sealType === 'milestone'
+          ? `Sealed. It opens when: ${letter.milestone}`
+          : `Sealed. It opens on ${formatLongDay(letter.unlockDate)}.`,
+      );
       await refresh();
     } catch {
       setError("Couldn't seal this letter. Please try again.");
@@ -118,21 +135,65 @@ export default function TimeCapsulePage() {
               }}
             />
           </div>
-          <div className="field">
-            <label htmlFor="letter-date">Opens on</label>
-            <input
-              id="letter-date"
-              type="date"
-              className="input letter-date-input"
-              value={unlockDate}
-              min={minDate}
-              onChange={(e) => {
-                setUnlockDate(e.target.value);
-                if (error) setError(null);
-              }}
-            />
-            <p className="hint">Once sealed, you won't be able to read or change it until then.</p>
-          </div>
+          <fieldset className="field">
+            <legend>How should it open?</legend>
+            <div className="seal-options">
+              {(
+                [
+                  ['date', 'Open on a date'],
+                  ['milestone', 'Open when something happens'],
+                ] as const
+              ).map(([value, label]) => (
+                <label key={value} className="seal-option">
+                  <input
+                    type="radio"
+                    name="seal-type"
+                    value={value}
+                    checked={sealType === value}
+                    onChange={() => {
+                      setSealType(value);
+                      setError(null);
+                    }}
+                  />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {sealType === 'date' ? (
+            <div className="field">
+              <label htmlFor="letter-date">Opens on</label>
+              <input
+                id="letter-date"
+                type="date"
+                className="input letter-date-input"
+                value={unlockDate}
+                min={minDate}
+                onChange={(e) => {
+                  setUnlockDate(e.target.value);
+                  if (error) setError(null);
+                }}
+              />
+              <p className="hint">Once sealed, you won't be able to read or change it until then.</p>
+            </div>
+          ) : (
+            <div className="field">
+              <label htmlFor="letter-milestone">What are you waiting for?</label>
+              <input
+                id="letter-milestone"
+                type="text"
+                className="input"
+                value={milestone}
+                maxLength={MILESTONE_MAX}
+                placeholder="e.g. I got my first job."
+                onChange={(e) => {
+                  setMilestone(e.target.value);
+                  if (error) setError(null);
+                }}
+              />
+              <p className="hint">It stays sealed until you say this has happened. There's no rush.</p>
+            </div>
+          )}
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -177,7 +238,9 @@ export default function TimeCapsulePage() {
         <ul className="letter-list">
           {letters.map((l) => {
             const statusLine = !l.ready
-              ? `Opens on ${formatLongDay(l.unlockDate)}`
+              ? l.sealType === 'milestone'
+                ? `Opens when: ${l.milestone}`
+                : `Opens on ${formatLongDay(l.unlockDate)}`
               : l.openedAt
                 ? `Opened ${formatShortDay(todayKey(new Date(l.openedAt)))}`
                 : 'Ready to open';
@@ -189,6 +252,7 @@ export default function TimeCapsulePage() {
                 <span className="letter-text">
                   <span className={`letter-title${l.title ? '' : ' untitled'}`}>{letterTitle(l)}</span>
                   <span className={`letter-status${l.ready && !l.openedAt ? ' ready' : ''}`}>{statusLine}</span>
+                  {!l.ready && l.sealType === 'milestone' && <MilestoneOpenButton id={l.id} milestone={l.milestone} />}
                 </span>
               </>
             );
