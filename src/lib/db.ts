@@ -1,11 +1,13 @@
 // Minimal promise wrapper around IndexedDB (no extra dependencies).
 const DB_NAME = 'thrive';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 /** All journal entries (quick and talk) live in this one store, keyed by `id`. */
 export const JOURNAL_STORE = 'journal';
 /** Index over [type, date] so we can ask for e.g. all "talk" entries on a given day. */
 export const TYPE_DATE_INDEX = 'type_date';
+/** Goals (added in version 3), keyed by `id`. */
+export const GOALS_STORE = 'goals';
 /** Version 1 kept quick entries in "entries", keyed by date. */
 const LEGACY_ENTRIES_STORE = 'entries';
 
@@ -25,6 +27,9 @@ function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(JOURNAL_STORE)) {
           const store = db.createObjectStore(JOURNAL_STORE, { keyPath: 'id' });
           store.createIndex(TYPE_DATE_INDEX, ['type', 'date']);
+        }
+        if (!db.objectStoreNames.contains(GOALS_STORE)) {
+          db.createObjectStore(GOALS_STORE, { keyPath: 'id' });
         }
         // Move quick entries saved by version 1 into the new store, then drop the old one.
         if (event.oldVersion < 2 && db.objectStoreNames.contains(LEGACY_ENTRIES_STORE)) {
@@ -92,6 +97,25 @@ export function idbReplaceAll<T>(storeName: string, values: T[]): Promise<void> 
         const store = tx.objectStore(storeName);
         store.clear();
         for (const v of values) store.put(v);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
+        tx.onabort = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
+      }),
+  );
+}
+
+/** Replace the contents of several stores in ONE transaction: all succeed, or nothing changes. */
+export function idbReplaceStores(contents: Record<string, unknown[]>): Promise<void> {
+  const names = Object.keys(contents);
+  return openDb().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(names, 'readwrite');
+        for (const name of names) {
+          const store = tx.objectStore(name);
+          store.clear();
+          for (const v of contents[name]) store.put(v);
+        }
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
         tx.onabort = () => reject(tx.error ?? new Error('Restoring was interrupted.'));

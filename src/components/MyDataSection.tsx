@@ -13,6 +13,7 @@ import {
 } from '../lib/backup';
 import { formatLongDay, listAllEntries, todayKey } from '../lib/journal';
 import { getLastBackupAt, setLastBackupAt } from '../lib/settings';
+import { listAllGoals } from '../lib/goals';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -22,7 +23,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   const [lastBackupAt, setLastBackup] = useState(getLastBackupAt);
   const [busy, setBusy] = useState<'backup' | 'readable' | 'reading' | 'restoring' | null>(null);
   const [message, setMessage] = useState<Message>(null);
-  const [pending, setPending] = useState<(CheckedBackup & { currentCount: number }) | null>(null);
+  const [pending, setPending] = useState<(CheckedBackup & { currentCount: number; currentGoals: number }) | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const overdue = lastBackupAt !== null && Date.now() - Date.parse(lastBackupAt) > 30 * DAY_MS;
@@ -65,8 +66,8 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('reading');
     setMessage(null);
     try {
-      const [checked, current] = await Promise.all([readBackupFile(file), listAllEntries()]);
-      setPending({ ...checked, currentCount: current.length });
+      const [checked, current, goals] = await Promise.all([readBackupFile(file), listAllEntries(), listAllGoals()]);
+      setPending({ ...checked, currentCount: current.length, currentGoals: goals.length });
     } catch (err) {
       setMessage({
         kind: 'error',
@@ -85,7 +86,8 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
       await applyBackup(pending);
       const total = pending.entries.length;
       setPending(null);
-      setMessage({ kind: 'ok', text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'} and your settings.` });
+      const goalsText = pending.goals ? `, ${pending.goals.length} ${pending.goals.length === 1 ? 'goal' : 'goals'}` : '';
+      setMessage({ kind: 'ok', text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${goalsText} and your settings.` });
       onRestored();
     } catch {
       setPending(null);
@@ -96,6 +98,16 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   }
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+  function restoreMessage(b: CheckedBackup & { currentCount: number; currentGoals: number }) {
+    const has = [plural(b.quickCount, 'quick entry', 'quick entries'), plural(b.talkCount, 'journal page', 'journal pages')];
+    if (b.goals) has.push(plural(b.goals.length, 'goal', 'goals'));
+    const saved = b.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(b.exportedAt)))}` : '';
+    const replaced = [plural(b.currentCount, 'entry', 'entries')];
+    if (b.goals) replaced.push(plural(b.currentGoals, 'goal', 'goals'));
+    const goalsNote = b.goals ? '' : " This older backup has no goals, so your current goals will stay as they are.";
+    return `This backup has ${has.join(', ')}${saved}. Restoring will replace everything currently in Thrive on this device — ${replaced.join(', ')} and your settings.${goalsNote} This can't be undone, so download a backup of what's here first if you might want it.`;
+  }
 
   return (
     <section className="card settings-section" aria-labelledby="my-data-heading">
@@ -139,15 +151,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
       {pending && (
         <ConfirmDialog
           title="Replace everything with this backup?"
-          message={`This backup has ${plural(pending.quickCount, 'quick entry', 'quick entries')} and ${plural(
-            pending.talkCount,
-            'journal page',
-            'journal pages',
-          )}${pending.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(pending.exportedAt)))}` : ''}. Restoring will replace everything currently in Thrive on this device — ${plural(
-            pending.currentCount,
-            'entry',
-            'entries',
-          )} and your settings. This can't be undone, so download a backup of what's here first if you might want it.`}
+          message={restoreMessage(pending)}
           confirmLabel="Replace everything"
           busy={busy === 'restoring'}
           busyLabel="Restoring…"

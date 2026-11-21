@@ -6,23 +6,26 @@ import {
   listAllEntries,
   newId,
   quickId,
-  replaceAllEntries,
   todayKey,
   withMetadata,
   type JournalEntry,
   type Mood,
 } from './journal';
 import { loadSettings, normalizeSettings, saveSettings, type AppSettings } from './settings';
+import { goalFromBackup, listAllGoals, type Goal } from './goals';
+import { GOALS_STORE, JOURNAL_STORE, idbReplaceStores } from './db';
 
-/* Backup file format (version 1):
-   { app: "thrive", kind: "backup", version: 1, exportedAt, settings, entries: [...] } */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 1 } as const;
+/* Backup file format:
+   version 1: { app: "thrive", kind: "backup", version: 1, exportedAt, settings, entries: [...] }
+   version 2: same, plus goals: [...] */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 2 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
   exportedAt: string;
   settings: AppSettings;
   entries: JournalEntry[];
+  goals: Goal[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -31,6 +34,7 @@ export async function buildBackup(): Promise<Backup> {
     exportedAt: new Date().toISOString(),
     settings: loadSettings(),
     entries: await listAllEntries(),
+    goals: await listAllGoals(),
   };
 }
 
@@ -87,6 +91,8 @@ export type CheckedBackup = {
   entries: JournalEntry[];
   quickCount: number;
   talkCount: number;
+  /** null = an older backup made before goals existed (current goals are kept). */
+  goals: Goal[] | null;
 };
 
 export async function readBackupFile(file: File): Promise<CheckedBackup> {
@@ -114,18 +120,34 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     if (!existing || existing.updatedAt < entry.updatedAt) byId.set(entry.id, entry);
   });
   const entries = [...byId.values()];
+
+  let goals: Goal[] | null = null;
+  if (d.goals !== undefined) {
+    if (!Array.isArray(d.goals)) throw new BackupError("This backup's goals list isn't valid.");
+    const goalsById = new Map<string, Goal>();
+    d.goals.forEach((raw, i) => {
+      const goal = goalFromBackup(raw);
+      if (!goal) throw new BackupError(`Goal ${i + 1} in this backup isn't valid (missing title).`);
+      const existing = goalsById.get(goal.id);
+      if (!existing || existing.updatedAt < goal.updatedAt) goalsById.set(goal.id, goal);
+    });
+    goals = [...goalsById.values()];
+  }
   return {
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
     settings: normalizeSettings(d.settings),
     entries,
     quickCount: entries.filter((e) => e.type === 'quick').length,
     talkCount: entries.filter((e) => e.type === 'talk').length,
+    goals,
   };
 }
 
-/** Replace everything in the app with a checked backup. Entries are swapped in one step. */
+/** Replace everything in the app with a checked backup. Entries (and goals) are swapped in one step. */
 export async function applyBackup(backup: CheckedBackup): Promise<void> {
-  await replaceAllEntries(backup.entries);
+  await idbReplaceStores(
+    backup.goals ? { [JOURNAL_STORE]: backup.entries, [GOALS_STORE]: backup.goals } : { [JOURNAL_STORE]: backup.entries },
+  );
   saveSettings(backup.settings);
 }
 
