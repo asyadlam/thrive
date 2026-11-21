@@ -596,3 +596,33 @@ textarea.input.goal-note-input { min-height: 64px; }
 .goals-completed[open] summary::before { transform: rotate(90deg); }
 .goals-completed summary:focus-visible { outline: 2px solid var(--green-500); border-radius: 8px; }
 .goals-completed .goal-list { margin-top: 6px; }
+
+/* ---------- Growth: positives ---------- */
+.remember-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  background: var(--green-50);
+  border-color: var(--green-100);
+}
+.remember-label { font-size: 0.8rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--green-700); }
+.remember-text { margin: 2px 0 0; font-size: 1.15rem; line-height: 1.4; overflow-wrap: anywhere; }
+.remember-empty { margin: 2px 0 0; color: var(--ink-soft); }
+.remember-next { margin-top: 8px; }
+.positives-add { margin: 16px 0 12px; }
+.positive-form { display: flex; flex-direction: column; gap: 10px; }
+.positive-form label { font-weight: 650; }
+.positive-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.positive-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: 14px;
+}
+.positive-text { overflow-wrap: anywhere; min-width: 0; }
+.positive-date { flex-shrink: 0; font-size: 0.8rem; color: var(--ink-soft); }

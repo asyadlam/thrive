@@ -13,12 +13,14 @@ import {
 } from './journal';
 import { loadSettings, normalizeSettings, saveSettings, type AppSettings } from './settings';
 import { goalFromBackup, listAllGoals, type Goal } from './goals';
-import { GOALS_STORE, JOURNAL_STORE, idbReplaceStores } from './db';
+import { GOALS_STORE, JOURNAL_STORE, POSITIVES_STORE, idbReplaceStores } from './db';
+import { listStandalonePositives, positiveFromBackup, type StandalonePositive } from './positives';
 
 /* Backup file format:
    version 1: { app: "thrive", kind: "backup", version: 1, exportedAt, settings, entries: [...] }
-   version 2: same, plus goals: [...] */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 2 } as const;
+   version 2: same, plus goals: [...]
+   version 3: same, plus positives: [...] (positives saved on their own) */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 3 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
@@ -26,6 +28,7 @@ export type Backup = typeof FORMAT & {
   settings: AppSettings;
   entries: JournalEntry[];
   goals: Goal[];
+  positives: StandalonePositive[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -35,6 +38,7 @@ export async function buildBackup(): Promise<Backup> {
     settings: loadSettings(),
     entries: await listAllEntries(),
     goals: await listAllGoals(),
+    positives: await listStandalonePositives(),
   };
 }
 
@@ -93,6 +97,8 @@ export type CheckedBackup = {
   talkCount: number;
   /** null = an older backup made before goals existed (current goals are kept). */
   goals: Goal[] | null;
+  /** null = an older backup made before standalone positives existed (current ones are kept). */
+  positives: StandalonePositive[] | null;
 };
 
 export async function readBackupFile(file: File): Promise<CheckedBackup> {
@@ -133,6 +139,19 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     });
     goals = [...goalsById.values()];
   }
+
+  let positives: StandalonePositive[] | null = null;
+  if (d.positives !== undefined) {
+    if (!Array.isArray(d.positives)) throw new BackupError("This backup's positives list isn't valid.");
+    const positivesById = new Map<string, StandalonePositive>();
+    d.positives.forEach((raw, i) => {
+      const positive = positiveFromBackup(raw);
+      if (!positive) throw new BackupError(`Positive ${i + 1} in this backup isn't valid (missing text or date).`);
+      const existing = positivesById.get(positive.id);
+      if (!existing || existing.updatedAt < positive.updatedAt) positivesById.set(positive.id, positive);
+    });
+    positives = [...positivesById.values()];
+  }
   return {
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
     settings: normalizeSettings(d.settings),
@@ -140,14 +159,16 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     quickCount: entries.filter((e) => e.type === 'quick').length,
     talkCount: entries.filter((e) => e.type === 'talk').length,
     goals,
+    positives,
   };
 }
 
-/** Replace everything in the app with a checked backup. Entries (and goals) are swapped in one step. */
+/** Replace everything in the app with a checked backup. Entries, goals and positives are swapped in one step. */
 export async function applyBackup(backup: CheckedBackup): Promise<void> {
-  await idbReplaceStores(
-    backup.goals ? { [JOURNAL_STORE]: backup.entries, [GOALS_STORE]: backup.goals } : { [JOURNAL_STORE]: backup.entries },
-  );
+  const stores: Record<string, unknown[]> = { [JOURNAL_STORE]: backup.entries };
+  if (backup.goals) stores[GOALS_STORE] = backup.goals;
+  if (backup.positives) stores[POSITIVES_STORE] = backup.positives;
+  await idbReplaceStores(stores);
   saveSettings(backup.settings);
 }
 
