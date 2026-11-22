@@ -33,6 +33,21 @@ export default defineConfig({
             handler: 'CacheFirst',
             options: { cacheName: 'thrive-pets', expiration: { maxEntries: 10 } },
           },
+          // The Nunito font (Google Fonts), so the app keeps its font offline.
+          {
+            urlPattern: ({ url }) => url.origin === 'https://fonts.googleapis.com',
+            handler: 'StaleWhileRevalidate',
+            options: { cacheName: 'thrive-font-css' },
+          },
+          {
+            urlPattern: ({ url }) => url.origin === 'https://fonts.gstatic.com',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'thrive-font-files',
+              expiration: { maxEntries: 20, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
     }),

@@ -110,84 +110,90 @@ export default function AffirmationsSection({ full = false }: { full?: boolean }
 
   return (
     <section className="affirmations" aria-labelledby="affirmations-heading" ref={sectionRef}>
-      <h2 id="affirmations-heading" className={full ? 'sr-only' : 'section-title'}>
-        Affirmations
-      </h2>
+      <div className="goals-header">
+        <h2 id="affirmations-heading" className={full ? 'sr-only' : 'section-title'}>
+          Affirmations
+        </h2>
+        <div className="section-actions">
+          {!full && (
+            <button
+              type="button"
+              className="btn-secondary btn-small"
+              onClick={() => setShown((cur) => pickRandom(pool(mine), cur.key))}
+            >
+              Another one
+            </button>
+          )}
+          {!adding && (
+            <button
+              type="button"
+              className="btn-secondary btn-small"
+              onClick={() => {
+                setMessage('');
+                setAdding(true);
+              }}
+            >
+              + Add your own
+            </button>
+          )}
+        </div>
+      </div>
+
+      <p className="save-status" role="status">
+        {message}
+      </p>
 
       {!full && (
-      <div className="card affirmation-card">
-        <div className={`crossfade${fade.faded ? ' faded' : ''}`}>
-          <p className="affirmation-text" aria-live="polite">
-            {fade.shown.text}
-          </p>
-          {fade.shown.mine && <span className="affirmation-mine">One of yours</span>}
+        <div className="card affirmation-card">
+          <div className={`crossfade${fade.faded ? ' faded' : ''}`}>
+            <p className="affirmation-text" aria-live="polite">
+              {fade.shown.text}
+            </p>
+            {fade.shown.mine && <span className="affirmation-mine">One of yours</span>}
+          </div>
         </div>
-        <button
-          type="button"
-          className="btn-secondary btn-small"
-          onClick={() => setShown((cur) => pickRandom(pool(mine), cur.key))}
-        >
-          Another one
-        </button>
-      </div>
       )}
 
-      <div className="affirmations-add">
-        {adding ? (
-          <form className="card positive-form" onSubmit={handleAdd} noValidate>
-            <label htmlFor="new-affirmation">Your affirmation</label>
-            <input
-              id="new-affirmation"
-              type="text"
-              className="input"
-              value={text}
-              maxLength={AFFIRMATION_MAX}
-              placeholder="e.g. I'm learning, and that's enough for today."
-              autoFocus
-              onChange={(e) => {
-                setText(e.target.value);
-                if (error) setError(null);
-              }}
-            />
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="form-actions">
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : 'Save affirmation'}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={saving}
-                onClick={() => {
-                  setAdding(false);
-                  setText('');
-                  setError(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
-          <button
-            type="button"
-            className="btn-secondary"
-            onClick={() => {
-              setMessage('');
-              setAdding(true);
+      {adding && (
+        <form className="card positive-form" onSubmit={handleAdd} noValidate>
+          <label htmlFor="new-affirmation">Your affirmation</label>
+          <input
+            id="new-affirmation"
+            type="text"
+            className="input"
+            value={text}
+            maxLength={AFFIRMATION_MAX}
+            placeholder="e.g. I'm learning, and that's enough for today."
+            autoFocus
+            onChange={(e) => {
+              setText(e.target.value);
+              if (error) setError(null);
             }}
-          >
-            + Add your own
-          </button>
-        )}
-        <p className="save-status" role="status">
-          {message}
-        </p>
-      </div>
+          />
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="form-actions">
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Saving…' : 'Save affirmation'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={saving}
+              onClick={() => {
+                setAdding(false);
+                setText('');
+                setError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
 
       {loadFailed && (
         <p className="form-error" role="alert">

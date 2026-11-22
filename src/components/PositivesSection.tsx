@@ -83,81 +83,14 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
 
   return (
     <section className="positives" aria-labelledby="positives-heading" ref={sectionRef}>
-      <h2 id="positives-heading" className={full ? 'sr-only' : 'section-title'}>
-        Positives
-      </h2>
-
-      {!full && (
-      <div className="card remember-card" aria-live="polite">
-        <span className="remember-label">A positive to remember</span>
-        {status === 'loading' ? (
-          <p className="hint">Loading…</p>
-        ) : featured ? (
-          <>
-            <div className={`crossfade${fade.faded ? ' faded' : ''}`}>
-              <p className="remember-text">{(fade.shown ?? featured).text}</p>
-              <span className="hint">{positiveDate((fade.shown ?? featured).date)}</span>
-            </div>
-            {items.length > 1 && (
-              <button
-                type="button"
-                className="btn-secondary btn-small remember-next"
-                onClick={() => setFeatured((cur) => pickRandom(items, cur?.key))}
-              >
-                Show me another
-              </button>
-            )}
-          </>
-        ) : (
-          <p className="remember-empty">Your good moments will collect here.</p>
-        )}
-      </div>
-      )}
-
-      <div className="positives-add">
-        {adding ? (
-          <form className="card positive-form" onSubmit={handleAdd} noValidate>
-            <label htmlFor="new-positive">A good moment</label>
-            <input
-              id="new-positive"
-              type="text"
-              className="input"
-              value={text}
-              maxLength={POSITIVE_MAX}
-              placeholder="e.g. The sun came out on my walk"
-              autoFocus
-              onChange={(e) => {
-                setText(e.target.value);
-                if (error) setError(null);
-              }}
-            />
-            {error && (
-              <p className="form-error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="form-actions">
-              <button type="submit" className="btn-primary" disabled={saving}>
-                {saving ? 'Saving…' : 'Save positive'}
-              </button>
-              <button
-                type="button"
-                className="btn-secondary"
-                disabled={saving}
-                onClick={() => {
-                  setAdding(false);
-                  setText('');
-                  setError(null);
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        ) : (
+      <div className="goals-header">
+        <h2 id="positives-heading" className={full ? 'sr-only' : 'section-title'}>
+          Positives
+        </h2>
+        {!adding && (
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary btn-small"
             onClick={() => {
               setMessage('');
               setAdding(true);
@@ -166,10 +99,79 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
             + Add a positive
           </button>
         )}
-        <p className="save-status" role="status">
-          {message}
-        </p>
       </div>
+
+      <p className="save-status" role="status">
+        {message}
+      </p>
+
+      {!full && (
+        <div className="card remember-card" aria-live="polite">
+          <span className="remember-label">A positive to remember</span>
+          {status === 'loading' ? (
+            <p className="hint">Loading…</p>
+          ) : featured ? (
+            <>
+              <div className={`crossfade${fade.faded ? ' faded' : ''}`}>
+                <p className="remember-text">{(fade.shown ?? featured).text}</p>
+                <span className="hint">{positiveDate((fade.shown ?? featured).date)}</span>
+              </div>
+              {items.length > 1 && (
+                <button
+                  type="button"
+                  className="btn-secondary btn-small remember-next"
+                  onClick={() => setFeatured((cur) => pickRandom(items, cur?.key))}
+                >
+                  Show me another
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="remember-empty">Your good moments will collect here.</p>
+          )}
+        </div>
+      )}
+
+      {adding && (
+        <form className="card positive-form" onSubmit={handleAdd} noValidate>
+          <label htmlFor="new-positive">A good moment</label>
+          <input
+            id="new-positive"
+            type="text"
+            className="input"
+            value={text}
+            maxLength={POSITIVE_MAX}
+            placeholder="e.g. The sun came out on my walk"
+            autoFocus
+            onChange={(e) => {
+              setText(e.target.value);
+              if (error) setError(null);
+            }}
+          />
+          {error && (
+            <p className="form-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div className="form-actions">
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? 'Saving…' : 'Save positive'}
+            </button>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={saving}
+              onClick={() => {
+                setAdding(false);
+                setText('');
+                setError(null);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
 
       {status === 'error' && (
         <p className="form-error" role="alert">

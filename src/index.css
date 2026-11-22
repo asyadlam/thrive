@@ -8,15 +8,22 @@
   --cream: #FAF6EF;
   --sand: #F0E8DC;
   --stone: #E8DCC8;
-  --ink: #3D3A35;
-  --ink-soft: #7A736A;
+  --ink: #43523C; /* main text: deep sage green */
+  --ink-soft: #7A8A72; /* secondary text and labels: muted sage */
+  --ink-faint: #93A58A; /* lightest sage: arrows, quiet details */
+  --tint-sage: #E4EDDC; /* highlight / summary cards */
+  --tint-cream: #F6F1E6; /* the remember-a-positive box */
+  --inset: #FAF6EF; /* rows and forms inside a white card */
+  --card-shadow: 0 6px 22px rgba(67, 82, 60, 0.06), 0 1px 3px rgba(67, 82, 60, 0.05);
+  --card-radius: 24px;
+  --row-radius: 18px;
   --help: #A9533D;
   --help-dark: #8E4433;
-  --radius: 18px;
+  --radius: 24px;
   --nav-h: 64px;
   --safe-b: env(safe-area-inset-bottom, 0px);
   --safe-t: env(safe-area-inset-top, 0px);
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Nunito', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; /* the only font in the app */
   color: var(--ink);
   background: var(--cream);
   -webkit-font-smoothing: antialiased;
@@ -24,6 +31,8 @@
 }
 
 * { box-sizing: border-box; }
+/* buttons and fields use the app font too (browsers give them their own by default) */
+button, input, textarea, select { font-family: inherit; }
 html, body, #root { margin: 0; min-height: 100%; }
 body { background: var(--cream); }
 
@@ -59,7 +68,7 @@ body { background: var(--cream); }
   border-radius: 999px;
   background: var(--help);
   color: #fff;
-  font-weight: 650;
+  font-weight: 700;
   font-size: 0.9rem;
   text-decoration: none;
   box-shadow: 0 2px 8px rgba(169, 83, 61, 0.25);
@@ -87,7 +96,7 @@ body { background: var(--cream); }
   padding: 8px 20px calc(var(--nav-h) + var(--safe-b) + 24px);
 }
 
-.page h1 { font-size: 1.75rem; margin: 8px 0 4px; font-weight: 650; }
+.page h1 { font-size: 1.75rem; margin: 8px 0 4px; font-weight: 700; }
 .subtitle { margin: 0 0 20px; color: var(--ink-soft); }
 
 .card {
@@ -137,7 +146,7 @@ body { background: var(--cream); }
 .nav-item:focus-visible { outline: 2px solid var(--green-500); outline-offset: -4px; border-radius: 12px; }
 
 /* ---------- Milestone 2: Journal entry + Home quick action ---------- */
-.section-title { font-size: 1rem; font-weight: 650; margin: 4px 0 12px; color: var(--ink); }
+.section-title { font-size: 1rem; font-weight: 700; margin: 4px 0 12px; color: var(--ink); }
 
 .quick-action {
   display: flex;
@@ -166,7 +175,7 @@ body { background: var(--cream); }
 
 .entry-form { display: flex; flex-direction: column; gap: 22px; }
 .field { border: 0; margin: 0; padding: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
-.field legend, .field > label { font-weight: 650; padding: 0; margin-bottom: 2px; }
+.field legend, .field > label { font-weight: 700; padding: 0; margin-bottom: 2px; }
 .hint { margin: 0; color: var(--ink-soft); font-size: 0.85rem; }
 
 .input {
@@ -242,9 +251,9 @@ textarea.input { resize: vertical; min-height: 110px; line-height: 1.45; }
 .saved-block { display: flex; flex-direction: column; gap: 4px; }
 .saved-block p, .saved-block ul { margin: 0; }
 .saved-block ul { padding-left: 20px; }
-.saved-label { font-size: 0.8rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
+.saved-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
 .saved-note { white-space: pre-wrap; overflow-wrap: anywhere; }
-.mood-pill { background: var(--green-100); color: var(--green-700); font-weight: 650; padding: 6px 14px; border-radius: 999px; }
+.mood-pill { background: var(--green-100); color: var(--green-700); font-weight: 700; padding: 6px 14px; border-radius: 999px; }
 .saved-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid var(--sand); padding-top: 14px; }
 
 /* ---------- Journal: entry choice + "Need to talk about it" ---------- */
@@ -348,7 +357,7 @@ textarea.input.talk-body {
 
 .calendar { padding: 14px 12px 12px; }
 .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
-.calendar-title { font-size: 1.05rem; font-weight: 650; margin: 0; }
+.calendar-title { font-size: 1.05rem; font-weight: 700; margin: 0; }
 .month-nav {
   width: 44px;
   height: 44px;
@@ -396,7 +405,7 @@ textarea.input.talk-body {
 .day-hint { text-align: center; padding: 8px 0; }
 .entry-item-main { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
 .mood-pill.small { padding: 3px 10px; font-size: 0.85rem; }
-.untitled { font-style: italic; color: var(--ink-soft); }
+.untitled { color: var(--ink-soft); }
 
 .talk-view-title { font-size: 1.15rem; margin: 0; }
 .talk-view-body { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
@@ -483,7 +492,7 @@ textarea.input.talk-body {
 }
 .pet-companion-name {
   font-size: 0.8rem;
-  font-weight: 650;
+  font-weight: 700;
   color: var(--green-700);
   background: var(--green-100);
   padding: 2px 10px;
@@ -587,7 +596,7 @@ textarea.input.goal-note-input { min-height: 64px; }
 .goals-completed { margin-top: 20px; }
 .goals-completed summary {
   cursor: pointer;
-  font-weight: 650;
+  font-weight: 700;
   color: var(--ink-soft);
   min-height: 44px;
   display: flex;
@@ -609,13 +618,12 @@ textarea.input.goal-note-input { min-height: 64px; }
   background: var(--green-50);
   border-color: var(--green-100);
 }
-.remember-label { font-size: 0.8rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--green-700); }
+.remember-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--green-700); }
 .remember-text { margin: 2px 0 0; font-size: 1.15rem; line-height: 1.4; overflow-wrap: anywhere; }
 .remember-empty { margin: 2px 0 0; color: var(--ink-soft); }
-.remember-next { margin-top: 8px; }
-.positives-add { margin: 16px 0 var(--after-action); }
+.remember-next { margin-top: 4px; }
 .positive-form { display: flex; flex-direction: column; gap: 10px; }
-.positive-form label { font-weight: 650; }
+.positive-form label { font-weight: 700; }
 .positive-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .positive-item {
   display: flex;
@@ -738,12 +746,11 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
   margin: 0;
   font-size: 1.4rem;
   line-height: 1.4;
-  font-weight: 550;
+  font-weight: 600;
   color: var(--ink);
   overflow-wrap: anywhere;
 }
 .affirmation-mine { font-size: 0.8rem; font-weight: 600; color: var(--green-700); margin-top: -4px; }
-.affirmations-add { margin: 16px 0 var(--after-action); }
 .my-affirmations { margin-top: 8px; }
 .affirmation-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .affirmation-item {
@@ -779,7 +786,7 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .habit-card:hover { border-color: var(--green-300); }
 .habit-card:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
 .habit-row { display: flex; flex-direction: column; gap: 1px; }
-.habit-label { font-size: 0.75rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
+.habit-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); }
 .habit-value { overflow-wrap: anywhere; }
 .habit-old { color: var(--ink-soft); }
 .habit-swap {
@@ -878,10 +885,10 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .lesson-card-title { font-size: 1.05rem; }
 .lesson-card-desc { color: var(--ink-soft); font-size: 0.92rem; line-height: 1.4; }
 .lesson-card-meta { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--ink-soft); margin-top: 2px; }
-.lesson-read-mark { color: var(--green-700); font-weight: 650; background: var(--green-100); padding: 1px 8px; border-radius: 999px; }
+.lesson-read-mark { color: var(--green-700); font-weight: 700; background: var(--green-100); padding: 1px 8px; border-radius: 999px; }
 .learn-note { margin: 22px 4px 0; font-size: 0.85rem; color: var(--ink-soft); text-align: center; }
 .lesson-body { display: flex; flex-direction: column; gap: 18px; padding: 22px 20px; }
-.lesson-intro { margin: 0; font-size: 1.05rem; color: var(--ink-soft); font-style: italic; line-height: 1.5; }
+.lesson-intro { margin: 0; font-size: 1.05rem; color: var(--ink-soft); line-height: 1.5; }
 .lesson-section h2 { font-size: 1.05rem; margin: 0 0 6px; color: var(--green-700); }
 .lesson-section p { margin: 0 0 10px; line-height: 1.65; }
 .lesson-section p:last-child { margin-bottom: 0; }
@@ -937,10 +944,10 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .ladder-tried-date { font-size: 0.82rem; font-weight: 600; color: var(--green-700); }
 .ladder-reflection { margin: 0; padding: 8px 10px; background: var(--cream); border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.92rem; }
 .ladder-reflect { margin-left: 40px; display: flex; flex-direction: column; gap: 8px; }
-.ladder-reflect label { font-weight: 650; }
+.ladder-reflect label { font-weight: 700; }
 .ladder-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-left: 40px; }
 .ladder-actions .btn-link { padding: 6px 0; }
-.ladder-unmark { color: var(--ink-soft); font-weight: 500; }
+.ladder-unmark { color: var(--ink-soft); font-weight: 400; }
 .ladder-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .ladder-icon {
   min-width: 36px;
@@ -964,7 +971,7 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .home-hero { display: flex; flex-direction: column; align-items: center; text-align: center; }
 .home-hero .pet-companion { margin: 0; gap: 8px; }
 .home-hero .pet-companion-img { height: 120px; }
-.home-greeting { margin: 4px 0 0; font-size: 1.6rem; line-height: 1.25; font-weight: 650; overflow-wrap: anywhere; }
+.home-greeting { margin: 4px 0 0; font-size: 1.6rem; line-height: 1.25; font-weight: 700; overflow-wrap: anywhere; }
 .home-hero .pet-companion-greeting { margin: 0; color: var(--ink-soft); font-size: 1rem; }
 .home-checkin {
   display: flex;
@@ -1113,7 +1120,7 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
   box-shadow: 0 4px 14px rgba(61, 58, 53, 0.1);
   color: var(--ink);
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.3;
   text-align: left;
   overflow-wrap: break-word;
@@ -1178,3 +1185,133 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .my-affirmations .see-more { margin-top: 10px; }
 /* coming back from a list's own page lands on its section, clear of the sticky header */
 .goals, .habits, .lists, .journeys, .affirmations { scroll-margin-top: 76px; }
+
+/* =====================================================================================
+   ONE DESIGN LANGUAGE (matches Home)
+   Nunito everywhere · white 24px cards with a soft shadow on cream · sage pills for the main
+   action, small sage text links for everything secondary · terracotta only for Get Help.
+   These rules come last on purpose: they restyle the pieces above without touching layout.
+   ===================================================================================== */
+
+/* ---- Page frame: same 16px side padding everywhere ---- */
+.app-header { padding-left: 16px; padding-right: 16px; }
+.app-main { padding-left: 16px; padding-right: 16px; }
+.home { padding-left: 4px; padding-right: 4px; } /* Home keeps exactly the width it had */
+.brand { font-weight: 800; }
+
+/* ---- Type: hierarchy from size, weight and colour only ---- */
+.page h1 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.2; }
+.section-title { font-size: 1.1rem; font-weight: 700; color: var(--ink); }
+.settings-heading { font-size: 1.1rem; font-weight: 700; }
+.calendar-title { font-weight: 700; }
+.lesson-section h2 { font-weight: 700; }
+.dialog h2 { font-weight: 700; }
+:is(.saved-label, .habit-label, .remember-label, .habit-swap .habit-label) {
+  font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft);
+}
+.quick-action-arrow { color: var(--ink-faint); }
+/* Quoted words (affirmations, positives, letters) are the one place italic is used */
+:is(.affirmation-text, .affirmation-item-text, .remember-text, .positive-text, .letter-read-body) { font-style: italic; }
+
+/* ---- Cards: white, 24px corners, soft shadow, no border ---- */
+.card,
+.dialog,
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives) {
+  background: #fff;
+  border: 0;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+}
+.card { padding: 16px; }
+.dialog { padding: 20px; }
+.dialog-backdrop { background: rgba(67, 82, 60, 0.4); }
+
+/* Every section on Growth / My Life (and their See-more pages) is its own card */
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives) { padding: 16px; margin: 0; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives) + :is(.goals, .habits, .lists, .journeys, .affirmations, .positives) {
+  margin-top: 12px;
+}
+
+/* Inside a section card, rows and forms sit on a soft cream inset instead of being cards again */
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives) :is(.card, .goal-item, .habit-card, .list-link, .positive-item, .affirmation-item) {
+  background: var(--inset);
+  border: 0;
+  border-radius: var(--row-radius);
+  box-shadow: none;
+}
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives) :is(.goal-item, .habit-card, .list-link):hover { background: #F4EEE3; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives) .input { background: #fff; }
+
+/* Rows that stand on their own on a page (Journal, Look back, Time Capsule, a list, a journey) */
+:is(.talk-list-item, .letter-row, .list-item, .ladder-step) {
+  background: #fff;
+  border: 0;
+  border-radius: var(--row-radius);
+  box-shadow: var(--card-shadow);
+}
+:is(.talk-list, .letter-list, .list-items, .ladder) { gap: 12px; }
+:is(.choice-card, .lesson-card, .quick-action):hover { box-shadow: 0 8px 26px rgba(67, 82, 60, 0.09), 0 1px 3px rgba(67, 82, 60, 0.06); }
+:is(.letter-delete, .list-item-delete) { border-left-color: var(--inset); }
+.saved-footer, .goal-extra-actions { border-top-color: var(--inset); }
+
+/* Empty / "nothing here yet" cards: a quiet cream panel */
+.placeholder { background: var(--tint-cream); border: 0; box-shadow: none; color: var(--ink-soft); padding: 32px 16px; }
+.card.form-error { box-shadow: none; }
+
+/* Highlight cards */
+.remember-card { background: var(--tint-cream) !important; } /* keeps its cream tint */
+.affirmation-card { background: var(--tint-sage) !important; padding: 20px 16px; }
+.journey-pace, .habit-swap { background: var(--tint-sage); }
+.remember-label { color: var(--ink-soft); }
+
+/* Inputs and choice chips: soft rounded fields */
+.input { border-color: #E9E2D3; border-radius: 14px; }
+.input::placeholder { color: var(--ink-faint); }
+.mood-chip span, .seal-option span, .pet-option-card { border-color: #E9E2D3; }
+
+/* ---- Buttons ---- */
+/* Main action: the sage pill, like Quick check-in */
+.btn-primary { background: var(--green-700); box-shadow: 0 6px 16px rgba(74, 115, 86, 0.2); }
+.btn-primary:hover:not(:disabled) { background: #3F6449; }
+/* Everything secondary: a small sage text link */
+.btn-secondary,
+.see-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 44px; /* still an easy tap target */
+  padding: 0 6px;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: none;
+  color: var(--green-700);
+  font: inherit;
+  font-size: 0.92rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn-secondary:hover:not(:disabled), .see-more:hover { color: #3F6449; text-decoration: underline; text-underline-offset: 3px; }
+.btn-secondary:disabled { opacity: 0.5; cursor: default; }
+.btn-small { min-height: 44px; }
+.see-more { display: flex; margin: 8px auto 0; width: fit-content; }
+.see-more + .see-more { margin-top: 0; }
+.my-affirmations .see-more { margin-top: 4px; }
+.btn-link { font-weight: 700; }
+
+/* Section action links sit on the title row, right-aligned */
+.goals-header { flex-wrap: wrap; row-gap: 0; margin-bottom: 12px; }
+.goals-header .section-title { margin-right: auto; }
+.section-actions { display: flex; align-items: center; gap: 0; margin-left: auto; }
+.goals-header > .btn-secondary { margin-left: auto; } /* right-aligned even when the title is hidden (See-more pages) */
+.goals-header :is(.btn-secondary) { padding: 0 5px; font-size: 0.9rem; white-space: nowrap; }
+.goals-header > :is(.btn-secondary, .section-actions) { margin-right: -5px; } /* text lines up with the card edge */
+.goals-header + .habits-hint { margin-top: -10px; }
+.habits-hint { margin-bottom: 12px; }
+.affirmation-card + :is(.positive-form, .save-status), .remember-card + .positive-form { margin-top: 12px; }
+.positives .positive-list { margin-top: 0; }
+:is(.remember-card, .positive-form, .form-error) ~ .positive-list { margin-top: 12px; }
+.my-affirmations { margin-top: 12px; }
+.remember-card .btn-secondary { margin-left: -6px; }
