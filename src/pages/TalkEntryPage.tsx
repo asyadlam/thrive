@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { LIMITS, formatDay, formatTime, getTalkEntry, saveTalkEntry, todayKey, type TalkEntry } from '../lib/journal';
+import DictationButton from '../components/DictationButton';
 
 type Status = 'loading' | 'ready' | 'not-found' | 'error';
 
@@ -107,6 +108,15 @@ export default function TalkEntryPage() {
             <label htmlFor="talk-body" className="sr-only">
               What's on your mind
             </label>
+            <DictationButton
+              value={body}
+              onChange={(next) => {
+                setBody(next);
+                setJustSaved(false);
+                if (error) setError(null);
+              }}
+              label="what's on your mind"
+            />
             <textarea
               id="talk-body"
               className="input talk-body"

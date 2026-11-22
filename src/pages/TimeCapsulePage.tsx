@@ -16,6 +16,7 @@ import {
   type SealType,
 } from '../lib/letters';
 import EmptyState from '../components/EmptyState';
+import DictationButton from '../components/DictationButton';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -124,7 +125,16 @@ export default function TimeCapsulePage() {
             />
           </div>
           <div className="field">
-            <label htmlFor="letter-body">Your letter</label>
+            <DictationButton
+              value={body}
+              onChange={(next) => {
+                setBody(next);
+                if (error) setError(null);
+              }}
+              label="your letter"
+            >
+              <label htmlFor="letter-body">Your letter</label>
+            </DictationButton>
             <textarea
               id="letter-body"
               className="input letter-body-input"

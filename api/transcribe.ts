@@ -1,0 +1,200 @@
+/*
+  POST /api/transcribe — turns a short voice recording into text for Thrive's dictation.
+
+  The browser sends one audio file (multipart form field "file"). This function forwards it to the
+  transcription provider and returns { text }. Nothing is logged or stored here: not the API key,
+  not the audio, not the transcript. (There are deliberately no console.log calls in this file.)
+
+  Errors come back as { error: <code> } with a matching HTTP status, so the app can show a gentle message.
+*/
+
+/* ============================== PROVIDER CONFIG (the one place to change it) ==============================
+   Swap providers by changing these Vercel environment variables. No code change needed, as long as the
+   provider speaks the OpenAI-style  POST {BASE_URL}/audio/transcriptions  API (Groq, OpenAI, and others do).
+
+   TRANSCRIPTION_BASE_URL   default: https://api.groq.com/openai/v1
+   TRANSCRIPTION_MODEL      default: whisper-large-v3-turbo
+   TRANSCRIPTION_API_KEY    no default. Set it in Vercel → Project → Settings → Environment Variables.
+                            It is only ever read here, on the server, and never sent to the browser.
+
+   Optional:
+   ALLOWED_ORIGINS          extra sites allowed to call this, comma-separated (e.g. a custom domain:
+                            https://thrive.example.com). Your Vercel domains are allowed automatically.
+   UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN   (or KV_REST_API_URL / KV_REST_API_TOKEN)
+                            if set, the daily limit is counted in that Redis so it holds across all servers.
+   ========================================================================================================= */
+const env = (globalThis as unknown as { process: { env: Record<string, string | undefined> } }).process.env;
+
+function providerConfig() {
+  return {
+    baseUrl: (env.TRANSCRIPTION_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, ''),
+    model: env.TRANSCRIPTION_MODEL || 'whisper-large-v3-turbo',
+    apiKey: env.TRANSCRIPTION_API_KEY || '', // no default, on purpose
+  };
+}
+
+const DAILY_LIMIT = 30; // dictation requests per visitor IP per day (UTC)
+const MAX_BYTES = 4 * 1024 * 1024; // Vercel accepts request bodies up to ~4.5 MB; 5 minutes of speech is ~1.2 MB
+const PROVIDER_TIMEOUT_MS = 50_000;
+
+// ---------------------------------------------------------------------------------------------------------
+
+type ErrorCode =
+  | 'forbidden'
+  | 'daily_limit'
+  | 'bad_audio'
+  | 'too_large'
+  | 'not_configured'
+  | 'provider_busy'
+  | 'provider_error';
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  });
+}
+const fail = (error: ErrorCode, status: number) => json({ error }, status);
+
+/** Host part of a URL or bare host ("https://a.b/x" → "a.b"), or '' if it isn't one. */
+function hostOf(value: string | null | undefined): string {
+  if (!value) return '';
+  try {
+    return new URL(value.includes('://') ? value : `https://${value}`).host.toLowerCase();
+  } catch {
+    return '';
+  }
+}
+
+/** Only my own app may call this: the page's Origin (or Referer) must be this site or one of my Vercel domains. */
+function isFromMyApp(request: Request): boolean {
+  const from = hostOf(request.headers.get('origin')) || hostOf(request.headers.get('referer'));
+  if (!from) return false;
+  const allowed = new Set(
+    [
+      request.headers.get('host'), // the domain this function is being served on
+      env.VERCEL_PROJECT_PRODUCTION_URL, // Vercel's own system variables: production, branch and deployment domains
+      env.VERCEL_BRANCH_URL,
+      env.VERCEL_URL,
+      ...(env.ALLOWED_ORIGINS || '').split(','),
+    ]
+      .map((v) => hostOf(v?.trim()))
+      .filter(Boolean),
+  );
+  return allowed.has(from);
+}
+
+function visitorIp(request: Request): string {
+  const forwarded =
+    request.headers.get('x-vercel-forwarded-for') || request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip');
+  return forwarded?.split(',')[0].trim() || 'unknown';
+}
+
+/** The IP is only ever kept as a one-way hash, and only to count requests for today. */
+async function hashIp(ip: string, day: string): Promise<string> {
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`thrive-dictation:${day}:${ip}`));
+  return Array.from(new Uint8Array(bytes), (b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
+// Best-effort fallback when no Redis is configured: counts per running server instance.
+const memoryCounts = new Map<string, number>();
+
+/** Adds one to today's count for this visitor and returns the new count. */
+async function countRequest(key: string): Promise<number> {
+  const url = env.UPSTASH_REDIS_REST_URL || env.KV_REST_API_URL;
+  const token = env.UPSTASH_REDIS_REST_TOKEN || env.KV_REST_API_TOKEN;
+  if (url && token) {
+    try {
+      const res = await fetch(`${url.replace(/\/+$/, '')}/pipeline`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify([
+          ['INCR', key],
+          ['EXPIRE', key, '90000'], // a little over a day, then it's gone
+        ]),
+      });
+      if (res.ok) {
+        const out = (await res.json()) as Array<{ result?: number }>;
+        if (typeof out[0]?.result === 'number') return out[0].result;
+      }
+    } catch {
+      /* fall through to the in-memory count */
+    }
+  }
+  if (memoryCounts.size > 10_000) memoryCounts.clear(); // keep memory small
+  const next = (memoryCounts.get(key) ?? 0) + 1;
+  memoryCounts.set(key, next);
+  return next;
+}
+
+const EXTENSIONS: Record<string, string> = {
+  'audio/webm': 'webm',
+  'audio/ogg': 'ogg',
+  'audio/mp4': 'm4a',
+  'audio/x-m4a': 'm4a',
+  'audio/m4a': 'm4a',
+  'audio/aac': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/wav': 'wav',
+  'audio/x-wav': 'wav',
+  'video/webm': 'webm', // some browsers label audio-only recordings this way
+  'video/mp4': 'mp4',
+};
+
+export async function POST(request: Request): Promise<Response> {
+  // 1. Only my own app
+  if (!isFromMyApp(request)) return fail('forbidden', 403);
+
+  // 2. The provider must be set up
+  const provider = providerConfig();
+  if (!provider.apiKey) return fail('not_configured', 503);
+
+  // 3. A real, reasonably sized audio file
+  const declaredSize = Number(request.headers.get('content-length') || 0);
+  if (declaredSize > MAX_BYTES + 64 * 1024) return fail('too_large', 413);
+  let audio: File;
+  try {
+    const form = await request.formData();
+    const file = form.get('file');
+    if (!(file instanceof File) || file.size === 0) return fail('bad_audio', 400);
+    audio = file;
+  } catch {
+    return fail('bad_audio', 400);
+  }
+  if (audio.size > MAX_BYTES) return fail('too_large', 413);
+  const type = audio.type.split(';')[0].trim().toLowerCase();
+  const ext = EXTENSIONS[type];
+  if (!ext) return fail('bad_audio', 415);
+
+  // 4. At most DAILY_LIMIT per visitor per day
+  const day = new Date().toISOString().slice(0, 10);
+  const count = await countRequest(`dictation:${day}:${await hashIp(visitorIp(request), day)}`);
+  if (count > DAILY_LIMIT) return fail('daily_limit', 429);
+
+  // 5. Forward to the provider (the audio only passes through; it isn't saved)
+  const upstream = new FormData();
+  upstream.append('file', audio, `dictation.${ext}`);
+  upstream.append('model', provider.model);
+  upstream.append('response_format', 'json');
+  let res: Response;
+  try {
+    res = await fetch(`${provider.baseUrl}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${provider.apiKey}` },
+      body: upstream,
+      signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
+    });
+  } catch {
+    return fail('provider_error', 502);
+  }
+  if (res.status === 429) return fail('provider_busy', 503);
+  if (!res.ok) return fail('provider_error', 502);
+
+  try {
+    const data = (await res.json()) as { text?: unknown };
+    const text = typeof data.text === 'string' ? data.text.trim() : '';
+    return json({ text });
+  } catch {
+    return fail('provider_error', 502);
+  }
+}

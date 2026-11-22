@@ -1315,3 +1315,41 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 :is(.remember-card, .positive-form, .form-error) ~ .positive-list { margin-top: 12px; }
 .my-affirmations { margin-top: 12px; }
 .remember-card .btn-secondary { margin-left: -6px; }
+
+/* ---------- Dictation: a small mic under a text area ---------- */
+.dictation { display: flex; flex-wrap: wrap; align-items: center; column-gap: 10px; min-height: 44px; }
+.dictation > label { font-weight: 700; } /* the field's label shares the row with the mic */
+.dictation-status { margin: 0; min-width: 0; flex: 1; font-size: 0.88rem; color: var(--ink-soft); }
+.dictation > label + .dictation-status { text-align: right; }
+.dictation > label + .dictation-status:empty { flex: 1; }
+.dictation-recording { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+.dictation-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--help); animation: dictation-pulse 1.2s ease-in-out infinite; }
+@keyframes dictation-pulse { 50% { opacity: 0.35; } }
+.dictation-writing { color: var(--green-700); font-weight: 700; }
+.dictation-note { color: var(--ink-soft); }
+.dictation-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 44px;
+  height: 44px;
+  padding: 0 12px;
+  margin-left: auto;
+  border: 0;
+  border-radius: 999px;
+  background: var(--tint-sage);
+  color: var(--green-700);
+  font: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+.dictation-btn:hover:not(:disabled) { background: #D8E5CE; }
+.dictation-btn:disabled { opacity: 0.55; cursor: default; }
+.dictation-btn:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.dictation-stop { background: var(--green-700); color: #fff; padding: 0 16px; }
+.dictation-stop:hover { background: #3F6449 !important; }
+.dictation-stop-square { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
+@media (prefers-reduced-motion: reduce) { .dictation-dot { animation: none; } }

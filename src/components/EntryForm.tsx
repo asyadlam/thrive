@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { LIMITS, MAX_POSITIVES, MOODS, type Mood, type QuickDraft, type QuickEntry } from '../lib/journal';
+import DictationButton from './DictationButton';
 
 type Props = {
   initial?: QuickEntry;
@@ -83,7 +84,9 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
       </fieldset>
 
       <div className="field">
-        <label htmlFor="entry-note">Short note</label>
+        <DictationButton value={note} onChange={setNote} maxLength={LIMITS.note} label="your note">
+          <label htmlFor="entry-note">Short note</label>
+        </DictationButton>
         <textarea
           id="entry-note"
           className="input"
