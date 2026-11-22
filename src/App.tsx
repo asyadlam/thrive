@@ -13,7 +13,8 @@ import ListPage from './pages/ListPage';
 import LessonPage from './pages/LessonPage';
 import JourneyPage from './pages/JourneyPage';
 import Growth from './pages/Growth';
-import { AffirmationsPage, AllListsPage, GoalsPage, HabitsPage, JourneysPage, PositivesPage } from './pages/FullListPages';
+import { AllListsPage, JourneysPage, PositivesPage } from './pages/FullListPages';
+import AffirmationsPage from './pages/AffirmationsPage';
 import MyLife from './pages/MyLife';
 import Learn from './pages/Learn';
 import Settings from './pages/Settings';
@@ -35,12 +36,17 @@ export default function App() {
         <Route path="journal/time-capsule/:id" element={<LetterPage />} />
         <Route path="growth" element={<Growth />} />
         <Route path="growth/positives" element={<PositivesPage />} />
-        <Route path="growth/affirmations" element={<AffirmationsPage />} />
+        <Route path="affirmations" element={<AffirmationsPage />} />
+        {/* goals and habit swaps now live inside journeys */}
+        <Route path="growth/goals" element={<Navigate to="/growth" replace />} />
+        <Route path="growth/habits" element={<Navigate to="/growth" replace />} />
+        {/* old addresses from before goals/habits moved to Growth and affirmations moved to Home */}
+        <Route path="growth/affirmations" element={<Navigate to="/affirmations" replace />} />
         <Route path="growth/journeys" element={<JourneysPage />} />
         <Route path="growth/journeys/:id" element={<JourneyPage />} />
         <Route path="my-life" element={<MyLife />} />
-        <Route path="my-life/goals" element={<GoalsPage />} />
-        <Route path="my-life/habits" element={<HabitsPage />} />
+        <Route path="my-life/goals" element={<Navigate to="/growth" replace />} />
+        <Route path="my-life/habits" element={<Navigate to="/growth" replace />} />
         <Route path="my-life/lists" element={<AllListsPage />} />
         <Route path="my-life/lists/:id" element={<ListPage />} />
         <Route path="learn" element={<Learn />} />

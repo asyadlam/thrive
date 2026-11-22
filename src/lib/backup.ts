@@ -27,14 +27,33 @@ import {
   JOURNEYS_STORE,
   LISTS_STORE,
   LETTERS_STORE,
+  MEASUREMENTS_STORE,
   MEMORIES_STORE,
   POSITIVES_STORE,
+  ROUTINE_STORE,
+  WISHLIST_STORE,
+  BUCKETLIST_STORE,
   idbReplaceStores,
 } from './db';
+import {
+  bucketItemFromBackup,
+  listBucketList,
+  type BucketItem,
+  listMeasurementKinds,
+  listRoutine,
+  listWishlist,
+  measurementKindFromBackup,
+  routineItemFromBackup,
+  wishFromBackup,
+  type MeasurementKind,
+  type RoutineItem,
+  type WishItem,
+} from './profile';
 import { listMemories, memoryFromBackup, type MemoryNote } from './memory';
 import { habitFromBackup, listHabits, type Habit } from './habits';
 import { listFromBackup, listLists, type UserList } from './lists';
 import { journeyFromBackup, listJourneys, type Journey } from './journeys';
+import { foldIntoJourneys } from './journeyParts';
 import { affirmationFromBackup, listCustomAffirmations, type CustomAffirmation } from './affirmations';
 import { letterFromBackup, lettersForBackup, type BackupLetter, type Letter } from './letters';
 import { listStandalonePositives, positiveFromBackup, type StandalonePositive } from './positives';
@@ -49,8 +68,14 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
    version 7: same, plus habits: [...] (habit swaps from My Life)
    version 8: same, plus lists: [...] (each list holds its items)
    version 9: same, plus journeys: [...] (Fear & Confidence; each journey holds its ladder of steps)
-   version 10: same, plus memories: [...] (companion memory notes I approved) */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 10 } as const;
+   version 10: same, plus memories: [...] (companion memory notes I approved)
+   version 11: same, plus My Life profile: measurements: [...] (each kind holds its logged values), routine: [...], wishlist: [...]
+               (name, birthday and "about me" are in settings)
+   version 12: same, plus bucketlist: [...]
+   version 13: Growth journeys hold their goal and habit swaps: each journey is { ..., goal, steps, swaps }.
+               goals: [] and habits: [] stay in the file but are empty (older files' goals/habits are turned into
+               journeys on restore and merge — see journeyParts.ts) */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 13 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
@@ -65,6 +90,10 @@ export type Backup = typeof FORMAT & {
   lists: UserList[];
   journeys: Journey[];
   memories: MemoryNote[];
+  measurements: MeasurementKind[];
+  routine: RoutineItem[];
+  wishlist: WishItem[];
+  bucketlist: BucketItem[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -81,6 +110,16 @@ export async function buildBackup(): Promise<Backup> {
     lists: await listLists(),
     journeys: await listJourneys(),
     memories: await listMemories(),
+    measurements: await listMeasurementKinds(),
+    routine: await listRoutine(),
+    wishlist: await (async () => {
+      const { wanted, got } = await listWishlist();
+      return [...wanted, ...got];
+    })(),
+    bucketlist: await (async () => {
+      const { todo, done } = await listBucketList();
+      return [...todo, ...done];
+    })(),
   };
 }
 
@@ -173,11 +212,41 @@ export type CheckedBackup = {
   habits: Habit[] | null;
   /** null = an older backup made before lists existed (current lists are kept). */
   lists: UserList[] | null;
-  /** null = an older backup made before Fear & Confidence journeys existed (current ones are kept). */
+  /**
+   * Journeys, with any standalone goals and habit swaps from an older backup already turned into journeys.
+   * null = the backup has none of journeys, goals or habits (current journeys are kept).
+   */
   journeys: Journey[] | null;
+  /** True when an older backup had goals/habits but no journeys list: restoring keeps my current ladders too. */
+  keepCurrentJourneys: boolean;
   /** null = an older backup made before companion memory existed (current notes are kept). */
   memories: MemoryNote[] | null;
+  /** null = an older backup made before the My Life profile existed (current ones are kept). */
+  measurements: MeasurementKind[] | null;
+  routine: RoutineItem[] | null;
+  wishlist: WishItem[] | null;
+  /** null = an older backup made before the bucket list existed (current items are kept). */
+  bucketlist: BucketItem[] | null;
 };
+
+/** Reads one optional collection from a backup: null if the backup predates it; throws if it's malformed. */
+function readCollection<T extends { id: string; updatedAt: string }>(
+  raw: unknown,
+  fromBackup: (r: unknown) => T | null,
+  what: string,
+  one: string,
+): T[] | null {
+  if (raw === undefined) return null;
+  if (!Array.isArray(raw)) throw new BackupError(`This backup's ${what} isn't valid.`);
+  const byId = new Map<string, T>();
+  raw.forEach((r, i) => {
+    const item = fromBackup(r);
+    if (!item) throw new BackupError(`${one} ${i + 1} in this backup isn't valid.`);
+    const existing = byId.get(item.id);
+    if (!existing || existing.updatedAt < item.updatedAt) byId.set(item.id, item);
+  });
+  return [...byId.values()];
+}
 
 export async function readBackupFile(file: File): Promise<CheckedBackup> {
   if (file.size > MAX_FILE_BYTES) throw new BackupError('That file is too large to be a Thrive backup.');
@@ -205,7 +274,7 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
   });
   const entries = [...byId.values()];
 
-  let goals: Goal[] | null = null;
+  let goals: Goal[] | null = null; // folded into journeys below
   if (d.goals !== undefined) {
     if (!Array.isArray(d.goals)) throw new BackupError("This backup's goals list isn't valid.");
     const goalsById = new Map<string, Goal>();
@@ -285,7 +354,7 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
 
   let journeys: Journey[] | null = null;
   if (d.journeys !== undefined) {
-    if (!Array.isArray(d.journeys)) throw new BackupError("This backup's journeys aren't valid.");
+    if (!Array.isArray(d.journeys)) throw new BackupError("This backup's ladders aren't valid.");
     const journeysById = new Map<string, Journey>();
     d.journeys.forEach((raw, i) => {
       const journey = journeyFromBackup(raw);
@@ -308,7 +377,19 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     });
     memories = [...memoriesById.values()];
   }
+  const measurements = readCollection(d.measurements, measurementKindFromBackup, 'measurements', 'Measurement');
+  const routine = readCollection(d.routine, routineItemFromBackup, 'routine', 'Routine entry');
+  const wishlist = readCollection(d.wishlist, wishFromBackup, 'wishlist', 'Wishlist item');
+  const bucketlist = readCollection(d.bucketlist, bucketItemFromBackup, 'bucket list', 'Bucket list item');
+  // Goals and habit swaps now live inside journeys: fold any from this backup in (same ids as the device upgrade).
+  const folded =
+    journeys || goals || habits ? (foldIntoJourneys(journeys ?? [], goals ?? [], habits ?? []) as Journey[]) : null;
+  const keepCurrentJourneys = !journeys && !!(goals || habits);
+  goals = null;
+  habits = null;
+  journeys = folded;
   return {
+    keepCurrentJourneys,
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
     settings: normalizeSettings(d.settings),
     entries,
@@ -322,20 +403,36 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     lists,
     journeys,
     memories,
+    measurements,
+    routine,
+    wishlist,
+    bucketlist,
   };
 }
 
 /** Replace everything in the app with a checked backup. All journal data, goals, positives, letters, affirmations, habits, lists and journeys are swapped in one step. */
 export async function applyBackup(backup: CheckedBackup): Promise<void> {
   const stores: Record<string, unknown[]> = { [JOURNAL_STORE]: backup.entries };
-  if (backup.goals) stores[GOALS_STORE] = backup.goals;
   if (backup.positives) stores[POSITIVES_STORE] = backup.positives;
   if (backup.letters) stores[LETTERS_STORE] = backup.letters;
   if (backup.affirmations) stores[AFFIRMATIONS_STORE] = backup.affirmations;
-  if (backup.habits) stores[HABITS_STORE] = backup.habits;
   if (backup.lists) stores[LISTS_STORE] = backup.lists;
-  if (backup.journeys) stores[JOURNEYS_STORE] = backup.journeys;
+  if (backup.journeys) {
+    // Goals and habit swaps live inside journeys now; their old stores stay empty.
+    let journeys = backup.journeys;
+    if (backup.keepCurrentJourneys) {
+      const restored = new Set(journeys.map((j) => j.id));
+      journeys = [...journeys, ...(await listJourneys()).filter((j) => !restored.has(j.id))];
+    }
+    stores[JOURNEYS_STORE] = journeys;
+    stores[GOALS_STORE] = [];
+    stores[HABITS_STORE] = [];
+  }
   if (backup.memories) stores[MEMORIES_STORE] = backup.memories;
+  if (backup.measurements) stores[MEASUREMENTS_STORE] = backup.measurements;
+  if (backup.routine) stores[ROUTINE_STORE] = backup.routine;
+  if (backup.wishlist) stores[WISHLIST_STORE] = backup.wishlist;
+  if (backup.bucketlist) stores[BUCKETLIST_STORE] = backup.bucketlist;
   await idbReplaceStores(stores);
   saveSettings(backup.settings);
 }

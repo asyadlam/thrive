@@ -1,15 +1,49 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { HABIT_FIELD_MAX, type Habit, type HabitDraft } from '../lib/habits';
 
+/** Example hints for the three parts of the sentence. */
+export type SwapExamples = { trigger: string; oldHabit: string; newHabit: string };
+const PHONE_EXAMPLE: SwapExamples = {
+  trigger: 'e.g. I get into bed with my phone',
+  oldHabit: 'e.g. scroll until 1am',
+  newHabit: 'e.g. leave my phone charging in the kitchen and read two pages',
+};
+
+/** A saved swap, shown as the little plan it is: When… / usually… / Instead, I'll try… */
+export function SwapSentence({ trigger, oldHabit, newHabit }: { trigger: string; oldHabit: string; newHabit: string }) {
+  return (
+    <>
+      <span className="swap-line">
+        <span className="swap-word">When</span> {trigger}
+      </span>
+      {oldHabit && (
+        <span className="swap-line swap-usually">
+          <span className="swap-word">… I usually</span> {oldHabit}
+        </span>
+      )}
+      <span className="swap-line swap-instead">
+        <span className="swap-word">… Instead, I’ll try</span> {newHabit}
+      </span>
+    </>
+  );
+}
+
 type Props = {
   initial?: Habit;
+  /** The grey example hints (defaults to the phone example). */
+  examples?: SwapExamples;
   onSave: (draft: HabitDraft) => Promise<void>;
   onCancel: () => void;
   /** Extra button(s) shown when editing (Delete). */
   extraActions?: ReactNode;
 };
 
-export default function HabitForm({ initial, onSave, onCancel, extraActions }: Props) {
+/**
+ * A habit swap, written as one guided sentence:
+ * "When [the moment] … I usually [what I do now] … Instead, I'll try [one tiny swap]."
+ * (Saved in the same fields as before: trigger, oldHabit, newHabit.)
+ */
+export default function HabitForm({ initial, examples = PHONE_EXAMPLE, onSave, onCancel, extraActions }: Props) {
   const [trigger, setTrigger] = useState(initial?.trigger ?? '');
   const [oldHabit, setOldHabit] = useState(initial?.oldHabit ?? '');
   const [newHabit, setNewHabit] = useState(initial?.newHabit ?? '');
@@ -19,14 +53,14 @@ export default function HabitForm({ initial, onSave, onCancel, extraActions }: P
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!trigger.trim()) return setError('Add the moment this happens, so you know when to use your plan.');
-    if (!newHabit.trim()) return setError('Add what you can do instead.');
+    if (!trigger.trim()) return setError('Add the moment — "When…" — so you know when to use your plan.');
+    if (!newHabit.trim()) return setError('Add one tiny thing to try instead.');
     setSaving(true);
     setError(null);
     try {
       await onSave({ trigger, oldHabit, newHabit });
     } catch {
-      setError("Couldn't save this habit. Please try again.");
+      setError("Couldn't save this swap. Please try again.");
       setSaving(false);
     }
   }
@@ -34,26 +68,26 @@ export default function HabitForm({ initial, onSave, onCancel, extraActions }: P
   const clearError = () => error && setError(null);
 
   return (
-    <form className="card habit-form" onSubmit={handleSubmit} noValidate>
-      <div className="field">
-        <label htmlFor={`${idBase}-trigger`}>When this happens</label>
+    <form className="card habit-form swap-form" onSubmit={handleSubmit} noValidate>
+      <div className="swap-sentence">
+        <label htmlFor={`${idBase}-trigger`} className="swap-word">
+          When
+        </label>
         <input
           id={`${idBase}-trigger`}
           type="text"
           className="input"
           value={trigger}
           maxLength={HABIT_FIELD_MAX}
-          placeholder="e.g. I feel stressed after class"
+          placeholder={examples.trigger}
           autoFocus
           onChange={(e) => {
             setTrigger(e.target.value);
             clearError();
           }}
         />
-      </div>
-      <div className="field">
-        <label htmlFor={`${idBase}-old`}>
-          I usually <span className="optional">(optional)</span>
+        <label htmlFor={`${idBase}-old`} className="swap-word">
+          … I usually <span className="optional">(optional)</span>
         </label>
         <input
           id={`${idBase}-old`}
@@ -61,19 +95,19 @@ export default function HabitForm({ initial, onSave, onCancel, extraActions }: P
           className="input"
           value={oldHabit}
           maxLength={HABIT_FIELD_MAX}
-          placeholder="e.g. scroll on my phone for an hour"
+          placeholder={examples.oldHabit}
           onChange={(e) => setOldHabit(e.target.value)}
         />
-      </div>
-      <div className="field">
-        <label htmlFor={`${idBase}-new`}>Instead, I can</label>
+        <label htmlFor={`${idBase}-new`} className="swap-word">
+          … Instead, I’ll try
+        </label>
         <input
           id={`${idBase}-new`}
           type="text"
           className="input"
           value={newHabit}
           maxLength={HABIT_FIELD_MAX}
-          placeholder="e.g. take a 10-minute walk"
+          placeholder={examples.newHabit}
           onChange={(e) => {
             setNewHabit(e.target.value);
             clearError();
@@ -89,7 +123,7 @@ export default function HabitForm({ initial, onSave, onCancel, extraActions }: P
 
       <div className="form-actions">
         <button type="submit" className="btn-primary" disabled={saving}>
-          {saving ? 'Saving…' : initial ? 'Save changes' : 'Add habit'}
+          {saving ? 'Saving…' : initial ? 'Save changes' : 'Add swap'}
         </button>
         <button type="button" className="btn-secondary" onClick={onCancel} disabled={saving}>
           Cancel

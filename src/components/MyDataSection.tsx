@@ -21,6 +21,7 @@ import { listHabits } from '../lib/habits';
 import { listLists } from '../lib/lists';
 import { listJourneys } from '../lib/journeys';
 import { listMemories } from '../lib/memory';
+import { listBucketList, listMeasurementKinds, listRoutine, listWishlist } from '../lib/profile';
 import { applyMerge, describeCounts, planMerge, totalAdded, type MergePlan } from '../lib/merge';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -36,6 +37,10 @@ type Current = {
   currentLists: number;
   currentJourneys: number;
   currentMemories: number;
+  currentMeasurements: number;
+  currentRoutine: number;
+  currentWishlist: number;
+  currentBucket: number;
 };
 
 export default function MyDataSection({ onRestored }: { onRestored: () => void }) {
@@ -87,7 +92,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('reading');
     setMessage(null);
     try {
-      const [checked, current, goals, positives, letters, affirmations, habits, lists, journeys, memories] = await Promise.all([
+      const [checked, current, goals, positives, letters, affirmations, habits, lists, journeys, memories, measurements, routine, wishlist, bucket] = await Promise.all([
         readBackupFile(file),
         listAllEntries(),
         listAllGoals(),
@@ -98,6 +103,10 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         listLists(),
         listJourneys(),
         listMemories(),
+        listMeasurementKinds(),
+        listRoutine(),
+        listWishlist(),
+        listBucketList(),
       ]);
       setPending({
         ...checked,
@@ -110,6 +119,10 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         currentLists: lists.length,
         currentJourneys: journeys.length,
         currentMemories: memories.length,
+        currentMeasurements: measurements.length,
+        currentRoutine: routine.length,
+        currentWishlist: wishlist.wanted.length + wishlist.got.length,
+        currentBucket: bucket.todo.length + bucket.done.length,
       });
     } catch (err) {
       setMessage({
@@ -142,11 +155,11 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
           pending.affirmations
             ? `, ${pending.affirmations.length} ${pending.affirmations.length === 1 ? 'affirmation' : 'affirmations'} of your own`
             : ''
-        }${pending.habits ? `, ${pending.habits.length} ${pending.habits.length === 1 ? 'habit' : 'habits'}` : ''}${
+        }${pending.habits ? `, ${pending.habits.length} ${pending.habits.length === 1 ? 'habit swap' : 'habit swaps'}` : ''}${
           pending.lists ? `, ${pending.lists.length} ${pending.lists.length === 1 ? 'list' : 'lists'}` : ''
         }${pending.journeys ? `, ${pending.journeys.length} ${pending.journeys.length === 1 ? 'journey' : 'journeys'}` : ''}${
           pending.memories ? `, ${pending.memories.length} memory ${pending.memories.length === 1 ? 'note' : 'notes'}` : ''
-        } and your settings.`,
+        }${pending.measurements || pending.routine || pending.wishlist || pending.bucketlist ? ', your My Life profile' : ''} and your settings.`,
       });
       onRestored();
     } catch {
@@ -211,33 +224,33 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
 
   function restoreMessage(b: CheckedBackup & Current) {
     const has = [plural(b.quickCount, 'quick entry', 'quick entries'), plural(b.talkCount, 'journal page', 'journal pages')];
-    if (b.goals) has.push(plural(b.goals.length, 'goal', 'goals'));
     if (b.positives) has.push(plural(b.positives.length, 'saved positive', 'saved positives'));
     if (b.letters) has.push(plural(b.letters.length, 'Time Capsule letter', 'Time Capsule letters'));
     if (b.affirmations) has.push(plural(b.affirmations.length, 'affirmation of your own', 'affirmations of your own'));
-    if (b.habits) has.push(plural(b.habits.length, 'habit', 'habits'));
     if (b.lists) has.push(plural(b.lists.length, 'list', 'lists'));
-    if (b.journeys) has.push(plural(b.journeys.length, 'Fear & Confidence journey', 'Fear & Confidence journeys'));
+    if (b.journeys) has.push(plural(b.journeys.length, 'journey', 'journeys'));
     if (b.memories) has.push(plural(b.memories.length, 'companion memory note', 'companion memory notes'));
+    if (b.wishlist) has.push(plural(b.wishlist.length, 'wishlist item', 'wishlist items'));
+    if (b.bucketlist) has.push(plural(b.bucketlist.length, 'bucket list item', 'bucket list items'));
     const saved = b.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(b.exportedAt)))}` : '';
     const replaced = [plural(b.currentCount, 'entry', 'entries')];
-    if (b.goals) replaced.push(plural(b.currentGoals, 'goal', 'goals'));
     if (b.positives) replaced.push(plural(b.currentPositives, 'saved positive', 'saved positives'));
     if (b.letters) replaced.push(plural(b.currentLetters, 'letter', 'letters'));
     if (b.affirmations) replaced.push(plural(b.currentAffirmations, 'affirmation of your own', 'affirmations of your own'));
-    if (b.habits) replaced.push(plural(b.currentHabits, 'habit', 'habits'));
     if (b.lists) replaced.push(plural(b.currentLists, 'list', 'lists'));
-    if (b.journeys) replaced.push(plural(b.currentJourneys, 'journey', 'journeys'));
+    if (b.journeys && !b.keepCurrentJourneys) replaced.push(plural(b.currentJourneys, 'journey', 'journeys'));
     if (b.memories) replaced.push(plural(b.currentMemories, 'memory note', 'memory notes'));
+    if (b.wishlist) replaced.push(plural(b.currentWishlist, 'wishlist item', 'wishlist items'));
+    if (b.bucketlist) replaced.push(plural(b.currentBucket, 'bucket list item', 'bucket list items'));
     const missing = [
-      !b.goals && 'goals',
       !b.positives && 'saved positives',
       !b.letters && 'Time Capsule letters',
       !b.affirmations && 'affirmations of your own',
-      !b.habits && 'habits',
       !b.lists && 'lists',
-      !b.journeys && 'Fear & Confidence journeys',
+      !b.journeys && 'journeys',
       !b.memories && 'companion memory notes',
+      !b.wishlist && 'wishlist',
+      !b.bucketlist && 'bucket list',
     ]
       .filter(Boolean)
       .join(' or ');

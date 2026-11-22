@@ -1,6 +1,7 @@
 // Minimal promise wrapper around IndexedDB (no extra dependencies).
+import { foldIntoJourneys } from './journeyParts';
 const DB_NAME = 'thrive';
-const DB_VERSION = 11; // 10: talk summaries became a list (see the migration below). 11: companion memory notes
+const DB_VERSION = 14; // 10: talk summaries became a list (see the migration below). 11: companion memory notes. 12: My Life profile. 13: bucket list. 14: goals + habit swaps move into journeys
 
 /** All journal entries (quick and talk) live in this one store, keyed by `id`. */
 export const JOURNAL_STORE = 'journal';
@@ -20,6 +21,14 @@ export const HABITS_STORE = 'habits';
 export const LISTS_STORE = 'lists';
 /** Companion memory: short notes I approved for the "Talk about this" companion (added in version 11), keyed by `id`. */
 export const MEMORIES_STORE = 'memories';
+/** My Life profile (added in version 12), each keyed by `id`: measurement kinds (each holding its logged values), */
+export const MEASUREMENTS_STORE = 'measurements';
+/** …my routine ("when → what" reference entries), */
+export const ROUTINE_STORE = 'routine';
+/** …my wishlist, */
+export const WISHLIST_STORE = 'wishlist';
+/** …and my bucket list (added in version 13). */
+export const BUCKETLIST_STORE = 'bucketlist';
 /** Fear & Confidence journeys, each holding its ladder of steps (added in version 9), keyed by `id`. */
 export const JOURNEYS_STORE = 'journeys';
 /** Version 1 kept quick entries in "entries", keyed by date. */
@@ -66,6 +75,9 @@ function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(MEMORIES_STORE)) {
           db.createObjectStore(MEMORIES_STORE, { keyPath: 'id' });
         }
+        for (const name of [MEASUREMENTS_STORE, ROUTINE_STORE, WISHLIST_STORE, BUCKETLIST_STORE]) {
+          if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
+        }
         // Version 10: a journal page's single talk summary becomes the first item of its summaries list.
         // (Same id and shape as talkSummariesOf in journal.ts, so backups and merges line up.)
         if (event.oldVersion >= 1 && event.oldVersion < 10 && db.objectStoreNames.contains(JOURNAL_STORE)) {
@@ -92,6 +104,26 @@ function openDb(): Promise<IDBDatabase> {
             }
             cursor.continue();
           };
+        }
+        // Version 14: Growth's journeys now hold a goal, steps and habit swaps. Every ladder gets its aim as its goal,
+        // and every standalone goal / habit swap moves into a journey of its own (see journeyParts.ts). Nothing is
+        // lost: the records are moved into journeys, then the old goals and habits stores are emptied.
+        if (event.oldVersion >= 1 && event.oldVersion < 14) {
+          const read = (name: string, done: (rows: never[]) => void) => {
+            if (!db.objectStoreNames.contains(name)) return done([]);
+            const r = tx.objectStore(name).getAll();
+            r.onsuccess = () => done(r.result as never[]);
+          };
+          read(JOURNEYS_STORE, (journeys) =>
+            read(GOALS_STORE, (goals) =>
+              read(HABITS_STORE, (habits) => {
+                const store = tx.objectStore(JOURNEYS_STORE);
+                for (const j of foldIntoJourneys(journeys, goals, habits)) store.put(j);
+                tx.objectStore(GOALS_STORE).clear();
+                tx.objectStore(HABITS_STORE).clear();
+              }),
+            ),
+          );
         }
         // Move quick entries saved by version 1 into the new store, then drop the old one.
         if (event.oldVersion < 2 && db.objectStoreNames.contains(LEGACY_ENTRIES_STORE)) {

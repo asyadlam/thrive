@@ -36,12 +36,13 @@ export default function Home() {
         <span className="home-checkin-sub">How are you, one positive, one small plan</span>
       </Link>
 
-      {/* 3. Today's affirmation */}
+      {/* 3. Today's affirmation — opens the Affirmations page */}
       {affirmation && (
-        <div className="home-card">
+        <Link to="/affirmations" className="home-card home-card-link">
           <span className="home-card-label">Today's affirmation</span>
           <p className="home-quote">{affirmation.text}</p>
-        </div>
+          <span className="home-caption">tap for more affirmations</span>
+        </Link>
       )}
 
       {/* 4. A positive to remember — only if I have one */}

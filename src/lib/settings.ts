@@ -13,13 +13,40 @@ export type AppSettings = {
   userName: string;
   /** Companion memory: off unless I turn it on. When off, notes are kept but never used or proposed. */
   companionMemory: boolean;
+  /** My Life "About me": birthday as "MM-DD" (no year), or '' if not set. */
+  birthday: string;
+  /** My Life "About me": a one-line description ('' if not set). */
+  aboutMe: string;
 };
 
 export const PET_NAME_MAX = 20;
 export const USER_NAME_MAX = 30;
+export const ABOUT_ME_MAX = 120;
+
+/** "03-04" → valid month/day (Feb 29 allowed). */
+export const isBirthday = (v: unknown): v is string => {
+  if (typeof v !== 'string' || !/^\d{2}-\d{2}$/.test(v)) return false;
+  const [m, d] = v.split('-').map(Number);
+  return m >= 1 && m <= 12 && d >= 1 && d <= new Date(2024, m, 0).getDate();
+};
+
+/** "03-04" → "March 4". */
+export function formatBirthday(v: string): string {
+  if (!isBirthday(v)) return '';
+  const [m, d] = v.split('-').map(Number);
+  return new Date(2024, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
+}
 
 const KEY = 'thrive.settings';
-const DEFAULTS: AppSettings = { companion: 'none', petName: '', readLessons: [], userName: '', companionMemory: false };
+const DEFAULTS: AppSettings = {
+  companion: 'none',
+  petName: '',
+  readLessons: [],
+  userName: '',
+  companionMemory: false,
+  birthday: '',
+  aboutMe: '',
+};
 
 /** Earlier versions called the hippo "yoshi"; keep that choice instead of resetting it. */
 const RENAMED: Record<string, Companion> = { yoshi: 'hippo' };
@@ -41,6 +68,8 @@ export function normalizeSettings(value: unknown): AppSettings {
       : [],
     userName: typeof parsed.userName === 'string' ? parsed.userName.slice(0, USER_NAME_MAX) : DEFAULTS.userName,
     companionMemory: parsed.companionMemory === true, // only ever on by my own choice
+    birthday: isBirthday(parsed.birthday) ? parsed.birthday : '',
+    aboutMe: typeof parsed.aboutMe === 'string' ? parsed.aboutMe.slice(0, ABOUT_ME_MAX) : '',
   };
 }
 
