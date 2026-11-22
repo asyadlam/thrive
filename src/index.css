@@ -1031,9 +1031,9 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 
 /* ---------- Small animations (transform + opacity only, all under ~400ms) ---------- */
 /* 1. Page content fades in when switching pages */
-.page-fade { animation: page-fade-in 260ms ease-out backwards; }
+.page-fade { animation: page-fade-in 250ms ease-out backwards; }
 @keyframes page-fade-in {
-  from { opacity: 0; }
+  from { opacity: 0.7; } /* starts almost fully visible, so text is readable straight away */
   to { opacity: 1; }
 }
 
@@ -1043,16 +1043,16 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
   .card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row,
   .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item
 ) {
-  animation: card-float-up 300ms ease-out backwards;
+  animation: card-float-up 220ms ease-out backwards;
 }
-.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(2) { animation-delay: 30ms; }
-.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(3) { animation-delay: 60ms; }
-.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(n + 4) { animation-delay: 90ms; }
-.page-fade li:nth-child(2) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 30ms; }
-.page-fade li:nth-child(3) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 60ms; }
-.page-fade li:nth-child(n + 4) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 90ms; }
+.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(2) { animation-delay: 40ms; }
+.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(3) { animation-delay: 80ms; }
+.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(n + 4) { animation-delay: 120ms; }
+.page-fade li:nth-child(2) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 40ms; }
+.page-fade li:nth-child(3) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 80ms; }
+.page-fade li:nth-child(n + 4) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 120ms; }
 @keyframes card-float-up {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0.6; transform: translateY(6px); } /* last card is done by ~340ms (120ms delay + 220ms) */
   to { opacity: 1; transform: translateY(0); }
 }
 
