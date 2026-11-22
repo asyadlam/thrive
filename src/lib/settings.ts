@@ -7,12 +7,14 @@ export type Companion = PetKind | 'none';
 export type AppSettings = {
   companion: Companion;
   petName: string;
+  /** Ids of Learn lessons I've marked "Finished reading". */
+  readLessons: string[];
 };
 
 export const PET_NAME_MAX = 20;
 
 const KEY = 'thrive.settings';
-const DEFAULTS: AppSettings = { companion: 'none', petName: '' };
+const DEFAULTS: AppSettings = { companion: 'none', petName: '', readLessons: [] };
 
 /** Earlier versions called the hippo "yoshi"; keep that choice instead of resetting it. */
 const RENAMED: Record<string, Companion> = { yoshi: 'hippo' };
@@ -29,13 +31,16 @@ export function normalizeSettings(value: unknown): AppSettings {
   return {
     companion: toCompanion(parsed.companion),
     petName: typeof parsed.petName === 'string' ? parsed.petName.slice(0, PET_NAME_MAX) : DEFAULTS.petName,
+    readLessons: Array.isArray(parsed.readLessons)
+      ? [...new Set(parsed.readLessons.filter((id): id is string => typeof id === 'string'))]
+      : [],
   };
 }
 
 export function loadSettings(): AppSettings {
   try {
     const raw = localStorage.getItem(KEY);
-    return raw ? normalizeSettings(JSON.parse(raw)) : { ...DEFAULTS };
+    return raw ? normalizeSettings(JSON.parse(raw)) : { ...DEFAULTS, readLessons: [] };
   } catch {
     return { ...DEFAULTS };
   }
@@ -49,6 +54,15 @@ export function saveSettings(settings: AppSettings): boolean {
   } catch {
     return false;
   }
+}
+
+/** Mark a Learn lesson as read (or not). Saved with the rest of the app settings. */
+export function setLessonRead(id: string, read: boolean): AppSettings {
+  const current = loadSettings();
+  const others = current.readLessons.filter((x) => x !== id);
+  const next = { ...current, readLessons: read ? [...others, id] : others };
+  saveSettings(next);
+  return next;
 }
 
 /* ---------- Last backup date (device info, not part of the backup itself) ---------- */

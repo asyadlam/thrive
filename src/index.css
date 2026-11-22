@@ -865,3 +865,23 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 }
 .list-item-delete:hover { background: #FBEFEB; color: var(--help-dark); }
 .list-item-delete:focus-visible { outline: 2px solid var(--help); outline-offset: -2px; }
+
+/* ---------- Learn ---------- */
+.lesson-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.lesson-card { display: flex; align-items: center; gap: 12px; padding: 16px; color: var(--ink); text-decoration: none; }
+.lesson-card:hover { border-color: var(--green-300); }
+.lesson-card:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.lesson-card-text { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 0; }
+.lesson-card-title { font-size: 1.05rem; }
+.lesson-card-desc { color: var(--ink-soft); font-size: 0.92rem; line-height: 1.4; }
+.lesson-card-meta { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; color: var(--ink-soft); margin-top: 2px; }
+.lesson-read-mark { color: var(--green-700); font-weight: 650; background: var(--green-100); padding: 1px 8px; border-radius: 999px; }
+.learn-note { margin: 22px 4px 0; font-size: 0.85rem; color: var(--ink-soft); text-align: center; }
+.lesson-body { display: flex; flex-direction: column; gap: 18px; padding: 22px 20px; }
+.lesson-intro { margin: 0; font-size: 1.05rem; color: var(--ink-soft); font-style: italic; line-height: 1.5; }
+.lesson-section h2 { font-size: 1.05rem; margin: 0 0 6px; color: var(--green-700); }
+.lesson-section p { margin: 0 0 10px; line-height: 1.65; }
+.lesson-section p:last-child { margin-bottom: 0; }
+.lesson-finish { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 20px 0 8px; }
+.lesson-finish-btn { width: 100%; flex: none; }
+.lesson-done { margin: 0; }
