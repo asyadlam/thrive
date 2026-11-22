@@ -7,6 +7,12 @@ export default function TalkView({ entry, onEdit, onDelete }: Props) {
     <article className="card saved-entry" aria-label="Journal page">
       <h2 className={`talk-view-title${entry.title ? '' : ' untitled'}`}>{talkEntryLabel(entry)}</h2>
       <p className="talk-view-body">{entry.body}</p>
+      {entry.talkSummary && (
+        <section className="talk-summary" aria-label="From your talk">
+          <span className="saved-label">From your talk</span>
+          <p>{entry.talkSummary}</p>
+        </section>
+      )}
       <div className="saved-footer">
         <span className="hint">Last saved at {formatTime(entry.updatedAt)}</span>
         <div className="entry-actions">

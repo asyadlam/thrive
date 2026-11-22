@@ -1353,3 +1353,103 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .dictation-stop:hover { background: #3F6449 !important; }
 .dictation-stop-square { width: 10px; height: 10px; border-radius: 2px; background: currentColor; }
 @media (prefers-reduced-motion: reduce) { .dictation-dot { animation: none; } }
+
+/* ---------- "Talk about this" ---------- */
+.btn-talk:not(:disabled) {
+  background: var(--tint-sage);
+  color: var(--green-700);
+  border: 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btn-talk:not(:disabled):hover { background: #D8E5CE; }
+.btn-talk:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.talk-reserved { border-top-color: var(--inset); border-top-style: solid; }
+.talk-summary, .talk-summary-card { display: flex; flex-direction: column; gap: 6px; }
+.talk-summary { padding: 14px 16px; background: var(--tint-sage); border-radius: var(--row-radius); }
+.talk-summary p, .talk-summary-card p { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
+.talk-summary-card { margin-top: 12px; }
+
+.chat { display: flex; flex-direction: column; gap: 12px; }
+.chat-note { margin: -8px 0 0; font-size: 0.85rem; color: var(--ink-soft); }
+.chat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.chat-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.chat-row.from-me { justify-content: flex-end; }
+.chat-pet { flex-shrink: 0; width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 2px 3px rgba(67, 82, 60, 0.15)); }
+.chat-pet-none { width: 10px; }
+.chat-bubble {
+  max-width: min(82%, 420px);
+  padding: 11px 14px;
+  border-radius: 20px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.from-companion .chat-bubble { background: #fff; border-bottom-left-radius: 6px; box-shadow: var(--card-shadow); }
+.from-me .chat-bubble { background: var(--tint-sage); border-bottom-right-radius: 6px; }
+.chat-typing { display: inline-flex; gap: 5px; align-items: center; min-height: 44px; }
+.chat-typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); animation: chat-dot 1.2s ease-in-out infinite; }
+.chat-typing span:nth-child(2) { animation-delay: 0.15s; }
+.chat-typing span:nth-child(3) { animation-delay: 0.3s; }
+@keyframes chat-dot { 0%, 80%, 100% { opacity: 0.35; } 40% { opacity: 1; } }
+.chat-help {
+  flex-basis: 100%;
+  margin-left: 44px;
+  padding: 14px 16px;
+  background: var(--tint-cream);
+  border-radius: var(--row-radius);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.from-me .chat-help { margin-left: 0; }
+.chat-help p { margin: 0; }
+.chat-help-link {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 16px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: var(--help);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+}
+.chat-help-link:focus-visible { outline: 2px solid var(--help); outline-offset: 2px; }
+.chat-problem { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 0.9rem; color: var(--ink-soft); }
+.chat-composer {
+  position: sticky;
+  bottom: calc(var(--nav-h) + var(--safe-b) + 8px);
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px;
+  background: #fff;
+  border-radius: var(--card-radius);
+  box-shadow: var(--card-shadow);
+}
+textarea.input.chat-input { min-height: 44px; max-height: 160px; resize: none; border: 0; background: var(--inset); }
+.chat-send {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green-700);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.chat-send:disabled { opacity: 0.45; cursor: default; }
+.chat-send:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.chat-end { align-self: center; }
+.chat-after { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 4px; }
+.chat-after > .btn-primary { flex: none; }
+.chat-summary { display: flex; flex-direction: column; gap: 8px; }
+.chat-summary p { margin: 0; line-height: 1.55; font-style: italic; }
+.chat-back { align-self: center; }
+@media (prefers-reduced-motion: reduce) { .chat-typing span { animation: none; } }

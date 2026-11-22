@@ -49,11 +49,11 @@ export default function TalkEntryPage() {
 
   const dirty = title !== (entry?.title ?? '') || body !== (entry?.body ?? '');
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  /** Saves the page; returns the saved entry, or null if it couldn't be saved. */
+  async function persist(): Promise<TalkEntry | null> {
     if (!body.trim()) {
       setError('Write something to save this page.');
-      return;
+      return null;
     }
     setSaving(true);
     setError(null);
@@ -63,11 +63,29 @@ export default function TalkEntryPage() {
       setTitle(saved.title);
       setJustSaved(true);
       if (!id) navigate(`/journal/talk/${saved.id}`, { replace: true, state: from ? { from } : null });
+      return saved;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong while saving.');
+      return null;
     } finally {
       setSaving(false);
     }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    await persist();
+  }
+
+  /** "Talk about this": a blank page goes straight to a friendly chat; written words are saved first. */
+  async function talk() {
+    const chatState = from ? { from } : null;
+    if (!body.trim()) {
+      navigate('/journal/chat', { state: chatState });
+      return;
+    }
+    const saved = entry && !dirty ? entry : await persist();
+    if (saved) navigate(`/journal/chat/${saved.id}`, { state: chatState });
   }
 
   const subtitle = formatDay(entry?.date ?? todayKey());
@@ -149,16 +167,24 @@ export default function TalkEntryPage() {
             </button>
           </div>
 
-          {/* Reserved for a future feature. Placeholder only: no AI yet. */}
           <div className="talk-reserved">
-            <button type="button" className="btn-talk" disabled aria-describedby="talk-soon">
+            <button type="button" className="btn-talk" onClick={() => void talk()} disabled={saving} aria-describedby="talk-about-hint">
               Talk about this
             </button>
-            <p id="talk-soon" className="hint">
-              Coming soon
+            <p id="talk-about-hint" className="hint">
+              {body.trim() && (!entry || dirty)
+                ? 'Talk it through with your companion. This page is saved first.'
+                : 'Talk it through with your companion.'}
             </p>
           </div>
         </form>
+      )}
+
+      {status === 'ready' && entry?.talkSummary && (
+        <section className="card talk-summary-card" aria-label="From your talk">
+          <span className="saved-label">From your talk</span>
+          <p>{entry.talkSummary}</p>
+        </section>
       )}
     </PageShell>
   );

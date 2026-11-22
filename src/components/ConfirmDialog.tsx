@@ -4,6 +4,8 @@ type Props = {
   title: string;
   message: string;
   confirmLabel: string;
+  /** Text for the safe choice (default "Cancel"). */
+  cancelLabel?: string;
   busy?: boolean;
   /** Button text while busy (default "Deleting…"). */
   busyLabel?: string;
@@ -18,6 +20,7 @@ export default function ConfirmDialog({
   title,
   message,
   confirmLabel,
+  cancelLabel = 'Cancel',
   busy,
   busyLabel = 'Deleting…',
   tone = 'danger',
@@ -53,7 +56,7 @@ export default function ConfirmDialog({
         <p id="confirm-message">{message}</p>
         <div className="dialog-actions">
           <button ref={cancelRef} type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
-            Cancel
+            {cancelLabel}
           </button>
           <button type="button" className={tone === 'gentle' ? 'btn-primary' : 'btn-danger'} onClick={onConfirm} disabled={busy}>
             {busy ? busyLabel : confirmLabel}

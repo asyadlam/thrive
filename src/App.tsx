@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import Journal from './pages/Journal';
 import QuickEntryPage from './pages/QuickEntryPage';
 import TalkEntryPage from './pages/TalkEntryPage';
+import TalkChatPage from './pages/TalkChatPage';
 import LookBackPage from './pages/LookBackPage';
 import EntryDetailPage from './pages/EntryDetailPage';
 import TimeCapsulePage from './pages/TimeCapsulePage';
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="journal" element={<Journal />} />
         <Route path="journal/quick" element={<QuickEntryPage />} />
         <Route path="journal/talk/:id?" element={<TalkEntryPage />} />
+        <Route path="journal/chat/:id?" element={<TalkChatPage />} />
         <Route path="journal/look-back" element={<LookBackPage />} />
         <Route path="journal/entry/:id" element={<EntryDetailPage />} />
         <Route path="journal/time-capsule" element={<TimeCapsulePage />} />

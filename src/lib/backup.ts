@@ -115,7 +115,10 @@ function checkEntry(raw: unknown, i: number): JournalEntry {
   if (e.type === 'talk') {
     if (!isStr(e.title) || !isStr(e.body)) fail('title or text');
     const id = isStr(e.id) && e.id.startsWith('talk-') ? e.id : `talk-${newId()}`;
-    return withMetadata({ ...(e as object), type: 'talk', date, id } as JournalEntry);
+    const { talkSummary, ...rest } = e;
+    // "From your talk" is optional: kept when it's text, dropped otherwise (older backups simply don't have it)
+    const summary = isStr(talkSummary) && talkSummary.trim() ? { talkSummary } : {};
+    return withMetadata({ ...(rest as object), ...summary, type: 'talk', date, id } as JournalEntry);
   }
   return fail('unknown entry type');
 }
@@ -305,6 +308,7 @@ export async function buildReadableText(): Promise<string> {
       lines.push(`Journal page · ${formatTime(e.createdAt)}`);
       if (e.title) lines.push(`Title: ${e.title}`);
       lines.push('', e.body);
+      if (e.talkSummary) lines.push('', 'From your talk:', e.talkSummary);
     }
     lines.push('');
   }

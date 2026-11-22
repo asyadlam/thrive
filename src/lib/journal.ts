@@ -27,6 +27,8 @@ export type TalkEntry = EntryBase & {
   type: 'talk';
   title: string;
   body: string;
+  /** Optional: a short summary saved from a "Talk about this" conversation (shown under "From your talk"). */
+  talkSummary?: string;
 };
 
 export type JournalEntry = QuickEntry | TalkEntry;
@@ -105,12 +107,29 @@ export async function saveTalkEntry(draft: TalkDraft, existing?: TalkEntry): Pro
     date: existing?.date ?? todayKey(),
     title: draft.title.trim(),
     body: draft.body, // kept exactly as written; no length limit
+    ...(existing?.talkSummary ? { talkSummary: existing.talkSummary } : {}), // editing the page keeps its talk summary
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
   await idbPut(JOURNAL_STORE, entry);
   keepStorage();
   return entry;
+}
+
+export const TALK_SUMMARY_MAX = 1000;
+
+/** Saves a short "From your talk" summary on a journal page (replacing any earlier one). */
+export async function saveTalkSummary(entryId: string, summary: string): Promise<TalkEntry> {
+  const existing = await getTalkEntry(entryId);
+  if (!existing) throw new Error('This journal page couldn’t be found on this device.');
+  const updated: TalkEntry = {
+    ...existing,
+    talkSummary: summary.trim().slice(0, TALK_SUMMARY_MAX),
+    updatedAt: new Date().toISOString(),
+  };
+  await idbPut(JOURNAL_STORE, updated);
+  keepStorage();
+  return updated;
 }
 
 export async function listTalkEntries(date: string): Promise<TalkEntry[]> {
