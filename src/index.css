@@ -885,3 +885,73 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .lesson-finish { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 20px 0 8px; }
 .lesson-finish-btn { width: 100%; flex: none; }
 .lesson-done { margin: 0; }
+
+/* ---------- Growth: Fear & Confidence journeys ---------- */
+.journeys { margin-top: 32px; }
+.journey-link { font-weight: 400; }
+.journey-link-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.journey-link .list-link-title { font-weight: 600; }
+.journey-summary { font-size: 0.85rem; color: var(--ink-soft); }
+.journey-pace {
+  margin: -6px 0 16px;
+  padding: 10px 14px;
+  background: var(--green-50);
+  border-radius: 12px;
+  color: var(--green-700);
+  font-size: 0.92rem;
+}
+.ladder-hint { margin: -8px 0 10px; }
+.ladder { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.ladder-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: 14px;
+}
+.ladder-step.tried { border-color: var(--green-100); }
+.ladder-top { display: flex; align-items: flex-start; gap: 12px; }
+.ladder-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  background: var(--sand);
+  color: var(--ink-soft);
+}
+.ladder-step.tried .ladder-num { background: var(--green-500); color: #fff; }
+.ladder-text { flex: 1; min-width: 0; padding-top: 3px; overflow-wrap: anywhere; }
+.ladder-edit { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.ladder-edit-actions { display: flex; gap: 8px; }
+.ladder-tried { margin-left: 40px; display: flex; flex-direction: column; gap: 4px; }
+.ladder-tried-date { font-size: 0.82rem; font-weight: 600; color: var(--green-700); }
+.ladder-reflection { margin: 0; padding: 8px 10px; background: var(--cream); border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.92rem; }
+.ladder-reflect { margin-left: 40px; display: flex; flex-direction: column; gap: 8px; }
+.ladder-reflect label { font-weight: 650; }
+.ladder-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-left: 40px; }
+.ladder-actions .btn-link { padding: 6px 0; }
+.ladder-unmark { color: var(--ink-soft); font-weight: 500; }
+.ladder-tools { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.ladder-icon {
+  min-width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+.ladder-icon:hover:not(:disabled) { background: var(--sand); }
+.ladder-icon:disabled { color: var(--stone); cursor: default; }
+.ladder-icon:focus-visible { outline: 2px solid var(--green-500); }
+.ladder-word { font-size: 0.82rem; padding: 0 6px; }
+.ladder-delete { color: var(--help-dark); }

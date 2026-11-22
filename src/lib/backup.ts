@@ -18,6 +18,7 @@ import {
   GOALS_STORE,
   HABITS_STORE,
   JOURNAL_STORE,
+  JOURNEYS_STORE,
   LISTS_STORE,
   LETTERS_STORE,
   POSITIVES_STORE,
@@ -25,6 +26,7 @@ import {
 } from './db';
 import { habitFromBackup, listHabits, type Habit } from './habits';
 import { listFromBackup, listLists, type UserList } from './lists';
+import { journeyFromBackup, listJourneys, type Journey } from './journeys';
 import { affirmationFromBackup, listCustomAffirmations, type CustomAffirmation } from './affirmations';
 import { letterFromBackup, lettersForBackup, type BackupLetter, type Letter } from './letters';
 import { listStandalonePositives, positiveFromBackup, type StandalonePositive } from './positives';
@@ -37,8 +39,9 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
    version 5: letters may have sealType "milestone" with a milestone (event text) and unsealedAt, instead of an unlockDate
    version 6: same, plus affirmations: [...] (my own; built-in ones aren't included)
    version 7: same, plus habits: [...] (habit swaps from My Life)
-   version 8: same, plus lists: [...] (each list holds its items) */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 8 } as const;
+   version 8: same, plus lists: [...] (each list holds its items)
+   version 9: same, plus journeys: [...] (Fear & Confidence; each journey holds its ladder of steps) */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 9 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
@@ -51,6 +54,7 @@ export type Backup = typeof FORMAT & {
   affirmations: CustomAffirmation[];
   habits: Habit[];
   lists: UserList[];
+  journeys: Journey[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -65,6 +69,7 @@ export async function buildBackup(): Promise<Backup> {
     affirmations: await listCustomAffirmations(),
     habits: await listHabits(),
     lists: await listLists(),
+    journeys: await listJourneys(),
   };
 }
 
@@ -133,6 +138,8 @@ export type CheckedBackup = {
   habits: Habit[] | null;
   /** null = an older backup made before lists existed (current lists are kept). */
   lists: UserList[] | null;
+  /** null = an older backup made before Fear & Confidence journeys existed (current ones are kept). */
+  journeys: Journey[] | null;
 };
 
 export async function readBackupFile(file: File): Promise<CheckedBackup> {
@@ -238,6 +245,19 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     });
     lists = [...listsById.values()];
   }
+
+  let journeys: Journey[] | null = null;
+  if (d.journeys !== undefined) {
+    if (!Array.isArray(d.journeys)) throw new BackupError("This backup's journeys aren't valid.");
+    const journeysById = new Map<string, Journey>();
+    d.journeys.forEach((raw, i) => {
+      const journey = journeyFromBackup(raw);
+      if (!journey) throw new BackupError(`Journey ${i + 1} in this backup isn't valid (missing a title, or a step without text).`);
+      const existing = journeysById.get(journey.id);
+      if (!existing || existing.updatedAt < journey.updatedAt) journeysById.set(journey.id, journey);
+    });
+    journeys = [...journeysById.values()];
+  }
   return {
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
     settings: normalizeSettings(d.settings),
@@ -250,10 +270,11 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     affirmations,
     habits,
     lists,
+    journeys,
   };
 }
 
-/** Replace everything in the app with a checked backup. All journal data, goals, positives, letters, affirmations, habits and lists are swapped in one step. */
+/** Replace everything in the app with a checked backup. All journal data, goals, positives, letters, affirmations, habits, lists and journeys are swapped in one step. */
 export async function applyBackup(backup: CheckedBackup): Promise<void> {
   const stores: Record<string, unknown[]> = { [JOURNAL_STORE]: backup.entries };
   if (backup.goals) stores[GOALS_STORE] = backup.goals;
@@ -262,6 +283,7 @@ export async function applyBackup(backup: CheckedBackup): Promise<void> {
   if (backup.affirmations) stores[AFFIRMATIONS_STORE] = backup.affirmations;
   if (backup.habits) stores[HABITS_STORE] = backup.habits;
   if (backup.lists) stores[LISTS_STORE] = backup.lists;
+  if (backup.journeys) stores[JOURNEYS_STORE] = backup.journeys;
   await idbReplaceStores(stores);
   saveSettings(backup.settings);
 }

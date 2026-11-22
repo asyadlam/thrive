@@ -10,6 +10,7 @@ import TimeCapsulePage from './pages/TimeCapsulePage';
 import LetterPage from './pages/LetterPage';
 import ListPage from './pages/ListPage';
 import LessonPage from './pages/LessonPage';
+import JourneyPage from './pages/JourneyPage';
 import Growth from './pages/Growth';
 import MyLife from './pages/MyLife';
 import Learn from './pages/Learn';
@@ -29,6 +30,7 @@ export default function App() {
         <Route path="journal/time-capsule" element={<TimeCapsulePage />} />
         <Route path="journal/time-capsule/:id" element={<LetterPage />} />
         <Route path="growth" element={<Growth />} />
+        <Route path="growth/journeys/:id" element={<JourneyPage />} />
         <Route path="my-life" element={<MyLife />} />
         <Route path="my-life/lists/:id" element={<ListPage />} />
         <Route path="learn" element={<Learn />} />
