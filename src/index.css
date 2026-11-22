@@ -503,7 +503,7 @@ textarea.input.talk-body {
 .settings-section { display: flex; flex-direction: column; gap: 14px; }
 .settings-heading { font-size: 1.1rem; margin: 0; }
 .settings-section > .hint { margin-top: -10px; }
-.pet-options { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.pet-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .pet-option { position: relative; }
 .pet-option input { position: absolute; opacity: 0; width: 1px; height: 1px; }
 .pet-option-card {

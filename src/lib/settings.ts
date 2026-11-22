@@ -1,6 +1,6 @@
 // App settings, kept on this device in localStorage (separate from journal entries).
 
-export const PET_KINDS = ['hippo', 'cat', 'platypus'] as const;
+export const PET_KINDS = ['hippo', 'cat', 'platypus', 'panda', 'dog'] as const;
 export type PetKind = (typeof PET_KINDS)[number];
 export type Companion = PetKind | 'none';
 

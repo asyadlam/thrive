@@ -11,6 +11,8 @@ export const PET_ART: Record<PetKind, { label: string; src: string }> = {
   hippo: { label: 'Hippo', src: '/pets/hippo.png' },
   cat: { label: 'Cat', src: '/pets/cat.png' },
   platypus: { label: 'Platypus', src: '/pets/platypus.png' },
+  panda: { label: 'Panda', src: '/pets/panda.png' },
+  dog: { label: 'Dog', src: '/pets/dog.png' },
 };
 
 /** Small still preview, used only by the Settings picker. */
