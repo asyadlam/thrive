@@ -3,8 +3,8 @@ import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
 import { GearIcon, HelpIcon } from './icons';
 
-/** e.g. "/journal/talk/talk-123" → "/journal/talk" */
-const pageKey = (path: string) => '/' + path.split('/').filter(Boolean).slice(0, 2).join('/');
+/** Which page this is, for the fade. "/journal/talk/<id>" counts as "/journal/talk" (saving a new page adds the id). */
+const pageKey = (path: string) => (path.startsWith('/journal/talk') ? '/journal/talk' : path);
 
 export default function Layout() {
   const { pathname } = useLocation();
@@ -29,9 +29,9 @@ export default function Layout() {
         </div>
       </header>
       <main className="app-main">
-        {/* keyed by page so the soft fade-in plays each time you switch pages. Only the first two
-            parts of the address count, so e.g. /journal/talk → /journal/talk/<id> after saving a
-            new page is treated as the same page (it keeps its state and doesn't fade again). */}
+        {/* keyed by page so the soft fade-in plays each time you switch pages. Saving a
+            new "Need to talk" page moves /journal/talk → /journal/talk/<id>, which is treated as the
+            same page (it keeps its state and doesn't fade again). */}
         <div key={pageKey(pathname)} className="page-fade">
           <Outlet />
         </div>

@@ -3,10 +3,16 @@ import { todayKey } from './journal';
 import { listAllPositives, type PositiveItem } from './positives';
 import { builtInItems, listCustomAffirmations, type AffirmationItem } from './affirmations';
 
-/** "Good morning" / "Good afternoon" / "Good evening" from the time of day. */
+/**
+ * "Good morning" / "Good afternoon" / "Good evening" from the device's own local clock
+ * (getHours() is always in the user's time zone). Late night, midnight to 5am, still counts
+ * as evening, so 12:31am says "Good evening", not "Good morning".
+ */
 export function timeGreeting(d = new Date()): string {
-  const h = d.getHours();
-  return h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening';
+  const h = d.getHours(); // local hour, 0–23
+  if (h >= 5 && h < 12) return 'Good morning';
+  if (h >= 12 && h < 18) return 'Good afternoon';
+  return 'Good evening';
 }
 
 /** Whole days since 1 Jan 1970 for a local YYYY-MM-DD day. */

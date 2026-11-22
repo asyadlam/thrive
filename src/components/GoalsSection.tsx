@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import GoalForm from './GoalForm';
 import ConfirmDialog from './ConfirmDialog';
 import { deleteGoal, listGoals, saveGoal, setGoalCompleted, type Goal, type GoalDraft } from '../lib/goals';
 import { formatShortDay, todayKey } from '../lib/journal';
 import EmptyState from './EmptyState';
+import { SeeMore, newestFirst, previewOf, useSectionAnchor } from './ListPreview';
 
 type Status = 'loading' | 'ready' | 'error';
 /** What's open: nothing, the "add" form, or one goal being edited (by id). */
 type Editing = null | 'new' | string;
 
-export default function GoalsSection() {
+/** My goals. On My Life it shows the 3 newest active goals; `full` (the My goals page) shows them all. */
+export default function GoalsSection({ full = false }: { full?: boolean }) {
   const [status, setStatus] = useState<Status>('loading');
   const [active, setActive] = useState<Goal[]>([]);
   const [completed, setCompleted] = useState<Goal[]>([]);
@@ -19,6 +21,10 @@ export default function GoalsSection() {
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
   const [params, setParams] = useSearchParams();
+  const sectionRef = useRef<HTMLElement>(null);
+  // "Completed (n)" on My Life opens the My goals page with the completed goals unfolded
+  const [openCompleted] = useState(useLocation().hash === '#completed');
+  useSectionAnchor('goals', sectionRef);
 
   // Deep link from Home: /my-life?add=goal opens the "add a goal" form.
   useEffect(() => {
@@ -30,7 +36,7 @@ export default function GoalsSection() {
   const refresh = useCallback(async () => {
     try {
       const goals = await listGoals();
-      setActive(goals.active);
+      setActive(newestFirst(goals.active));
       setCompleted(goals.completed);
       setStatus('ready');
     } catch {
@@ -125,9 +131,9 @@ export default function GoalsSection() {
     );
 
   return (
-    <section className="goals" aria-labelledby="goals-heading">
+    <section className="goals" aria-labelledby="goals-heading" ref={sectionRef}>
       <div className="goals-header">
-        <h2 id="goals-heading" className="section-title">
+        <h2 id="goals-heading" className={full ? 'sr-only' : 'section-title'}>
           My goals
         </h2>
         {editing !== 'new' && (
@@ -155,11 +161,17 @@ export default function GoalsSection() {
           {active.length === 0 && editing !== 'new' ? (
             <EmptyState>No active goals. Add one whenever you're ready.</EmptyState>
           ) : (
-            <ul className="goal-list">{active.map(renderGoal)}</ul>
+            <ul className="goal-list">{previewOf(active, full).map(renderGoal)}</ul>
+          )}
+          {!full && active.length > 3 && <SeeMore to="/my-life/goals" a11yLabel="See all your goals" />}
+
+          {/* Completed goals live on the My goals page */}
+          {!full && completed.length > 0 && (
+            <SeeMore to="/my-life/goals#completed" label={`Completed (${completed.length})`} a11yLabel="See your completed goals" />
           )}
 
-          {completed.length > 0 && (
-            <details className="goals-completed">
+          {full && completed.length > 0 && (
+            <details className="goals-completed" id="completed" open={openCompleted || undefined}>
               <summary>Completed ({completed.length})</summary>
               <ul className="goal-list">{completed.map(renderGoal)}</ul>
             </details>

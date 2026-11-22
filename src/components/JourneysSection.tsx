@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JOURNEY_TITLE_MAX, createJourney, journeySummary, listJourneys, type Journey } from '../lib/journeys';
 import EmptyState from './EmptyState';
+import { SeeMore, newestFirst, previewOf, useSectionAnchor } from './ListPreview';
 
 type Status = 'loading' | 'ready' | 'error';
 
 /** The Fear & Confidence area on Growth: my journeys, and a way to start a new one. */
-export default function JourneysSection() {
+export default function JourneysSection({ full = false }: { full?: boolean }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('loading');
   const [journeys, setJourneys] = useState<Journey[]>([]);
@@ -14,13 +15,15 @@ export default function JourneysSection() {
   const [title, setTitle] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  useSectionAnchor('journeys', sectionRef);
 
   useEffect(() => {
     let active = true;
     listJourneys()
       .then((all) => {
         if (!active) return;
-        setJourneys(all);
+        setJourneys(newestFirst(all));
         setStatus('ready');
       })
       .catch(() => active && setStatus('error'));
@@ -47,9 +50,9 @@ export default function JourneysSection() {
   }
 
   return (
-    <section className="journeys" aria-labelledby="journeys-heading">
+    <section className="journeys" aria-labelledby="journeys-heading" ref={sectionRef}>
       <div className="goals-header">
-        <h2 id="journeys-heading" className="section-title">
+        <h2 id="journeys-heading" className={full ? 'sr-only' : 'section-title'}>
           Fear &amp; Confidence
         </h2>
         {!creating && (
@@ -58,7 +61,7 @@ export default function JourneysSection() {
           </button>
         )}
       </div>
-      <p className="hint habits-hint">Build a ladder of small steps toward something that feels hard.</p>
+      {!full && <p className="hint habits-hint">Build a ladder of small steps toward something that feels hard.</p>}
 
       {creating && (
         <form className="card positive-form list-create" onSubmit={handleCreate} noValidate>
@@ -112,7 +115,7 @@ export default function JourneysSection() {
       )}
       {status === 'ready' && journeys.length > 0 && (
         <ul className="list-index">
-          {journeys.map((j) => (
+          {previewOf(journeys, full).map((j) => (
             <li key={j.id}>
               <Link to={`/growth/journeys/${j.id}`} className="list-link journey-link">
                 <span className="journey-link-text">
@@ -125,6 +128,7 @@ export default function JourneysSection() {
           ))}
         </ul>
       )}
+      {!full && journeys.length > 3 && <SeeMore to="/growth/journeys" a11yLabel="See all your journeys" />}
     </section>
   );
 }

@@ -1,24 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import HabitForm from './HabitForm';
 import ConfirmDialog from './ConfirmDialog';
 import { deleteHabit, listHabits, saveHabit, type Habit, type HabitDraft } from '../lib/habits';
 import EmptyState from './EmptyState';
+import { SeeMore, newestFirst, previewOf, useSectionAnchor } from './ListPreview';
 
 type Status = 'loading' | 'ready' | 'error';
 /** What's open: nothing, the "add" form, or one habit being edited (by id). */
 type Editing = null | 'new' | string;
 
-export default function HabitsSection() {
+/** Habit swaps. On My Life it shows the 3 newest; `full` (the Habits page) shows them all. */
+export default function HabitsSection({ full = false }: { full?: boolean }) {
   const [status, setStatus] = useState<Status>('loading');
   const [habits, setHabits] = useState<Habit[]>([]);
   const [editing, setEditing] = useState<Editing>(null);
   const [confirmDelete, setConfirmDelete] = useState<Habit | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
+  const sectionRef = useRef<HTMLElement>(null);
+  useSectionAnchor('habits', sectionRef);
 
   const refresh = useCallback(async () => {
     try {
-      setHabits(await listHabits());
+      setHabits(newestFirst(await listHabits()));
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -65,9 +69,9 @@ export default function HabitsSection() {
   }
 
   return (
-    <section className="habits" aria-labelledby="habits-heading">
+    <section className="habits" aria-labelledby="habits-heading" ref={sectionRef}>
       <div className="goals-header">
-        <h2 id="habits-heading" className="section-title">
+        <h2 id="habits-heading" className={full ? 'sr-only' : 'section-title'}>
           Habits
         </h2>
         {editing !== 'new' && (
@@ -76,7 +80,7 @@ export default function HabitsSection() {
           </button>
         )}
       </div>
-      <p className="hint habits-hint">Small swaps to try when a familiar moment comes up.</p>
+      {!full && <p className="hint habits-hint">Small swaps to try when a familiar moment comes up.</p>}
 
       <p className="save-status" role="status">
         {message}
@@ -97,7 +101,7 @@ export default function HabitsSection() {
 
       {status === 'ready' && habits.length > 0 && (
         <ul className="habit-list">
-          {habits.map((habit) =>
+          {previewOf(habits, full).map((habit) =>
             editing === habit.id ? (
               <li key={habit.id}>
                 <HabitForm
@@ -139,6 +143,7 @@ export default function HabitsSection() {
           )}
         </ul>
       )}
+      {!full && habits.length > 3 && <SeeMore to="/my-life/habits" a11yLabel="See all your habits" />}
 
       {confirmDelete && (
         <ConfirmDialog

@@ -1,12 +1,13 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LIST_TITLE_MAX, createList, listLists, type UserList } from '../lib/lists';
 import EmptyState from './EmptyState';
+import { SeeMore, newestFirst, previewOf, useSectionAnchor } from './ListPreview';
 
 type Status = 'loading' | 'ready' | 'error';
 
 /** The Lists area on My Life: my lists by title, and a way to start a new one. */
-export default function ListsSection() {
+export default function ListsSection({ full = false }: { full?: boolean }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('loading');
   const [lists, setLists] = useState<UserList[]>([]);
@@ -14,13 +15,15 @@ export default function ListsSection() {
   const [title, setTitle] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  useSectionAnchor('lists', sectionRef);
 
   useEffect(() => {
     let active = true;
     listLists()
       .then((all) => {
         if (!active) return;
-        setLists(all);
+        setLists(newestFirst(all));
         setStatus('ready');
       })
       .catch(() => active && setStatus('error'));
@@ -47,9 +50,9 @@ export default function ListsSection() {
   }
 
   return (
-    <section className="lists" aria-labelledby="lists-heading">
+    <section className="lists" aria-labelledby="lists-heading" ref={sectionRef}>
       <div className="goals-header">
-        <h2 id="lists-heading" className="section-title">
+        <h2 id="lists-heading" className={full ? 'sr-only' : 'section-title'}>
           Lists
         </h2>
         {!creating && (
@@ -58,7 +61,7 @@ export default function ListsSection() {
           </button>
         )}
       </div>
-      <p className="hint habits-hint">Little collections, just for you.</p>
+      {!full && <p className="hint habits-hint">Little collections, just for you.</p>}
 
       {creating && (
         <form className="card positive-form list-create" onSubmit={handleCreate} noValidate>
@@ -112,7 +115,7 @@ export default function ListsSection() {
       )}
       {status === 'ready' && lists.length > 0 && (
         <ul className="list-index">
-          {lists.map((l) => (
+          {previewOf(lists, full).map((l) => (
             <li key={l.id}>
               <Link to={`/my-life/lists/${l.id}`} className="list-link">
                 <span className="list-link-title">{l.title}</span>
@@ -122,6 +125,7 @@ export default function ListsSection() {
           ))}
         </ul>
       )}
+      {!full && lists.length > 3 && <SeeMore to="/my-life/lists" a11yLabel="See all your lists" />}
     </section>
   );
 }

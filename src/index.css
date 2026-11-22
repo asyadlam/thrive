@@ -1155,3 +1155,26 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
   .pet-fx { display: none; }
   .pet-bubble { animation: none; } /* the message simply appears, then disappears after ~3s */
 }
+
+/* ---------- List previews: "See more" under the first 3 items ---------- */
+.see-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: fit-content;
+  margin: 12px auto 0;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid var(--green-300);
+  color: var(--green-700);
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+}
+.see-more + .see-more { margin-top: 8px; }
+.see-more:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.my-affirmations .see-more { margin-top: 10px; }
+/* coming back from a list's own page lands on its section, clear of the sticky header */
+.goals, .habits, .lists, .journeys, .affirmations { scroll-margin-top: 76px; }

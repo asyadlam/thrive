@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { POSITIVE_MAX, addStandalonePositive, listAllPositives, type PositiveItem } from '../lib/positives';
 import { formatShortDay, todayKey } from '../lib/journal';
 import { useCrossFade } from './useCrossFade';
+import { SeeMore, previewOf, scrollToSection } from './ListPreview';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -18,7 +19,8 @@ function pickRandom(items: PositiveItem[], avoidKey?: string): PositiveItem | nu
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export default function PositivesSection() {
+/** Positives. On Growth: a positive to remember + the 3 newest; `full` (the Positives page) lists them all. */
+export default function PositivesSection({ full = false }: { full?: boolean }) {
   const [status, setStatus] = useState<Status>('loading');
   const [items, setItems] = useState<PositiveItem[]>([]);
   const [featured, setFeatured] = useState<PositiveItem | null>(null);
@@ -37,7 +39,7 @@ export default function PositivesSection() {
     if (!wantsAdd && params.get('section') !== 'positives') return;
     if (wantsAdd) setAdding(true);
     setParams({}, { replace: true });
-    requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ block: 'start' }));
+    scrollToSection(sectionRef);
   }, [params, setParams]);
 
   const refresh = useCallback(async (keepFeatured?: PositiveItem | null) => {
@@ -81,10 +83,11 @@ export default function PositivesSection() {
 
   return (
     <section className="positives" aria-labelledby="positives-heading" ref={sectionRef}>
-      <h2 id="positives-heading" className="section-title">
+      <h2 id="positives-heading" className={full ? 'sr-only' : 'section-title'}>
         Positives
       </h2>
 
+      {!full && (
       <div className="card remember-card" aria-live="polite">
         <span className="remember-label">A positive to remember</span>
         {status === 'loading' ? (
@@ -109,6 +112,7 @@ export default function PositivesSection() {
           <p className="remember-empty">Your good moments will collect here.</p>
         )}
       </div>
+      )}
 
       <div className="positives-add">
         {adding ? (
@@ -175,7 +179,7 @@ export default function PositivesSection() {
 
       {status === 'ready' && items.length > 0 && (
         <ul className="positive-list" aria-label="All your positives, newest first">
-          {items.map((item) => (
+          {previewOf(items, full).map((item) => (
             <li key={item.key} className="positive-item">
               <span className="positive-text">{item.text}</span>
               <span className="positive-date">{positiveDate(item.date)}</span>
@@ -183,6 +187,7 @@ export default function PositivesSection() {
           ))}
         </ul>
       )}
+      {!full && items.length > 3 && <SeeMore to="/growth/positives" a11yLabel="See all your positives" />}
     </section>
   );
 }

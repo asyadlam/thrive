@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import { useCrossFade } from './useCrossFade';
+import EmptyState from './EmptyState';
+import { SeeMore, newestFirst, previewOf, useSectionAnchor } from './ListPreview';
 import {
   AFFIRMATION_MAX,
   addCustomAffirmation,
@@ -16,7 +18,19 @@ function pickRandom(items: AffirmationItem[], avoidKey?: string): AffirmationIte
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-export default function AffirmationsSection() {
+/** On Growth my affirmations stay folded away under "Your affirmations"; on their own page they're simply listed. */
+function MineWrapper({ full, children }: { full: boolean; children: ReactNode }) {
+  if (full) return <div className="my-affirmations-full">{children}</div>;
+  return (
+    <details className="goals-completed my-affirmations">
+      <summary>Your affirmations</summary>
+      {children}
+    </details>
+  );
+}
+
+/** Affirmations. On Growth: one to read + my 3 newest; `full` (the Your affirmations page) lists all of mine. */
+export default function AffirmationsSection({ full = false }: { full?: boolean }) {
   const [mine, setMine] = useState<CustomAffirmation[]>([]);
   const [shown, setShown] = useState<AffirmationItem>(() => pickRandom(builtInItems()));
   const [adding, setAdding] = useState(false);
@@ -27,6 +41,8 @@ export default function AffirmationsSection() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CustomAffirmation | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const sectionRef = useRef<HTMLElement>(null);
+  useSectionAnchor('affirmations', sectionRef);
 
   const fade = useCrossFade(shown, (a, b) => a.key === b.key && a.text === b.text);
 
@@ -93,11 +109,12 @@ export default function AffirmationsSection() {
   }
 
   return (
-    <section className="affirmations" aria-labelledby="affirmations-heading">
-      <h2 id="affirmations-heading" className="section-title">
+    <section className="affirmations" aria-labelledby="affirmations-heading" ref={sectionRef}>
+      <h2 id="affirmations-heading" className={full ? 'sr-only' : 'section-title'}>
         Affirmations
       </h2>
 
+      {!full && (
       <div className="card affirmation-card">
         <div className={`crossfade${fade.faded ? ' faded' : ''}`}>
           <p className="affirmation-text" aria-live="polite">
@@ -113,6 +130,7 @@ export default function AffirmationsSection() {
           Another one
         </button>
       </div>
+      )}
 
       <div className="affirmations-add">
         {adding ? (
@@ -177,11 +195,12 @@ export default function AffirmationsSection() {
         </p>
       )}
 
+      {full && mine.length === 0 && !loadFailed && <EmptyState>Affirmations you write will show up here.</EmptyState>}
+
       {mine.length > 0 && (
-        <details className="goals-completed my-affirmations">
-          <summary>Your affirmations</summary>
+        <MineWrapper full={full}>
           <ul className="affirmation-list">
-            {mine.map((a) => (
+            {previewOf(newestFirst(mine), full).map((a) => (
               <li key={a.id} className="affirmation-item">
                 <span className="affirmation-item-text">{a.text}</span>
                 <button
@@ -195,7 +214,8 @@ export default function AffirmationsSection() {
               </li>
             ))}
           </ul>
-        </details>
+          {!full && mine.length > 3 && <SeeMore to="/growth/affirmations" a11yLabel="See all your affirmations" />}
+        </MineWrapper>
       )}
 
       {confirmDelete && (
