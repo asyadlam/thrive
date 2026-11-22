@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icons/favicon.svg', 'apple-touch-icon.png', 'logo-wordmark.png'],
+      includeAssets: ['favicon.ico', 'favicon.png', 'apple-touch-icon.png', 'logo-wordmark.png'],
       manifest: {
         name: 'Thrive',
         short_name: 'Thrive',
