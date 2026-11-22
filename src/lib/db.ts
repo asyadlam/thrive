@@ -152,3 +152,22 @@ export function idbReplaceStores(contents: Record<string, unknown[]>): Promise<v
       }),
   );
 }
+
+/** Add/put records into several stores in ONE transaction (nothing is cleared): all succeed, or nothing changes. */
+export function idbPutMany(contents: Record<string, unknown[]>): Promise<void> {
+  const names = Object.keys(contents).filter((n) => contents[n].length > 0);
+  if (names.length === 0) return Promise.resolve();
+  return openDb().then(
+    (db) =>
+      new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(names, 'readwrite');
+        for (const name of names) {
+          const store = tx.objectStore(name);
+          for (const v of contents[name]) store.put(v);
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error ?? new Error('Adding was interrupted.'));
+        tx.onabort = () => reject(tx.error ?? new Error('Adding was interrupted.'));
+      }),
+  );
+}

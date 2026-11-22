@@ -20,6 +20,7 @@ import { listCustomAffirmations } from '../lib/affirmations';
 import { listHabits } from '../lib/habits';
 import { listLists } from '../lib/lists';
 import { listJourneys } from '../lib/journeys';
+import { applyMerge, describeCounts, planMerge, totalAdded, type MergePlan } from '../lib/merge';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -37,7 +38,9 @@ type Current = {
 
 export default function MyDataSection({ onRestored }: { onRestored: () => void }) {
   const [lastBackupAt, setLastBackup] = useState(getLastBackupAt);
-  const [busy, setBusy] = useState<'backup' | 'readable' | 'reading' | 'restoring' | null>(null);
+  const [busy, setBusy] = useState<'backup' | 'readable' | 'reading' | 'restoring' | 'merge-reading' | 'merging' | null>(null);
+  const [mergePlan, setMergePlan] = useState<MergePlan | null>(null);
+  const mergeInput = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<Message>(null);
   const [pending, setPending] = useState<(CheckedBackup & Current) | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -150,6 +153,56 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
 
   const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
+  // Merge step 1: pick + check the file and work out what would be added. Nothing changes here.
+  async function handleMergeFile(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setBusy('merge-reading');
+    setMessage(null);
+    try {
+      const plan = await planMerge(await readBackupFile(file));
+      if (totalAdded(plan.added) === 0) {
+        setMessage({
+          kind: 'ok',
+          text: `Everything in this backup is already here, so there's nothing to add (${plural(
+            plan.skipped,
+            'item',
+            'items',
+          )} already present).`,
+        });
+      } else {
+        setMergePlan(plan);
+      }
+    } catch (err) {
+      setMessage({
+        kind: 'error',
+        text: err instanceof BackupError ? err.message : "That file couldn't be read as a Thrive backup.",
+      });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // Merge step 2: only after you tap Add.
+  async function handleMerge() {
+    if (!mergePlan) return;
+    setBusy('merging');
+    try {
+      await applyMerge(mergePlan);
+      setMessage({
+        kind: 'ok',
+        text: `Added ${describeCounts(mergePlan.added)}. Skipped ${plural(mergePlan.skipped, 'item', 'items')} already here.`,
+      });
+      onRestored();
+    } catch {
+      setMessage({ kind: 'error', text: "Adding didn't finish, so nothing was changed. Please try again." });
+    } finally {
+      setMergePlan(null);
+      setBusy(null);
+    }
+  }
+
   function restoreMessage(b: CheckedBackup & Current) {
     const has = [plural(b.quickCount, 'quick entry', 'quick entries'), plural(b.talkCount, 'journal page', 'journal pages')];
     if (b.goals) has.push(plural(b.goals.length, 'goal', 'goals'));
@@ -204,6 +257,9 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         <button type="button" className="btn-secondary" onClick={() => fileInput.current?.click()} disabled={busy !== null}>
           {busy === 'reading' ? 'Checking file…' : 'Restore from backup'}
         </button>
+        <button type="button" className="btn-secondary" onClick={() => mergeInput.current?.click()} disabled={busy !== null}>
+          {busy === 'merge-reading' ? 'Checking file…' : 'Add a backup to my data'}
+        </button>
         <button type="button" className="btn-secondary" onClick={handleReadable} disabled={busy !== null}>
           {busy === 'readable' ? 'Preparing…' : 'Download readable copy'}
         </button>
@@ -215,6 +271,15 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
           tabIndex={-1}
           aria-hidden="true"
           onChange={handleFile}
+        />
+        <input
+          ref={mergeInput}
+          type="file"
+          accept="application/json,.json"
+          className="sr-only"
+          tabIndex={-1}
+          aria-hidden="true"
+          onChange={handleMergeFile}
         />
       </div>
 
@@ -231,6 +296,21 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
           busyLabel="Restoring…"
           onConfirm={handleRestore}
           onCancel={() => setPending(null)}
+        />
+      )}
+
+      {mergePlan && (
+        <ConfirmDialog
+          title="Add this backup to your data?"
+          message={`This will ADD anything from the backup that isn't already here. Nothing will be deleted or overwritten. It would add ${describeCounts(
+            mergePlan.added,
+          )}, and skip ${plural(mergePlan.skipped, 'item', 'items')} that ${mergePlan.skipped === 1 ? 'is' : 'are'} already here. Your settings stay as they are.`}
+          confirmLabel="Add"
+          busy={busy === 'merging'}
+          busyLabel="Adding…"
+          tone="gentle"
+          onConfirm={handleMerge}
+          onCancel={() => setMergePlan(null)}
         />
       )}
     </section>
