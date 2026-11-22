@@ -9,7 +9,9 @@ import {
   MAX_CHAT_MESSAGES,
   TalkFailure,
   askCompanion,
-  downloadTranscript,
+  openingRequest,
+  rememberOpening,
+  toTranscript,
   soundsLikeCrisis,
   type ChatMessage,
   type TalkMode,
@@ -27,7 +29,7 @@ type Summary =
   | { state: 'declined' };
 
 const CONSENT =
-  'The companion will read only this entry to talk it through with you. The text of this entry is sent to our AI provider (Groq) for this conversation. The chat itself isn’t saved unless you choose to save a summary.';
+  'The companion will read only this entry to talk it through with you. The text of this entry is sent to our AI provider (Groq) for this conversation. The chat itself isn’t saved unless you choose to save a summary. If you save a summary, that chat’s transcript is kept on the entry (on this device only) so you can download it later.';
 
 /** Shown if the companion can't send its goodbye: ending always works from your side. */
 const LOCAL_CLOSING = 'Thank you for talking it through. Be gentle with yourself — and here’s to a softer tomorrow.';
@@ -96,7 +98,9 @@ export default function TalkChatPage() {
     const controller = new AbortController();
     request.current = controller;
     try {
-      const { reply, crisis } = await askCompanion(mode, entryText, toApi(history), controller.signal);
+      const opening = mode === 'open' ? openingRequest() : undefined;
+      const { reply, crisis, builtIn } = await askCompanion(mode, entryText, toApi(history), controller.signal, opening);
+      if (opening) rememberOpening(opening, reply, builtIn);
       const lastUser = [...history].reverse().find((m) => m.role === 'user');
       const showHelp = mode !== 'open' && (crisis || (!!lastUser && soundsLikeCrisis(lastUser.content)));
       setMessages([...history, { role: 'assistant', content: reply, crisis: showHelp }]);
@@ -175,7 +179,7 @@ export default function TalkChatPage() {
     if (!id) return;
     setSummary({ state: 'saving', text });
     try {
-      await saveTalkSummary(id, text);
+      await saveTalkSummary(id, text, toTranscript(messages)); // the chat is kept only now, with its summary
       setSummary({ state: 'saved' });
     } catch {
       setSummary({ state: 'shown', text });
@@ -204,14 +208,7 @@ export default function TalkChatPage() {
 
       {(phase === 'chatting' || phase === 'ended') && (
         <div className="chat">
-          <div className="chat-top">
-            <p className="chat-note">This chat isn’t saved.</p>
-            {messages.length > 0 && (
-              <button type="button" className="btn-secondary btn-small" onClick={() => downloadTranscript(title, toApi(messages))}>
-                Download transcript
-              </button>
-            )}
-          </div>
+          <p className="chat-note">This chat isn’t saved.</p>
 
           <ol className="chat-list" aria-live="polite" aria-label="Conversation">
             {messages.map((m, i) => (
@@ -321,9 +318,6 @@ export default function TalkChatPage() {
               )}
               {summary.state === 'saved' && <p className="save-status">Saved to your entry, under “From your talk”.</p>}
               {!id && <p className="hint">This page wasn’t saved, so there’s nowhere to keep a summary this time.</p>}
-              <button type="button" className="btn-secondary chat-back" onClick={() => downloadTranscript(title, toApi(messages))}>
-                Download transcript
-              </button>
               <Link to={backTo} state={backState} className="btn-secondary chat-back">
                 Back to your entry
               </Link>

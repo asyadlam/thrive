@@ -2,6 +2,7 @@ import {
   MOODS,
   formatLongDay,
   formatTime,
+  cleanTranscript,
   isIsoTime,
   legacySummaryId,
   listAllEntries,
@@ -129,10 +130,12 @@ function checkEntry(raw: unknown, i: number): JournalEntry {
       for (const raw of talkSummaries as unknown[]) {
         const s = (raw ?? {}) as Record<string, unknown>;
         if (!isStr(s.text) || !s.text.trim()) continue;
+        const transcript = cleanTranscript(s.transcript); // the saved chat, if this summary has one
         list.push({
           id: isStr(s.id) && s.id ? s.id : `summary-${newId()}`,
           text: s.text,
           createdAt: isStr(s.createdAt) && !Number.isNaN(Date.parse(s.createdAt)) ? s.createdAt : updatedAt,
+          ...(transcript ? { transcript } : {}),
         });
       }
     }

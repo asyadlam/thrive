@@ -36,8 +36,26 @@ export type TalkEntry = EntryBase & {
 /** "Sunday, November 22, 2026 at 9:41 PM" for a saved summary. */
 export const formatTalkSummaryDate = (iso: string) => `${formatLongDay(todayKey(new Date(iso)))} at ${formatTime(iso)}`;
 
-/** One saved summary of a "Talk about this" conversation. */
-export type TalkSummary = { id: string; text: string; createdAt: string };
+/** One line of a saved chat: who said it and what they said. */
+export type TranscriptLine = { role: 'user' | 'assistant'; text: string };
+
+/**
+ * One saved summary of a "Talk about this" conversation. `transcript` is that chat, kept only because the
+ * summary was saved (summaries saved before transcripts existed don't have one).
+ */
+export type TalkSummary = { id: string; text: string; createdAt: string; transcript?: TranscriptLine[] };
+
+/** Keeps only well-formed transcript lines (used when saving and when reading a backup). */
+export function cleanTranscript(raw: unknown): TranscriptLine[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const lines = raw
+    .filter(
+      (l): l is TranscriptLine =>
+        !!l && ((l as TranscriptLine).role === 'user' || (l as TranscriptLine).role === 'assistant') && typeof (l as TranscriptLine).text === 'string',
+    )
+    .map((l) => ({ role: l.role, text: l.text }));
+  return lines.length ? lines : undefined;
+}
 
 /** The id an old single summary gets when it becomes the first item of the list (the same everywhere). */
 export const legacySummaryId = (entryId: string) => `summary-${entryId}-legacy`;
@@ -153,13 +171,22 @@ export async function saveTalkEntry(draft: TalkDraft, existing?: TalkEntry): Pro
 
 export const TALK_SUMMARY_MAX = 1000;
 
-/** Adds a "From your talk" summary to a journal page. Earlier summaries are always kept. */
-export async function saveTalkSummary(entryId: string, summary: string): Promise<TalkEntry> {
+/**
+ * Adds a "From your talk" summary to a journal page, together with that chat's transcript.
+ * This is the only moment a chat is ever stored. Earlier summaries are always kept.
+ */
+export async function saveTalkSummary(entryId: string, summary: string, transcript: TranscriptLine[]): Promise<TalkEntry> {
   const existing = await getTalkEntry(entryId);
   if (!existing) throw new Error('This journal page couldn’t be found on this device.');
   const now = new Date().toISOString();
   const current = withSummaryList(existing);
-  const added: TalkSummary = { id: `summary-${newId()}`, text: summary.trim().slice(0, TALK_SUMMARY_MAX), createdAt: now };
+  const lines = cleanTranscript(transcript);
+  const added: TalkSummary = {
+    id: `summary-${newId()}`,
+    text: summary.trim().slice(0, TALK_SUMMARY_MAX),
+    createdAt: now,
+    ...(lines ? { transcript: lines } : {}),
+  };
   const updated: TalkEntry = {
     ...current,
     talkSummaries: [...talkSummariesOf(current), added],

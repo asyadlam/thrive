@@ -1371,12 +1371,11 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .talk-summary { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; background: var(--tint-sage); border-radius: var(--row-radius); }
 .talk-summary p { margin: 0; line-height: 1.55; overflow-wrap: anywhere; }
 .talk-summary-date { font-size: 0.8rem; font-weight: 700; color: var(--ink-soft); }
+.talk-transcript-btn { align-self: flex-start; margin: 2px 0 -8px -6px; }
 .talk-summary-card { margin-top: 12px; }
 
 .chat { display: flex; flex-direction: column; gap: 12px; }
-.chat-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-top: -8px; }
-.chat-note { margin: 0; font-size: 0.85rem; color: var(--ink-soft); }
-.chat-top .btn-secondary { margin-right: -6px; }
+.chat-note { margin: -8px 0 0; font-size: 0.85rem; color: var(--ink-soft); }
 .chat-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 .chat-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
 .chat-row.from-me { justify-content: flex-end; }
