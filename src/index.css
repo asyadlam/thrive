@@ -1453,3 +1453,4 @@ textarea.input.chat-input { min-height: 44px; max-height: 160px; resize: none; b
 .chat-summary p { margin: 0; line-height: 1.55; font-style: italic; }
 .chat-back { align-self: center; }
 @media (prefers-reduced-motion: reduce) { .chat-typing span { animation: none; } }
+.chat-debug { flex-basis: 100%; font-size: 0.75rem; color: var(--ink-faint); overflow-wrap: anywhere; }

@@ -2,8 +2,9 @@
   POST /api/talk — the "Talk about this" companion.
 
   The app sends ONE journal entry plus the conversation so far, and gets back the companion's next message.
-  Nothing is logged or stored here: not the API key, not the entry, not the conversation.
-  (There are deliberately no console.log calls in this file.) The app itself keeps the chat only in memory.
+  Nothing is stored here, and the API key, the entry and the conversation are never logged. The only log lines
+  are provider failures (HTTP status + the provider's error code/message), so problems show up in Vercel logs.
+  The app itself keeps the chat only in memory.
 
   Body (JSON):
     { mode: 'open' | 'reply' | 'close' | 'summary',
@@ -16,7 +17,9 @@
    Any provider with an OpenAI-style  POST {BASE_URL}/chat/completions  API works.
 
    CHAT_BASE_URL            default: https://api.groq.com/openai/v1
-   CHAT_MODEL               default: llama-3.3-70b-versatile
+   CHAT_MODEL               default: openai/gpt-oss-120b
+                            (llama-3.3-70b-versatile was shut down by Groq on 16 Aug 2026 for free and developer
+                            accounts — calls to it fail. Groq names openai/gpt-oss-120b as its replacement.)
    TRANSCRIPTION_API_KEY    the SAME Groq key dictation already uses. No new key. Only read here, on the server.
 
    Optional (shared with /api/transcribe): ALLOWED_ORIGINS, UPSTASH_REDIS_REST_URL / _TOKEN (or KV_REST_API_URL / _TOKEN).
@@ -26,7 +29,7 @@ const env = (globalThis as unknown as { process: { env: Record<string, string | 
 function providerConfig() {
   return {
     baseUrl: (env.CHAT_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, ''),
-    model: env.CHAT_MODEL || 'llama-3.3-70b-versatile',
+    model: env.CHAT_MODEL || 'openai/gpt-oss-120b',
     apiKey: env.TRANSCRIPTION_API_KEY || '', // same Groq account key as dictation; no default, on purpose
   };
 }
@@ -37,6 +40,9 @@ const MAX_MESSAGE_CHARS = 4000;
 const MAX_ENTRY_CHARS = 16000; // a very long entry is trimmed to this for the conversation
 const MAX_BODY_BYTES = 300 * 1024;
 const PROVIDER_TIMEOUT_MS = 45_000;
+
+/** While debugging: error replies also carry the provider's HTTP status and error code (never any text). */
+const DEBUG_PROVIDER_ERRORS = true;
 
 /* ---------------------------------------------- the companion ---------------------------------------------- */
 
@@ -81,7 +87,29 @@ function json(body: unknown, status = 200): Response {
     headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
   });
 }
-const fail = (error: ErrorCode, status: number) => json({ error }, status);
+const fail = (error: ErrorCode, status: number, debug?: { providerStatus?: number; providerCode?: string }) =>
+  json(DEBUG_PROVIDER_ERRORS && debug ? { error, ...debug } : { error }, status);
+
+/**
+ * Writes a provider failure to the Vercel logs: HTTP status, mode, model, and the provider's own error
+ * code/type/message (shortened). Never the API key, the entry, or the conversation.
+ */
+function logProviderError(info: { mode: string; model: string; status: number; body: string; apiKey: string }): string {
+  let code = '';
+  let detail = '';
+  try {
+    const parsed = JSON.parse(info.body) as { error?: { code?: unknown; type?: unknown; message?: unknown } };
+    const err = parsed.error ?? {};
+    code = String(err.code ?? err.type ?? '');
+    detail = String(err.message ?? '');
+  } catch {
+    detail = info.body;
+  }
+  if (info.apiKey) detail = detail.split(info.apiKey).join('[key]');
+  detail = detail.replace(/\s+/g, ' ').slice(0, 200);
+  console.error(`[talk] provider error: status=${info.status} mode=${info.mode} model=${info.model} code=${code || '-'} message=${detail || '-'}`);
+  return code;
+}
 
 function hostOf(value: string | null | undefined): string {
   if (!value) return '';
@@ -175,6 +203,23 @@ function readBody(raw: unknown): { mode: Mode; entry: { title: string; body: str
   return { mode, entry: { title, body }, messages };
 }
 
+/**
+ * Makes the history a clean alternating list: merges back-to-back messages from the same side (e.g. after a
+ * failed reply) and starts with a user turn, since the companion spoke first.
+ */
+function tidyHistory(messages: ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  for (const m of messages) {
+    const content = m.content.trim();
+    if (!content) continue;
+    const prev = out.at(-1);
+    if (prev && prev.role === m.role) prev.content = `${prev.content}\n\n${content}`;
+    else out.push({ role: m.role, content });
+  }
+  if (out[0]?.role === 'assistant') out.unshift({ role: 'user', content: '(I opened my journal entry to talk it through.)' });
+  return out;
+}
+
 /** Is there real writing in the entry, or is it blank / nearly blank? */
 const hasWriting = (body: string) => body.replace(/[\s\p{P}]/gu, '').length >= 12;
 
@@ -217,7 +262,7 @@ export async function POST(request: Request): Promise<Response> {
     const transcript = messages.map((m) => `${m.role === 'user' ? 'Me' : 'Companion'}: ${m.content}`).join('\n');
     chat.push({ role: 'user', content: `${SUMMARIZER}\n\nThe conversation:\n${transcript}` });
   } else {
-    chat.push(...messages);
+    chat.push(...tidyHistory(messages));
     if (mode === 'open') chat.push({ role: 'system', content: OPENER });
     if (mode === 'close') chat.push({ role: 'system', content: CLOSER });
     if (crisis && mode === 'reply')
@@ -227,6 +272,7 @@ export async function POST(request: Request): Promise<Response> {
       });
   }
 
+  const isGptOss = /(^|\/)gpt-oss/i.test(provider.model);
   let res: Response;
   try {
     res = await fetch(`${provider.baseUrl}/chat/completions`, {
@@ -236,23 +282,40 @@ export async function POST(request: Request): Promise<Response> {
         model: provider.model,
         messages: chat,
         temperature: mode === 'summary' ? 0.3 : 0.7,
-        max_tokens: mode === 'summary' ? 220 : 320,
+        max_completion_tokens: 1024,
+        // GPT-OSS models think before answering: keep that short and out of the reply.
+        ...(isGptOss ? { reasoning_effort: 'low', include_reasoning: false } : {}),
       }),
       signal: AbortSignal.timeout(PROVIDER_TIMEOUT_MS),
     });
-  } catch {
-    return fail('provider_error', 502);
+  } catch (err) {
+    const why = err instanceof Error && err.name === 'TimeoutError' ? 'timeout' : 'network';
+    console.error(`[talk] provider unreachable: ${why} mode=${mode} model=${provider.model}`);
+    return fail('provider_error', 502, { providerCode: why });
   }
-  if (res.status === 429) return fail('provider_busy', 503);
-  if (!res.ok) return fail('provider_error', 502);
 
-  try {
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
-    const content = data.choices?.[0]?.message?.content;
-    const reply = typeof content === 'string' ? content.trim().replace(/^(companion|assistant)\s*:\s*/i, '') : '';
-    if (!reply) return fail('provider_error', 502);
-    return json({ reply, crisis });
-  } catch {
-    return fail('provider_error', 502);
+  const raw = await res.text().catch(() => '');
+  if (!res.ok) {
+    const providerCode = logProviderError({ mode, model: provider.model, status: res.status, body: raw, apiKey: provider.apiKey });
+    const debug = { providerStatus: res.status, providerCode };
+    return res.status === 429 ? fail('provider_busy', 503, debug) : fail('provider_error', 502, debug);
   }
+
+  // Read the reply without ever throwing: normally JSON, but plain text is accepted as the reply too.
+  let reply = '';
+  let finish = '';
+  try {
+    const data = JSON.parse(raw) as { choices?: Array<{ message?: { content?: unknown }; finish_reason?: unknown }> };
+    const content = data.choices?.[0]?.message?.content;
+    reply = typeof content === 'string' ? content : '';
+    finish = String(data.choices?.[0]?.finish_reason ?? '');
+  } catch {
+    reply = raw;
+  }
+  reply = reply.trim().replace(/^(companion|assistant)\s*:\s*/i, '');
+  if (!reply) {
+    console.error(`[talk] provider returned no reply text: mode=${mode} model=${provider.model} finish_reason=${finish || '-'}`);
+    return fail('provider_error', 502, { providerStatus: res.status, providerCode: `empty_reply:${finish || '-'}` });
+  }
+  return json({ reply, crisis });
 }

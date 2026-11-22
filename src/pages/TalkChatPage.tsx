@@ -5,7 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { PET_ART } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
 import { loadSettings } from '../lib/settings';
-import { MAX_CHAT_MESSAGES, askCompanion, soundsLikeCrisis, type ChatMessage, type TalkError, type TalkMode } from '../lib/talk';
+import { MAX_CHAT_MESSAGES, TalkFailure, askCompanion, soundsLikeCrisis, type ChatMessage, type TalkMode } from '../lib/talk';
 
 /** One chat bubble. `crisis` shows the Get Help card under it. Kept only in memory, never saved. */
 type Bubble = ChatMessage & { crisis?: boolean };
@@ -21,11 +21,17 @@ type Summary =
 const CONSENT =
   'The companion will read only this entry to talk it through with you. The text of this entry is sent to our AI provider (Groq) for this conversation. The chat itself isn’t saved unless you choose to save a summary.';
 
+/** Shown if the companion can't send its goodbye: ending always works from your side. */
+const LOCAL_CLOSING = 'Thank you for talking it through. Be gentle with yourself — and here’s to a softer tomorrow.';
+
 function sorry(e: unknown): string {
-  return e === 'daily_limit'
+  return e instanceof TalkFailure && e.code === 'daily_limit'
     ? 'That’s all the talking for today. Your entry is safe, and the companion will be here tomorrow.'
     : 'I couldn’t reply just now. Your words are still here — try again in a moment.';
 }
+
+/** While debugging: what went wrong, in short (status codes only, never any of your words). */
+const debugDetail = (e: unknown) => (e instanceof TalkFailure && e.detail ? e.detail : '');
 
 /** "Talk about this": a calm chat about one journal page. Leaving the page discards the chat. */
 export default function TalkChatPage() {
@@ -40,7 +46,7 @@ export default function TalkChatPage() {
   const [messages, setMessages] = useState<Bubble[]>([]);
   const [draft, setDraft] = useState('');
   const [waiting, setWaiting] = useState(false);
-  const [problem, setProblem] = useState<{ text: string; retry: TalkMode | null } | null>(null);
+  const [problem, setProblem] = useState<{ text: string; retry: TalkMode | null; detail?: string } | null>(null);
   const [summary, setSummary] = useState<Summary>({ state: 'idle' });
 
   const request = useRef<AbortController | null>(null);
@@ -90,14 +96,24 @@ export default function TalkChatPage() {
     } catch (e) {
       if (controller.signal.aborted) return;
       const lastUser = [...history].reverse().find((m) => m.role === 'user');
-      // Even if the companion can't answer, someone in crisis still sees where to get help.
-      if (lastUser && soundsLikeCrisis(lastUser.content)) {
-        setMessages(history.map((m) => (m === lastUser ? { ...m, crisis: true } : m)));
+      const crisis = !!lastUser && soundsLikeCrisis(lastUser.content);
+      if (mode === 'close') {
+        // Ending never depends on the server: close with a built-in goodbye and carry on.
+        setMessages([...history, { role: 'assistant', content: LOCAL_CLOSING, crisis }]);
+        setPhase('ended');
+        setProblem({ text: '', retry: null, detail: debugDetail(e) });
+        return;
       }
-      setProblem({ text: sorry(e as TalkError), retry: e === 'daily_limit' ? null : mode });
+      // Even if the companion can't answer, someone in crisis still sees where to get help.
+      if (crisis) setMessages(history.map((m) => (m === lastUser ? { ...m, crisis: true } : m)));
+      const limit = e instanceof TalkFailure && e.code === 'daily_limit';
+      setProblem({ text: sorry(e), retry: limit ? null : mode, detail: debugDetail(e) });
     } finally {
-      setWaiting(false);
-      request.current = null;
+      // Only the newest request may clear the "waiting" state (End can replace a slow reply).
+      if (request.current === controller) {
+        setWaiting(false);
+        request.current = null;
+      }
     }
   }
 
@@ -125,8 +141,9 @@ export default function TalkChatPage() {
     }
   }
 
+  /** Always works: stops a reply that's still on its way, then says goodbye (locally if it has to). */
   function end() {
-    if (waiting) return;
+    request.current?.abort();
     if (messages.length === 0) return navigate(backTo, { state: backState });
     void ask('close', messages);
   }
@@ -138,7 +155,11 @@ export default function TalkChatPage() {
       setSummary({ state: 'shown', text: reply });
     } catch (e) {
       setSummary({ state: 'idle' });
-      setProblem({ text: sorry(e as TalkError), retry: null });
+      setProblem({
+        text: 'The summary couldn’t be written just now. You can try again, or simply head back — nothing is lost.',
+        retry: null,
+        detail: debugDetail(e),
+      });
     }
   }
 
@@ -216,9 +237,10 @@ export default function TalkChatPage() {
             )}
           </ol>
 
-          {problem && (
+          {problem && (problem.text || problem.detail) && (
             <div className="chat-problem" role="status">
-              <span>{problem.text}</span>
+              {problem.text && <span>{problem.text}</span>}
+              {problem.detail && <small className="chat-debug">Details for debugging: {problem.detail}</small>}
               {problem.retry && (
                 <button type="button" className="btn-secondary btn-small" onClick={() => void ask(problem.retry!, messages)}>
                   Try again
@@ -250,7 +272,7 @@ export default function TalkChatPage() {
             </form>
           )}
           {phase === 'chatting' && (
-            <button type="button" className="btn-secondary chat-end" onClick={end} disabled={waiting}>
+            <button type="button" className="btn-secondary chat-end" onClick={end}>
               End conversation
             </button>
           )}
