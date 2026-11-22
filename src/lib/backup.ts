@@ -18,11 +18,13 @@ import {
   GOALS_STORE,
   HABITS_STORE,
   JOURNAL_STORE,
+  LISTS_STORE,
   LETTERS_STORE,
   POSITIVES_STORE,
   idbReplaceStores,
 } from './db';
 import { habitFromBackup, listHabits, type Habit } from './habits';
+import { listFromBackup, listLists, type UserList } from './lists';
 import { affirmationFromBackup, listCustomAffirmations, type CustomAffirmation } from './affirmations';
 import { letterFromBackup, lettersForBackup, type BackupLetter, type Letter } from './letters';
 import { listStandalonePositives, positiveFromBackup, type StandalonePositive } from './positives';
@@ -34,8 +36,9 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
    version 4: same, plus letters: [...] (Time Capsule; sealed ones keep their text encoded in "sealedBody")
    version 5: letters may have sealType "milestone" with a milestone (event text) and unsealedAt, instead of an unlockDate
    version 6: same, plus affirmations: [...] (my own; built-in ones aren't included)
-   version 7: same, plus habits: [...] (habit swaps from My Life) */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 7 } as const;
+   version 7: same, plus habits: [...] (habit swaps from My Life)
+   version 8: same, plus lists: [...] (each list holds its items) */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 8 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
@@ -47,6 +50,7 @@ export type Backup = typeof FORMAT & {
   letters: BackupLetter[];
   affirmations: CustomAffirmation[];
   habits: Habit[];
+  lists: UserList[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -60,6 +64,7 @@ export async function buildBackup(): Promise<Backup> {
     letters: await lettersForBackup(),
     affirmations: await listCustomAffirmations(),
     habits: await listHabits(),
+    lists: await listLists(),
   };
 }
 
@@ -126,6 +131,8 @@ export type CheckedBackup = {
   affirmations: CustomAffirmation[] | null;
   /** null = an older backup made before habits existed (current habits are kept). */
   habits: Habit[] | null;
+  /** null = an older backup made before lists existed (current lists are kept). */
+  lists: UserList[] | null;
 };
 
 export async function readBackupFile(file: File): Promise<CheckedBackup> {
@@ -218,6 +225,19 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     });
     habits = [...habitsById.values()];
   }
+
+  let lists: UserList[] | null = null;
+  if (d.lists !== undefined) {
+    if (!Array.isArray(d.lists)) throw new BackupError("This backup's lists aren't valid.");
+    const listsById = new Map<string, UserList>();
+    d.lists.forEach((raw, i) => {
+      const list = listFromBackup(raw);
+      if (!list) throw new BackupError(`List ${i + 1} in this backup isn't valid (missing a title, or an item without text).`);
+      const existing = listsById.get(list.id);
+      if (!existing || existing.updatedAt < list.updatedAt) listsById.set(list.id, list);
+    });
+    lists = [...listsById.values()];
+  }
   return {
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
     settings: normalizeSettings(d.settings),
@@ -229,10 +249,11 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     letters,
     affirmations,
     habits,
+    lists,
   };
 }
 
-/** Replace everything in the app with a checked backup. All journal data, goals, positives, letters, affirmations and habits are swapped in one step. */
+/** Replace everything in the app with a checked backup. All journal data, goals, positives, letters, affirmations, habits and lists are swapped in one step. */
 export async function applyBackup(backup: CheckedBackup): Promise<void> {
   const stores: Record<string, unknown[]> = { [JOURNAL_STORE]: backup.entries };
   if (backup.goals) stores[GOALS_STORE] = backup.goals;
@@ -240,6 +261,7 @@ export async function applyBackup(backup: CheckedBackup): Promise<void> {
   if (backup.letters) stores[LETTERS_STORE] = backup.letters;
   if (backup.affirmations) stores[AFFIRMATIONS_STORE] = backup.affirmations;
   if (backup.habits) stores[HABITS_STORE] = backup.habits;
+  if (backup.lists) stores[LISTS_STORE] = backup.lists;
   await idbReplaceStores(stores);
   saveSettings(backup.settings);
 }

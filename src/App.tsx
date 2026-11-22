@@ -8,6 +8,7 @@ import LookBackPage from './pages/LookBackPage';
 import EntryDetailPage from './pages/EntryDetailPage';
 import TimeCapsulePage from './pages/TimeCapsulePage';
 import LetterPage from './pages/LetterPage';
+import ListPage from './pages/ListPage';
 import Growth from './pages/Growth';
 import MyLife from './pages/MyLife';
 import Learn from './pages/Learn';
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="journal/time-capsule/:id" element={<LetterPage />} />
         <Route path="growth" element={<Growth />} />
         <Route path="my-life" element={<MyLife />} />
+        <Route path="my-life/lists/:id" element={<ListPage />} />
         <Route path="learn" element={<Learn />} />
         <Route path="settings" element={<Settings />} />
         <Route path="help" element={<Help />} />
