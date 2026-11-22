@@ -52,3 +52,32 @@ export function memoryFromBackup(raw: unknown): MemoryNote | null {
     updatedAt: isIsoTime(m.updatedAt) ? m.updatedAt : createdAt,
   };
 }
+
+/* ---------- Not twice: a quick check that a suggested note isn't one I already have ---------- */
+
+const STOP = new Set(
+  'the a an and or but of to in on at for with about is are was were be been it its this that they them their there my me i you your we our has have had do does did not no so very really often always again'.split(
+    ' ',
+  ),
+);
+function words(text: string): Set<string> {
+  return new Set(
+    text
+      .toLowerCase()
+      .replace(/[^a-z0-9\s'-]/g, ' ')
+      .split(/\s+/)
+      .map((w) => w.replace(/(?:'s|s)$/, ''))
+      .filter((w) => w.length > 2 && !STOP.has(w)),
+  );
+}
+
+/** True if a suggested note mostly repeats the wording of a note I already have. */
+export function repeatsExistingNote(note: string, existing: string[]): boolean {
+  const a = words(note);
+  if (a.size === 0) return true;
+  return existing.some((e) => {
+    const b = words(e);
+    const shared = [...a].filter((w) => b.has(w)).length;
+    return shared / Math.min(a.size, b.size || 1) >= 0.7 || shared / new Set([...a, ...b]).size >= 0.5;
+  });
+}

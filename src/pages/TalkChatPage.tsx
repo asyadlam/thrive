@@ -5,7 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { PET_ART } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
 import { loadSettings } from '../lib/settings';
-import { MEMORY_MAX, addMemory, listMemories } from '../lib/memory';
+import { MEMORY_MAX, addMemory, listMemories, repeatsExistingNote } from '../lib/memory';
 import {
   MAX_CHAT_MESSAGES,
   TalkFailure,
@@ -187,7 +187,9 @@ export default function TalkChatPage() {
         ...memoryForChat,
         proposeNotes: companionMemory, // suggested notes only when memory is on in Settings
       });
-      setSummary({ state: 'shown', text: reply, proposals: notes.map((text) => ({ text, keep: true })) });
+      // Also checked here against every note on this device (even if this chat didn't include memory).
+      const fresh = notes.filter((n) => !repeatsExistingNote(n, memoryNotes ?? []));
+      setSummary({ state: 'shown', text: reply, proposals: fresh.map((text) => ({ text, keep: true })) });
     } catch (e) {
       setSummary({ state: 'idle' });
       setProblem({
