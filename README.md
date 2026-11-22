@@ -56,5 +56,14 @@ Thrive was built privacy-first, and the architecture enforces it rather than pro
 
 ## Building it
 
-Thrive is also a portfolio project in **directing AI coding agents**: the app was specified feature-by-feature (privacy rules, consent flows, tone guidelines for the companion, data-mer
-...[truncated 1106 chars]
+Thrive is also a portfolio project in **directing AI coding agents**: the app was specified feature-by-feature (privacy rules, consent flows, tone guidelines for the companion, data-merging backup rules), and every build step was verified live before the next began. The codebase is the output; the spec, the prompts, and the verification discipline are the portfolio.
+
+The name is a tribute to the Thrive programme, which helped the author more than traditional therapy did — this app is the journal she wished she'd had alongside it.
+
+## Status
+
+Feature-complete against the original concept (November 2026) and in daily personal use. Parked for later, deliberately: real home-screen widgets (needs a native-app step) and optional cloud sync (only if Thrive ever opens to other users — the local-first data layer, record IDs, and backup format are already the migration path).
+
+## License
+
+Personal project — all rights reserved for now. (A license may be chosen if Thrive is ever released publicly.)
