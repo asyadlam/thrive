@@ -11,13 +11,15 @@ export type AppSettings = {
   readLessons: string[];
   /** "What should Thrive call you?" ('' = greet without a name). */
   userName: string;
+  /** Companion memory: off unless I turn it on. When off, notes are kept but never used or proposed. */
+  companionMemory: boolean;
 };
 
 export const PET_NAME_MAX = 20;
 export const USER_NAME_MAX = 30;
 
 const KEY = 'thrive.settings';
-const DEFAULTS: AppSettings = { companion: 'none', petName: '', readLessons: [], userName: '' };
+const DEFAULTS: AppSettings = { companion: 'none', petName: '', readLessons: [], userName: '', companionMemory: false };
 
 /** Earlier versions called the hippo "yoshi"; keep that choice instead of resetting it. */
 const RENAMED: Record<string, Companion> = { yoshi: 'hippo' };
@@ -38,6 +40,7 @@ export function normalizeSettings(value: unknown): AppSettings {
       ? [...new Set(parsed.readLessons.filter((id): id is string => typeof id === 'string'))]
       : [],
     userName: typeof parsed.userName === 'string' ? parsed.userName.slice(0, USER_NAME_MAX) : DEFAULTS.userName,
+    companionMemory: parsed.companionMemory === true, // only ever on by my own choice
   };
 }
 

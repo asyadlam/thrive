@@ -15,6 +15,7 @@ import {
   JOURNAL_STORE,
   JOURNEYS_STORE,
   LETTERS_STORE,
+  MEMORIES_STORE,
   LISTS_STORE,
   POSITIVES_STORE,
   idbGetAll,
@@ -36,6 +37,7 @@ export type MergeCounts = {
   journeySteps: number;
   affirmations: number;
   talkSummaries: number;
+  memories: number;
 };
 
 export type MergePlan = {
@@ -58,6 +60,7 @@ const zero = (): MergeCounts => ({
   journeySteps: 0,
   affirmations: 0,
   talkSummaries: 0,
+  memories: 0,
 });
 
 type WithId = { id: string };
@@ -143,6 +146,7 @@ export async function planMerge(backup: CheckedBackup): Promise<MergePlan> {
   await flat(HABITS_STORE, backup.habits, 'habits');
   await flat(POSITIVES_STORE, backup.positives, 'positives');
   await flat(AFFIRMATIONS_STORE, backup.affirmations, 'affirmations');
+  await flat(MEMORIES_STORE, backup.memories, 'memories'); // only notes whose id isn't here yet
   await nested<UserList, UserList['items'][number]>(
     LISTS_STORE,
     backup.lists,
@@ -180,6 +184,7 @@ const LABELS: [keyof MergeCounts, string, string][] = [
   ['journeySteps', 'journey step', 'journey steps'],
   ['affirmations', 'affirmation of your own', 'affirmations of your own'],
   ['talkSummaries', 'talk summary', 'talk summaries'],
+  ['memories', 'companion memory note', 'companion memory notes'],
 ];
 
 /** e.g. "1 journal entry, 2 list items" (only collections with something added). */

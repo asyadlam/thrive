@@ -20,6 +20,7 @@ import { listCustomAffirmations } from '../lib/affirmations';
 import { listHabits } from '../lib/habits';
 import { listLists } from '../lib/lists';
 import { listJourneys } from '../lib/journeys';
+import { listMemories } from '../lib/memory';
 import { applyMerge, describeCounts, planMerge, totalAdded, type MergePlan } from '../lib/merge';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -34,6 +35,7 @@ type Current = {
   currentHabits: number;
   currentLists: number;
   currentJourneys: number;
+  currentMemories: number;
 };
 
 export default function MyDataSection({ onRestored }: { onRestored: () => void }) {
@@ -85,7 +87,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('reading');
     setMessage(null);
     try {
-      const [checked, current, goals, positives, letters, affirmations, habits, lists, journeys] = await Promise.all([
+      const [checked, current, goals, positives, letters, affirmations, habits, lists, journeys, memories] = await Promise.all([
         readBackupFile(file),
         listAllEntries(),
         listAllGoals(),
@@ -95,6 +97,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         listHabits(),
         listLists(),
         listJourneys(),
+        listMemories(),
       ]);
       setPending({
         ...checked,
@@ -106,6 +109,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         currentHabits: habits.length,
         currentLists: lists.length,
         currentJourneys: journeys.length,
+        currentMemories: memories.length,
       });
     } catch (err) {
       setMessage({
@@ -140,7 +144,9 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
             : ''
         }${pending.habits ? `, ${pending.habits.length} ${pending.habits.length === 1 ? 'habit' : 'habits'}` : ''}${
           pending.lists ? `, ${pending.lists.length} ${pending.lists.length === 1 ? 'list' : 'lists'}` : ''
-        }${pending.journeys ? `, ${pending.journeys.length} ${pending.journeys.length === 1 ? 'journey' : 'journeys'}` : ''} and your settings.`,
+        }${pending.journeys ? `, ${pending.journeys.length} ${pending.journeys.length === 1 ? 'journey' : 'journeys'}` : ''}${
+          pending.memories ? `, ${pending.memories.length} memory ${pending.memories.length === 1 ? 'note' : 'notes'}` : ''
+        } and your settings.`,
       });
       onRestored();
     } catch {
@@ -212,6 +218,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     if (b.habits) has.push(plural(b.habits.length, 'habit', 'habits'));
     if (b.lists) has.push(plural(b.lists.length, 'list', 'lists'));
     if (b.journeys) has.push(plural(b.journeys.length, 'Fear & Confidence journey', 'Fear & Confidence journeys'));
+    if (b.memories) has.push(plural(b.memories.length, 'companion memory note', 'companion memory notes'));
     const saved = b.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(b.exportedAt)))}` : '';
     const replaced = [plural(b.currentCount, 'entry', 'entries')];
     if (b.goals) replaced.push(plural(b.currentGoals, 'goal', 'goals'));
@@ -221,6 +228,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     if (b.habits) replaced.push(plural(b.currentHabits, 'habit', 'habits'));
     if (b.lists) replaced.push(plural(b.currentLists, 'list', 'lists'));
     if (b.journeys) replaced.push(plural(b.currentJourneys, 'journey', 'journeys'));
+    if (b.memories) replaced.push(plural(b.currentMemories, 'memory note', 'memory notes'));
     const missing = [
       !b.goals && 'goals',
       !b.positives && 'saved positives',
@@ -229,6 +237,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
       !b.habits && 'habits',
       !b.lists && 'lists',
       !b.journeys && 'Fear & Confidence journeys',
+      !b.memories && 'companion memory notes',
     ]
       .filter(Boolean)
       .join(' or ');

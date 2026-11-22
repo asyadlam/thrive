@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import MyDataSection from '../components/MyDataSection';
 import { PET_ART, PetThumb } from '../components/PetCompanion';
@@ -103,6 +104,36 @@ export default function Settings() {
           {status === 'saved' && 'Saved on this device.'}
           {status === 'error' && "Couldn't save settings in this browser."}
         </p>
+      </section>
+
+      <section className="card settings-section" aria-labelledby="memory-heading">
+        <h2 id="memory-heading" className="settings-heading">
+          Companion memory
+        </h2>
+        <p className="hint">
+          Let your Talk about this companion remember a few things between talks — short notes you approve, never your chats.
+          Notes stay on this device and are only shared inside a talk you start.
+        </p>
+        <label className="switch-row">
+          <span>Remember notes I approve</span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="switch"
+            checked={settings.companionMemory}
+            onChange={(e) => update({ companionMemory: e.target.checked })}
+          />
+        </label>
+        {settings.companionMemory ? (
+          <Link to="/settings/memory" className="list-link">
+            <span className="list-link-title">What your companion remembers</span>
+            <span className="quick-action-arrow" aria-hidden="true">
+              ›
+            </span>
+          </Link>
+        ) : (
+          <p className="hint">Off: nothing is remembered or suggested, and any notes you saved earlier aren't used.</p>
+        )}
       </section>
 
       <MyDataSection

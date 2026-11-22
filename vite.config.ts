@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/favicon.svg', 'icons/apple-touch-icon.png'],
+      includeAssets: ['favicon.ico', 'icons/favicon.svg', 'apple-touch-icon.png', 'logo-wordmark.png'],
       manifest: {
         name: 'Thrive',
         short_name: 'Thrive',
@@ -16,12 +16,11 @@ export default defineConfig({
         scope: '/',
         display: 'standalone',
         orientation: 'portrait',
-        background_color: '#FAF6F0',
+        background_color: '#FAF6EF',
         theme_color: '#6B9E7A',
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
         ],
       },
       workbox: {

@@ -27,9 +27,11 @@ import {
   JOURNEYS_STORE,
   LISTS_STORE,
   LETTERS_STORE,
+  MEMORIES_STORE,
   POSITIVES_STORE,
   idbReplaceStores,
 } from './db';
+import { listMemories, memoryFromBackup, type MemoryNote } from './memory';
 import { habitFromBackup, listHabits, type Habit } from './habits';
 import { listFromBackup, listLists, type UserList } from './lists';
 import { journeyFromBackup, listJourneys, type Journey } from './journeys';
@@ -46,8 +48,9 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
    version 6: same, plus affirmations: [...] (my own; built-in ones aren't included)
    version 7: same, plus habits: [...] (habit swaps from My Life)
    version 8: same, plus lists: [...] (each list holds its items)
-   version 9: same, plus journeys: [...] (Fear & Confidence; each journey holds its ladder of steps) */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 9 } as const;
+   version 9: same, plus journeys: [...] (Fear & Confidence; each journey holds its ladder of steps)
+   version 10: same, plus memories: [...] (companion memory notes I approved) */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 10 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
@@ -61,6 +64,7 @@ export type Backup = typeof FORMAT & {
   habits: Habit[];
   lists: UserList[];
   journeys: Journey[];
+  memories: MemoryNote[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -76,6 +80,7 @@ export async function buildBackup(): Promise<Backup> {
     habits: await listHabits(),
     lists: await listLists(),
     journeys: await listJourneys(),
+    memories: await listMemories(),
   };
 }
 
@@ -170,6 +175,8 @@ export type CheckedBackup = {
   lists: UserList[] | null;
   /** null = an older backup made before Fear & Confidence journeys existed (current ones are kept). */
   journeys: Journey[] | null;
+  /** null = an older backup made before companion memory existed (current notes are kept). */
+  memories: MemoryNote[] | null;
 };
 
 export async function readBackupFile(file: File): Promise<CheckedBackup> {
@@ -288,6 +295,19 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     });
     journeys = [...journeysById.values()];
   }
+
+  let memories: MemoryNote[] | null = null;
+  if (d.memories !== undefined) {
+    if (!Array.isArray(d.memories)) throw new BackupError("This backup's companion memory isn't valid.");
+    const memoriesById = new Map<string, MemoryNote>();
+    d.memories.forEach((raw, i) => {
+      const note = memoryFromBackup(raw);
+      if (!note) throw new BackupError(`Memory note ${i + 1} in this backup isn't valid (missing text).`);
+      const existing = memoriesById.get(note.id);
+      if (!existing || existing.updatedAt < note.updatedAt) memoriesById.set(note.id, note);
+    });
+    memories = [...memoriesById.values()];
+  }
   return {
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
     settings: normalizeSettings(d.settings),
@@ -301,6 +321,7 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     habits,
     lists,
     journeys,
+    memories,
   };
 }
 
@@ -314,6 +335,7 @@ export async function applyBackup(backup: CheckedBackup): Promise<void> {
   if (backup.habits) stores[HABITS_STORE] = backup.habits;
   if (backup.lists) stores[LISTS_STORE] = backup.lists;
   if (backup.journeys) stores[JOURNEYS_STORE] = backup.journeys;
+  if (backup.memories) stores[MEMORIES_STORE] = backup.memories;
   await idbReplaceStores(stores);
   saveSettings(backup.settings);
 }

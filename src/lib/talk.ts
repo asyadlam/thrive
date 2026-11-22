@@ -94,13 +94,22 @@ export async function askCompanion(
   messages: ChatMessage[],
   signal?: AbortSignal,
   opening?: { angle: OpeningAngle; avoidOpener: string },
-): Promise<{ reply: string; crisis: boolean; builtIn: boolean }> {
+  /** Companion memory notes included in this chat; and, for a summary, whether to suggest new notes. */
+  memory?: { notes: string[]; proposeNotes?: boolean },
+): Promise<{ reply: string; crisis: boolean; builtIn: boolean; notes: string[] }> {
   let res: Response;
   try {
     res = await fetch('/api/talk', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ mode, entry, messages, ...(mode === 'open' && opening ? opening : {}) }),
+      body: JSON.stringify({
+        mode,
+        entry,
+        messages,
+        ...(mode === 'open' && opening ? opening : {}),
+        ...(memory?.notes.length ? { memories: memory.notes } : {}),
+        ...(mode === 'summary' && memory?.proposeNotes ? { proposeNotes: true } : {}),
+      }),
       signal,
     });
   } catch {
@@ -110,6 +119,7 @@ export async function askCompanion(
     reply?: unknown;
     crisis?: unknown;
     builtIn?: unknown;
+    notes?: unknown;
     error?: unknown;
     providerStatus?: unknown;
     providerCode?: unknown;
@@ -126,5 +136,8 @@ export async function askCompanion(
     throw new TalkFailure(data?.error === 'daily_limit' ? 'daily_limit' : 'failed', detail);
   }
   if (typeof data.reply !== 'string' || !data.reply.trim()) throw new TalkFailure('failed', 'empty reply');
-  return { reply: data.reply.trim(), crisis: data.crisis === true, builtIn: data.builtIn === true };
+  const notes = Array.isArray(data.notes)
+    ? data.notes.filter((n): n is string => typeof n === 'string' && !!n.trim()).slice(0, 2)
+    : [];
+  return { reply: data.reply.trim(), crisis: data.crisis === true, builtIn: data.builtIn === true, notes };
 }

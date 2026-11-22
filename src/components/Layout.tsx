@@ -17,7 +17,9 @@ export default function Layout() {
   return (
     <div className="app">
       <header className="app-header">
-        <Link to="/" className="brand">Thrive</Link>
+        <Link to="/" className="brand">
+          <img src="/logo-wordmark.png" alt="Thrive" className="brand-logo" width={77} height={30} />
+        </Link>
         <div className="header-actions">
           <NavLink to="/help" className="help-button">
             <HelpIcon />

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 
 type Props = {
   title: string;
@@ -13,6 +13,8 @@ type Props = {
   tone?: 'danger' | 'gentle';
   onConfirm: () => void;
   onCancel: () => void;
+  /** Optional extra content between the message and the buttons (e.g. a choice to make first). */
+  children?: ReactNode;
 };
 
 /** Small in-app "are you sure?" dialog. Render it only while it should be open. */
@@ -26,6 +28,7 @@ export default function ConfirmDialog({
   tone = 'danger',
   onConfirm,
   onCancel,
+  children,
 }: Props) {
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -54,6 +57,7 @@ export default function ConfirmDialog({
       >
         <h2 id="confirm-title">{title}</h2>
         <p id="confirm-message">{message}</p>
+        {children}
         <div className="dialog-actions">
           <button ref={cancelRef} type="button" className="btn-secondary" onClick={onCancel} disabled={busy}>
             {cancelLabel}

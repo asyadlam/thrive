@@ -17,6 +17,7 @@ import { AffirmationsPage, AllListsPage, GoalsPage, HabitsPage, JourneysPage, Po
 import MyLife from './pages/MyLife';
 import Learn from './pages/Learn';
 import Settings from './pages/Settings';
+import MemoryPage from './pages/MemoryPage';
 import Help from './pages/Help';
 
 export default function App() {
@@ -45,6 +46,7 @@ export default function App() {
         <Route path="learn" element={<Learn />} />
         <Route path="learn/:id" element={<LessonPage />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="settings/memory" element={<MemoryPage />} />
         <Route path="help" element={<Help />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

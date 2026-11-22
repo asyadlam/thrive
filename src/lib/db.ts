@@ -1,6 +1,6 @@
 // Minimal promise wrapper around IndexedDB (no extra dependencies).
 const DB_NAME = 'thrive';
-const DB_VERSION = 10; // 10: talk summaries became a list (see the migration below)
+const DB_VERSION = 11; // 10: talk summaries became a list (see the migration below). 11: companion memory notes
 
 /** All journal entries (quick and talk) live in this one store, keyed by `id`. */
 export const JOURNAL_STORE = 'journal';
@@ -18,6 +18,8 @@ export const AFFIRMATIONS_STORE = 'affirmations';
 export const HABITS_STORE = 'habits';
 /** My lists, each holding its own items (added in version 8), keyed by `id`. */
 export const LISTS_STORE = 'lists';
+/** Companion memory: short notes I approved for the "Talk about this" companion (added in version 11), keyed by `id`. */
+export const MEMORIES_STORE = 'memories';
 /** Fear & Confidence journeys, each holding its ladder of steps (added in version 9), keyed by `id`. */
 export const JOURNEYS_STORE = 'journeys';
 /** Version 1 kept quick entries in "entries", keyed by date. */
@@ -60,6 +62,9 @@ function openDb(): Promise<IDBDatabase> {
         }
         if (!db.objectStoreNames.contains(JOURNEYS_STORE)) {
           db.createObjectStore(JOURNEYS_STORE, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(MEMORIES_STORE)) {
+          db.createObjectStore(MEMORIES_STORE, { keyPath: 'id' });
         }
         // Version 10: a journal page's single talk summary becomes the first item of its summaries list.
         // (Same id and shape as talkSummariesOf in journal.ts, so backups and merges line up.)

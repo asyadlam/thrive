@@ -5,6 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { PET_ART } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
 import { loadSettings } from '../lib/settings';
+import { MEMORY_MAX, addMemory, listMemories } from '../lib/memory';
 import {
   MAX_CHAT_MESSAGES,
   TalkFailure,
@@ -23,10 +24,13 @@ type Phase = 'loading' | 'missing' | 'consent' | 'chatting' | 'ended';
 type Summary =
   | { state: 'idle' }
   | { state: 'writing' }
-  | { state: 'shown'; text: string }
-  | { state: 'saving'; text: string }
-  | { state: 'saved' }
+  | { state: 'shown'; text: string; proposals: Proposal[] }
+  | { state: 'saving'; text: string; proposals: Proposal[] }
+  | { state: 'saved'; notesSaved: number }
   | { state: 'declined' };
+
+/** A memory note the companion suggested after a talk: kept only if it stays checked when I save. */
+type Proposal = { text: string; keep: boolean };
 
 const CONSENT =
   'The companion will read only this entry to talk it through with you. The text of this entry is sent to our AI provider (Groq) for this conversation. The chat itself isn’t saved unless you choose to save a summary. If you save a summary, that chat’s transcript is kept on the entry (on this device only) so you can download it later.';
@@ -48,7 +52,10 @@ export default function TalkChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const [{ companion }] = useState(loadSettings);
+  const [{ companion, companionMemory }] = useState(loadSettings);
+  // Companion memory: the notes I approved earlier (only read when memory is on in Settings).
+  const [memoryNotes, setMemoryNotes] = useState<string[] | null>(companionMemory ? null : []);
+  const [includeMemory, setIncludeMemory] = useState(true);
   const petSrc = companion === 'none' ? null : PET_ART[companion].src;
 
   const [phase, setPhase] = useState<Phase>(id ? 'loading' : 'consent');
@@ -79,6 +86,17 @@ export default function TalkChatPage() {
     };
   }, [id]);
 
+  useEffect(() => {
+    if (!companionMemory) return;
+    let active = true;
+    listMemories()
+      .then((notes) => active && setMemoryNotes(notes.map((n) => n.text)))
+      .catch(() => active && setMemoryNotes([]));
+    return () => {
+      active = false;
+    };
+  }, [companionMemory]);
+
   useEffect(() => () => request.current?.abort(), []);
 
   // Keep the newest message in view.
@@ -91,6 +109,8 @@ export default function TalkChatPage() {
   const backState = (location.state as { from?: string } | null)?.from ? { from: (location.state as { from: string }).from } : null;
   const entryText = { title: entry?.title ?? '', body: entry?.body ?? '' };
   const toApi = (list: Bubble[]): ChatMessage[] => list.map(({ role, content }) => ({ role, content }));
+  // What this chat sends besides the entry: memory notes only if memory is on, there are some, and I kept them included.
+  const memoryForChat = { notes: includeMemory && memoryNotes ? memoryNotes : [] };
 
   async function ask(mode: TalkMode, history: Bubble[]) {
     setWaiting(true);
@@ -99,7 +119,7 @@ export default function TalkChatPage() {
     request.current = controller;
     try {
       const opening = mode === 'open' ? openingRequest() : undefined;
-      const { reply, crisis, builtIn } = await askCompanion(mode, entryText, toApi(history), controller.signal, opening);
+      const { reply, crisis, builtIn } = await askCompanion(mode, entryText, toApi(history), controller.signal, opening, memoryForChat);
       if (opening) rememberOpening(opening, reply, builtIn);
       const lastUser = [...history].reverse().find((m) => m.role === 'user');
       const showHelp = mode !== 'open' && (crisis || (!!lastUser && soundsLikeCrisis(lastUser.content)));
@@ -163,8 +183,11 @@ export default function TalkChatPage() {
   async function writeSummary() {
     setSummary({ state: 'writing' });
     try {
-      const { reply } = await askCompanion('summary', entryText, toApi(messages));
-      setSummary({ state: 'shown', text: reply });
+      const { reply, notes } = await askCompanion('summary', entryText, toApi(messages), undefined, undefined, {
+        ...memoryForChat,
+        proposeNotes: companionMemory, // suggested notes only when memory is on in Settings
+      });
+      setSummary({ state: 'shown', text: reply, proposals: notes.map((text) => ({ text, keep: true })) });
     } catch (e) {
       setSummary({ state: 'idle' });
       setProblem({
@@ -175,17 +198,28 @@ export default function TalkChatPage() {
     }
   }
 
-  async function keepSummary(text: string) {
+  async function keepSummary(text: string, proposals: Proposal[]) {
     if (!id) return;
-    setSummary({ state: 'saving', text });
+    setSummary({ state: 'saving', text, proposals });
     try {
       await saveTalkSummary(id, text, toTranscript(messages)); // the chat is kept only now, with its summary
-      setSummary({ state: 'saved' });
+      // Only the notes I left checked become memory.
+      const approved = proposals.filter((p) => p.keep && p.text.trim());
+      for (const p of approved) await addMemory(p.text);
+      setSummary({ state: 'saved', notesSaved: approved.length });
     } catch {
-      setSummary({ state: 'shown', text });
+      setSummary({ state: 'shown', text, proposals });
       setProblem({ text: 'Couldn’t save the summary on this device. Please try again.', retry: null });
     }
   }
+
+  function editProposal(index: number, change: Partial<Proposal>) {
+    setSummary((s) =>
+      s.state === 'shown' ? { ...s, proposals: s.proposals.map((p, i) => (i === index ? { ...p, ...change } : p)) } : s,
+    );
+  }
+
+  const memoryCount = memoryNotes?.length ?? 0;
 
   const title = entry ? talkEntryLabel(entry) : 'A blank page';
 
@@ -194,7 +228,7 @@ export default function TalkChatPage() {
       {phase === 'loading' && <div className="card placeholder">Loading…</div>}
       {phase === 'missing' && <div className="card placeholder">This journal page couldn't be found on this device.</div>}
 
-      {phase === 'consent' && (
+      {phase === 'consent' && memoryNotes !== null && (
         <ConfirmDialog
           title="Talk about this entry?"
           message={CONSENT}
@@ -203,7 +237,20 @@ export default function TalkChatPage() {
           tone="gentle"
           onConfirm={start}
           onCancel={() => navigate(backTo, { replace: true, state: backState })}
-        />
+        >
+          {companionMemory && memoryCount > 0 && (
+            <div className="consent-memory">
+              <p>
+                This chat will also include your companion memory ({memoryCount} {memoryCount === 1 ? 'note' : 'notes'}) so it can
+                remember your story.
+              </p>
+              <label className="memory-toggle">
+                <input type="checkbox" checked={includeMemory} onChange={(e) => setIncludeMemory(e.target.checked)} />
+                <span>Include memory in this chat</span>
+              </label>
+            </div>
+          )}
+        </ConfirmDialog>
       )}
 
       {(phase === 'chatting' || phase === 'ended') && (
@@ -301,12 +348,40 @@ export default function TalkChatPage() {
                 <div className="card chat-summary">
                   <span className="saved-label">Your summary</span>
                   <p>{summary.text}</p>
+                  {summary.proposals.length > 0 && (
+                    <fieldset className="memory-proposals" disabled={summary.state === 'saving'}>
+                      <legend className="saved-label">Remember for next time?</legend>
+                      <p className="hint">Only the notes you leave checked are saved to your companion’s memory.</p>
+                      {summary.proposals.map((p, i) => (
+                        <div key={i} className={`memory-proposal${p.keep ? '' : ' off'}`}>
+                          <input
+                            type="checkbox"
+                            id={`proposal-${i}`}
+                            checked={p.keep}
+                            onChange={(e) => editProposal(i, { keep: e.target.checked })}
+                            aria-label={`Remember this note: ${p.text}`}
+                          />
+                          <label htmlFor={`proposal-text-${i}`} className="sr-only">
+                            Note {i + 1}
+                          </label>
+                          <textarea
+                            id={`proposal-text-${i}`}
+                            className="input memory-proposal-text"
+                            rows={2}
+                            maxLength={MEMORY_MAX}
+                            value={p.text}
+                            onChange={(e) => editProposal(i, { text: e.target.value })}
+                          />
+                        </div>
+                      ))}
+                    </fieldset>
+                  )}
                   <div className="form-actions">
                     <button
                       type="button"
                       className="btn-primary"
                       disabled={summary.state === 'saving'}
-                      onClick={() => void keepSummary(summary.text)}
+                      onClick={() => void keepSummary(summary.text, summary.proposals)}
                     >
                       {summary.state === 'saving' ? 'Saving…' : 'Save to this entry'}
                     </button>
@@ -316,7 +391,13 @@ export default function TalkChatPage() {
                   </div>
                 </div>
               )}
-              {summary.state === 'saved' && <p className="save-status">Saved to your entry, under “From your talk”.</p>}
+              {summary.state === 'saved' && (
+                <p className="save-status">
+                  Saved to your entry, under “From your talk”.
+                  {summary.notesSaved > 0 &&
+                    ` ${summary.notesSaved === 1 ? 'One note was' : `${summary.notesSaved} notes were`} added to your companion’s memory.`}
+                </p>
+              )}
               {!id && <p className="hint">This page wasn’t saved, so there’s nowhere to keep a summary this time.</p>}
               <Link to={backTo} state={backState} className="btn-secondary chat-back">
                 Back to your entry
