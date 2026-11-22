@@ -1,69 +1,54 @@
 # Thrive 🌱
 
-A calm, private mental-state journal — designed, directed, and built by Asya.
+Hi, I'm Asya. I designed Thrive and directed its build, feature by feature, with an AI coding agent doing the typing. It's the journal app I wanted for myself.
 
-Thrive is a personal wellbeing app that lives entirely on your device: daily journaling, positives worth remembering, gentle goal and habit support, and an AI companion you can talk through a journal entry with — one that listens first, rants with you when that's what's needed, and only remembers what you explicitly approve.
+Thrive is a calm place to write about your day, keep the good moments, and work on things gently at your own pace. Everything you write stays on your device. There are no accounts. If you talk to the companion, it only ever sees the one page you show it, and it only remembers things you approved first.
 
 **Live app:** https://thrive-psi-nine.vercel.app
 
 ![Thrive logo](public/logo-wordmark.png)
 
-<!-- Add 3–4 screenshots here: Home, a Journal entry, Talk about this, Growth -->
+<!-- Screenshots to add: Home, a Journal entry, Talk about this, a Journey page -->
 
-## What it does
+## Why I made it
 
-**Home** — a deliberately minimal start screen: your companion pet with a time-of-day greeting, one Quick check-in pill, today's affirmation, and a positive to remember.
+A programme called "The Thrive Program" helped me a lot emotionally, more than therapy ever did, and writing has always been the thing that helps me most. So I named the app after it, and built the journal I wished I had back then.
 
-**Journal**
-- *Quick entry* — mood, up to three positives, a short note, tomorrow's intention
-- *Need to talk about it* — a long-form page with AI dictation and **Talk about this**
-- Calendar look-back: dots on entry days, tap any day to revisit, edit, or delete
-- **Time Capsule** — sealed letters to your future self, opened on a date *or* "when something happens" (e.g. "I got my first job")
+It's also my portfolio project for learning how to direct AI coding agents well. I write the specs, the privacy rules and the prompts, and I check every step live before moving on to the next one.
 
-**Talk about this** — a per-entry AI companion chat
-- Opens only after an explicit consent sheet, and reads *only that entry*
-- Listens first: reflects your own words back, asks specific questions, rants *with* you about the situation — solutions only when you ask
-- Varied openings, a kind closing with a word for tomorrow
-- Chats are **not saved** by default. You may save a short summary to the entry (multiple talks = multiple summaries, stacked under "From your talk"), and each saved summary keeps its full transcript on-device with a **Download transcript** button
-- **Companion memory** (opt-in, off by default): short notes the companion may remember between talks. Notes are *proposed* after a talk and saved only if you approve them; you can view, edit, delete, or forget them all at any time in Settings
+## What is inside
 
-**Growth** — Positives Tracker (auto-collects the positives from your quick entries), Affirmations (built-ins + your own), and a Fear & Confidence Journey: a ladder of small steps toward something that feels hard, at your pace
+**Home** is kept very simple on purpose. Your pet says hello, there is one quick check in button, todays affirmation, and a positive to remember.
 
-**My Life** — Goals (with your "why"), Habits as gentle swaps ("When this happens… instead, I can…"), and personal Lists
+**Journal** has quick entries with a mood, positives, a short note and an intention for tomorrow, and longer pages for when you need to talk about it. There is a calendar to look back on past days, and a Time Capsule where you can seal a letter to your future self and open it on a date, or when something happens, like getting your first job.
 
-**Learn** — six short, beliefs-based lessons (about 2 minutes each)
+**Talk about this** is a chat with a companion about a journal page. It listens first, and it will rant with you when that is what you need. Solutions come later, and only if you want them. Chats are not saved unless you save a short summary to the entry, and each saved summary keeps its transcript on your device with a download button. The companion can remember small notes between talks, but only notes it suggests and you approve. You can read them, edit them or delete them any time in Settings.
 
-**Companion pets** — an optional companion (Hippo, Cat, Platypus, Sprout, or None) that lives in each page header and reacts to taps with little hearts, sparkles, and kind messages. Never guilt-based: a missed day is always "welcome back"
+**Growth** is for positives and journeys. A journey is one thing you are working on, all in one place: the goal, the small steps toward it, and the habits you want to change along the way.
 
-**Always there** — a Get Help button in the header, and Settings that let you show/hide sections without deleting anything
+**My Life** is the profile tab. About me, measurements if you want them (you add your own kinds, and lengths and weights show both units), a wishlist with a "got it" moment, a bucket list, and your own lists (like for groceries, to-do, packing, ...). If you couldn't tell... I loooove lists.
 
-## Privacy by design
+**Learn** has six short lessons, about two minutes each, based on some of the beliefs that helped me. They are not medical suggestions.
+The content shared in the Learn section is based on personal experiences and practices that have helped me. It is intended for personal growth purposes only and should not be considered medical or professional advice. Mostly because they were made for me.
 
-Thrive was built privacy-first, and the architecture enforces it rather than promising it:
+You can also pick a companion pet: Hippo, Cat, Platypus, Panda, Dog, or none at all. The pet sits in the page headers, and tapping it gives you little hearts, sparkles and kind messages. A Get Help button is always in the header, just in case. Right now it is empty because the web app is just for me. It is there in case I ever wanted to make it more publicly available.
 
-- **Local-first.** All entries, goals, summaries, transcripts, and memory notes live in IndexedDB on your device. There are no accounts and no Thrive server storing your data.
-- **Backups you own.** One-tap backup export/import, including a *merge* import that adds what's missing and never overwrites or deletes. Readable-copy export included.
-- **AI calls are narrow and consented.** Dictation sends only your audio clip; a talk sends only the one entry you approved (plus memory notes, only if memory is on and you leave it on for that chat). Audio is never stored; the serverless functions log nothing — no keys, no entry text, no conversations.
-- **Keys stay server-side.** API keys exist only as Vercel environment secrets, are never in the codebase (verified: the key's fingerprint appears nowhere in this repo), and the functions accept requests only from the app's own domain, with per-visitor rate limits.
-- **Provider-swappable.** The AI provider is configuration, not code: base URL, model, and key are environment variables (currently Groq's free tier — Whisper for dictation, an open chat model for talks), so switching providers is a settings change.
+## Privacy, because it matters
 
-## Tech
+• Your entries, journeys, summaries, transcripts and memory notes live in a database on your device. No Thrive server holds your data.
+• Backups are yours. You can download one, restore one, or merge one into your data without overwriting what you already have. There is also a readable copy you can export.
+• Dictation sends only your audio clip to be transcribed, and the audio is never stored. A talk sends only the entry you approved, plus memory notes only if you turned memory on and left it on for that chat.
+• The server functions log nothing. API keys live only as secret settings on the host, never in the code.
+• The AI provider is just configuration, so I can switch providers later by changing settings instead of code.
 
-- **Frontend:** Vite + React + TypeScript, installable PWA, IndexedDB storage
-- **Hosting/functions:** Vercel (static app + `/api/transcribe` and `/api/talk` serverless functions)
-- **AI:** Groq API (OpenAI-compatible) — Whisper large-v3-turbo for dictation; `openai/gpt-oss-120b` for the companion
-- **Design:** one font (Nunito), cream `#FAF6EF`, sage palette, soft cards — one consistent design language across every page
+## Tech, briefly
 
-## Building it
-
-Thrive is also a portfolio project in **directing AI coding agents**: the app was specified feature-by-feature (privacy rules, consent flows, tone guidelines for the companion, data-merging backup rules), and every build step was verified live before the next began. The codebase is the output; the spec, the prompts, and the verification discipline are the portfolio.
-
-The name is a tribute to the Thrive programme, which helped the author more than traditional therapy did — this app is the journal she wished she'd had alongside it.
+Vite, React and TypeScript. It is an installable web app, and data is stored locally in IndexedDB. Vercel hosts it and runs two small server functions, one for dictation and one for talks. Dictation uses Whisper through Groq, and talks use an open chat model through Groq as well. The design is one font (Nunito), a cream background, sage colors and soft white cards on every page.
 
 ## Status
 
-Feature-complete against the original concept (November 2026) and in daily personal use. Parked for later, deliberately: real home-screen widgets (needs a native-app step) and optional cloud sync (only if Thrive ever opens to other users — the local-first data layer, record IDs, and backup format are already the migration path).
+I use Thrive every day, and it does everything from my original concept, plus a few things I thought of while using it. My family can try it too, since every phone keeps its own data. The next step, when I am ready for it, is optional accounts with cloud backup, so moving to a new device stops being a manual restore job. Real phone widgets would need a native app step, so those are just thoughts as of now.
 
 ## License
 
-Personal project — all rights reserved for now. (A license may be chosen if Thrive is ever released publicly.)
+Personal project, all rights reserved for now.
