@@ -1,6 +1,6 @@
 /*
-  My Life profile: my wishlist and my bucket list. (Measurements and routine are no longer shown in the app, but
-  anything saved in them earlier is kept here and in backups.) (Name, birthday and "about me" live in the app
+  My Life profile: my measurements, wishlist and bucket list. (The routine is no longer shown in the app, but
+  anything saved in it earlier is kept here and in backups.) (Name, birthday and "about me" live in the app
   settings, so the name stays the one used by the Home greeting and Settings.) Everything stays on this device
   and goes into backups like the rest of Thrive.
 */
@@ -21,34 +21,70 @@ const times = (r: Record<string, unknown>, fallback = now()) => {
 export const MEASURE_NAME_MAX = 40;
 export const MEASURE_UNIT_MAX = 12;
 
-/** One logged value. `date` is the day it was measured (YYYY-MM-DD). */
-export type MeasurementEntry = { id: string; value: number; date: string; createdAt: string; updatedAt: string };
+/** The unit a length or weight was typed in. */
+export type DisplayUnit = 'cm' | 'in' | 'kg' | 'lb';
+const isDisplayUnit = (v: unknown): v is DisplayUnit => v === 'cm' || v === 'in' || v === 'kg' || v === 'lb';
 
-/** A kind of measurement I defined ("Waist", "cm"), holding every value I've logged for it. */
+/** What kind of number a measurement is: a length (stored in cm), a weight (stored in kg), or just a number. */
+export type MeasureType = 'length' | 'weight' | 'number';
+const isMeasureType = (v: unknown): v is MeasureType => v === 'length' || v === 'weight' || v === 'number';
+
+/**
+ * One logged value. For lengths and weights `value` is always stored in cm / kg, so the unit toggle can never
+ * change the data; `entered` is the unit I typed it in, so it's shown first. `date` is the day it was measured.
+ */
+export type MeasurementEntry = {
+  id: string;
+  value: number;
+  entered?: DisplayUnit;
+  date: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+/**
+ * A measurement I added ("Waist"), holding every value I've logged for it. `unit` is "cm" for lengths, "kg" for
+ * weights, or my own label for just-a-number ("size", "%", or empty). Kinds saved before `type` existed are read
+ * from `unit` (cm → length, kg → weight, anything else → just a number), so older data keeps its meaning.
+ */
 export type MeasurementKind = {
   id: string;
   name: string;
+  type?: MeasureType;
   unit: string;
   entries: MeasurementEntry[];
   createdAt: string;
   updatedAt: string;
 };
 
+export const measureType = (k: Pick<MeasurementKind, 'type' | 'unit'>): MeasureType =>
+  k.type ?? (k.unit === 'cm' ? 'length' : k.unit === 'kg' ? 'weight' : 'number');
+
 /** Oldest → newest by the day measured (then by when it was logged). */
 export const byDate = (a: MeasurementEntry, b: MeasurementEntry) => a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
 
-/** All kinds, in the order I added them. */
+const PER_UNIT: Record<DisplayUnit, number> = { cm: 1, in: 2.54, kg: 1, lb: 0.45359237 }; // → cm / kg
+/** A value typed in `unit` → the stored value (cm or kg). */
+export const toBase = (value: number, unit: DisplayUnit) => value * PER_UNIT[unit];
+/** A stored value (cm or kg) → `unit`. */
+export const fromBase = (value: number, unit: DisplayUnit) => value / PER_UNIT[unit];
+/** The other unit of the pair (cm ↔ in, kg ↔ lb). */
+export const otherUnit = (unit: DisplayUnit): DisplayUnit => ({ cm: 'in', in: 'cm', kg: 'lb', lb: 'kg' })[unit] as DisplayUnit;
+
+/** All my measurements, in the order I added them. */
 export async function listMeasurementKinds(): Promise<MeasurementKind[]> {
   const all = await idbGetAll<MeasurementKind>(MEASUREMENTS_STORE);
   return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
-export async function addMeasurementKind(name: string, unit: string): Promise<MeasurementKind> {
+/** Adds a measurement. `label` is only used for just-a-number ("size", "%"). */
+export async function addMeasurementKind(name: string, type: MeasureType, label = ''): Promise<MeasurementKind> {
   const t = now();
   const kind: MeasurementKind = {
     id: `measure-${newId()}`,
     name: name.trim().slice(0, MEASURE_NAME_MAX),
-    unit: unit.trim().slice(0, MEASURE_UNIT_MAX),
+    type,
+    unit: type === 'length' ? 'cm' : type === 'weight' ? 'kg' : label.trim().slice(0, MEASURE_UNIT_MAX),
     entries: [],
     createdAt: t,
     updatedAt: t,
@@ -57,9 +93,12 @@ export async function addMeasurementKind(name: string, unit: string): Promise<Me
   return kind;
 }
 
-export async function logMeasurement(kind: MeasurementKind, value: number, date = todayKey()): Promise<MeasurementKind> {
+/** Logs a value. For lengths/weights `unit` is what I typed it in, and it's stored in cm/kg. */
+export async function logMeasurement(kind: MeasurementKind, value: number, unit: DisplayUnit | null, date = todayKey()): Promise<MeasurementKind> {
   const t = now();
-  const entry: MeasurementEntry = { id: `reading-${newId()}`, value, date, createdAt: t, updatedAt: t };
+  const entry: MeasurementEntry = unit
+    ? { id: `reading-${newId()}`, value: toBase(value, unit), entered: unit, date, createdAt: t, updatedAt: t }
+    : { id: `reading-${newId()}`, value, date, createdAt: t, updatedAt: t };
   const updated = { ...kind, entries: [...kind.entries, entry], updatedAt: t };
   await idbPut(MEASUREMENTS_STORE, updated);
   return updated;
@@ -80,6 +119,8 @@ export function measurementKindFromBackup(raw: unknown): MeasurementKind | null 
   if (!name) return null;
   if (k.entries !== undefined && !Array.isArray(k.entries)) return null;
   const kindTimes = times(k);
+  const unit = str(k.unit, MEASURE_UNIT_MAX);
+  const type = isMeasureType(k.type) ? k.type : measureType({ unit });
   const entries: MeasurementEntry[] = [];
   for (const rawEntry of (k.entries as unknown[] | undefined) ?? []) {
     const e = (rawEntry ?? {}) as Record<string, unknown>;
@@ -87,6 +128,7 @@ export function measurementKindFromBackup(raw: unknown): MeasurementKind | null 
     entries.push({
       id: typeof e.id === 'string' && e.id.startsWith('reading-') ? e.id : `reading-${newId()}`,
       value: e.value,
+      ...(type !== 'number' && isDisplayUnit(e.entered) ? { entered: e.entered } : {}),
       date: e.date,
       ...times(e, kindTimes.createdAt),
     });
@@ -94,7 +136,8 @@ export function measurementKindFromBackup(raw: unknown): MeasurementKind | null 
   return {
     id: typeof k.id === 'string' && k.id.startsWith('measure-') ? k.id : `measure-${newId()}`,
     name,
-    unit: str(k.unit, MEASURE_UNIT_MAX),
+    type,
+    unit: type === 'length' ? 'cm' : type === 'weight' ? 'kg' : unit,
     entries,
     ...kindTimes,
   };

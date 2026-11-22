@@ -163,7 +163,7 @@ export async function planMerge(backup: CheckedBackup): Promise<MergePlan> {
   await flat(ROUTINE_STORE, backup.routine, 'routine');
   await flat(WISHLIST_STORE, backup.wishlist, 'wishlist');
   await flat(BUCKETLIST_STORE, backup.bucketlist, 'bucketlist');
-  // A measurement kind that's already here keeps its name/unit and only gains values with new ids.
+  // A measurement that's already here keeps its name/type/unit and only gains values with new ids.
   await nested<MeasurementKind, MeasurementKind['entries'][number]>(
     MEASUREMENTS_STORE,
     backup.measurements,
@@ -239,7 +239,7 @@ const LABELS: [keyof MergeCounts, string, string][] = [
   ['affirmations', 'affirmation of your own', 'affirmations of your own'],
   ['talkSummaries', 'talk summary', 'talk summaries'],
   ['memories', 'companion memory note', 'companion memory notes'],
-  ['measurementKinds', 'kind of measurement', 'kinds of measurement'], // kept for older data; not shown in the app
+  ['measurementKinds', 'measurement', 'measurements'],
   ['measurementValues', 'measurement value', 'measurement values'],
   ['routine', 'routine entry', 'routine entries'],
   ['wishlist', 'wishlist item', 'wishlist items'],

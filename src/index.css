@@ -1217,7 +1217,7 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 /* ---- Cards: white, 24px corners, soft shadow, no border ---- */
 .card,
 .dialog,
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .wishlist, .bucketlist, .journey-part) {
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) {
   background: #fff;
   border: 0;
   border-radius: var(--card-radius);
@@ -1228,20 +1228,20 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .dialog-backdrop { background: rgba(67, 82, 60, 0.4); }
 
 /* Every section on Growth / My Life (and their See-more pages) is its own card */
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .wishlist, .bucketlist, .journey-part) { padding: 16px; margin: 0; }
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .wishlist, .bucketlist, .journey-part) + :is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .wishlist, .bucketlist, .journey-part) {
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) { padding: 16px; margin: 0; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) + :is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) {
   margin-top: 12px;
 }
 
 /* Inside a section card, rows and forms sit on a soft cream inset instead of being cards again */
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .wishlist, .bucketlist, .journey-part) :is(.card, .goal-item, .habit-card, .list-link, .positive-item, .affirmation-item) {
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) :is(.card, .goal-item, .habit-card, .list-link, .positive-item, .affirmation-item) {
   background: var(--inset);
   border: 0;
   border-radius: var(--row-radius);
   box-shadow: none;
 }
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .wishlist, .bucketlist, .journey-part) :is(.goal-item, .habit-card, .list-link):hover { background: #F4EEE3; }
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .wishlist, .bucketlist, .journey-part) .input { background: #fff; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) :is(.goal-item, .habit-card, .list-link):hover { background: #F4EEE3; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) .input { background: #fff; }
 
 /* Rows that stand on their own on a page (Journal, Look back, Time Capsule, a list, a journey) */
 :is(.talk-list-item, .letter-row, .list-item, .ladder-step) {
@@ -1662,3 +1662,60 @@ select.input { appearance: auto; }
 .journey-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 16px; }
 .journey-empty p { margin: 0; }
 .journey-none { margin: 0; }
+
+/* ---------- My Life: Measurements (a calm record — values and dates only) ----------
+   One rhythm throughout: 12px between blocks, 8px between rows, 10px inside forms, 12px 14px row padding. */
+.measure-switches { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; }
+.measure-switch { display: inline-flex; align-items: center; gap: 6px; }
+.measure-switch-label { font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); }
+.measure-pill {
+  min-height: 34px; min-width: 44px; padding: 0 12px; border: 1px solid var(--green-100); border-radius: 999px;
+  background: #fff; font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--ink-soft); cursor: pointer;
+}
+.measure-pill.active { background: var(--green-100); border-color: var(--green-300); color: var(--green-700); }
+.measure-pill:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.measurements .placeholder { margin-bottom: 12px; }
+.measure-add { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
+.measure-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.measure-types { display: flex; flex-direction: column; gap: 8px; }
+.measure-type { position: relative; display: block; cursor: pointer; }
+.measure-type input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.measure-type > span {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 14px;
+  background: #fff; border: 1px solid #E9E2D3; border-radius: 14px;
+}
+.measure-type-label { font-weight: 700; }
+.measure-type-hint { font-size: 0.85rem; color: var(--ink-soft); }
+.measure-type input:checked + span { background: var(--green-50); border-color: var(--green-500); }
+.measure-type input:checked + span .measure-type-label { color: var(--green-700); }
+.measure-type input:focus-visible + span { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.measure-label-input { max-width: 200px; }
+.measure-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.measure-item { background: var(--inset); border-radius: var(--row-radius); }
+.measure-row {
+  width: 100%; min-height: 56px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px;
+  border: 0; background: none; font: inherit; color: var(--ink); text-align: left; cursor: pointer; border-radius: var(--row-radius);
+}
+.measure-row:focus-visible { outline: 2px solid var(--green-500); outline-offset: -2px; }
+.measure-name { font-weight: 700; }
+.measure-latest, .measure-history-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.measure-latest { align-items: flex-end; text-align: right; }
+.measure-value { font-weight: 700; color: var(--ink); overflow-wrap: anywhere; }
+.measure-date { font-size: 0.8rem; color: var(--ink-soft); }
+.measure-none { font-size: 0.9rem; color: var(--ink-faint); }
+.measure-start { font-style: italic; }
+.measure-panel { padding: 0 14px 14px; display: flex; flex-direction: column; gap: 12px; }
+.measure-form { display: flex; flex-direction: column; gap: 10px; }
+.measure-form .field { margin: 0; }
+.measure-form label { font-weight: 700; }
+.measure-form .form-error { margin: 0; }
+.measure-history { border-top: 1px solid var(--stone); padding-top: 12px; }
+.measure-history .saved-label { margin: 0 0 4px; }
+.measure-history ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.measure-history li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
+.measure-history li + li { border-top: 1px solid var(--sand); }
+.measure-history li:last-child { padding-bottom: 0; }
+.measure-kind-actions { border-top: 1px solid var(--stone); padding-top: 12px; display: flex; }
+.measure-kind-actions .btn-danger-outline { flex: 1; min-height: 40px; }
+.measure-delete { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 0.8rem; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; flex-shrink: 0; }
+.measure-delete:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
