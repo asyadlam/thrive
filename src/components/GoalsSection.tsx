@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import GoalForm from './GoalForm';
 import ConfirmDialog from './ConfirmDialog';
 import { deleteGoal, listGoals, saveGoal, setGoalCompleted, type Goal, type GoalDraft } from '../lib/goals';
@@ -16,6 +17,14 @@ export default function GoalsSection() {
   const [confirmDelete, setConfirmDelete] = useState<Goal | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [message, setMessage] = useState('');
+  const [params, setParams] = useSearchParams();
+
+  // Deep link from Home: /my-life?add=goal opens the "add a goal" form.
+  useEffect(() => {
+    if (params.get('add') !== 'goal') return;
+    setEditing('new');
+    setParams({}, { replace: true });
+  }, [params, setParams]);
 
   const refresh = useCallback(async () => {
     try {

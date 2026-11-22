@@ -4,7 +4,7 @@
   --green-300: #A9C9B1;
   --green-500: #6B9E7A;
   --green-700: #4A7356;
-  --cream: #FAF6F0;
+  --cream: #FAF6EF;
   --sand: #F0E8DC;
   --stone: #E8DCC8;
   --ink: #3D3A35;
@@ -955,3 +955,55 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .ladder-icon:focus-visible { outline: 2px solid var(--green-500); }
 .ladder-word { font-size: 0.82rem; padding: 0 6px; }
 .ladder-delete { color: var(--help-dark); }
+
+/* ---------- Home: minimal and calm ---------- */
+.home { display: flex; flex-direction: column; gap: 28px; padding-top: 12px; padding-bottom: 8px; }
+.home-hero { display: flex; flex-direction: column; align-items: center; text-align: center; }
+.home-hero .pet-companion { margin: 0; gap: 8px; }
+.home-hero .pet-companion-img { height: 120px; }
+.home-greeting { margin: 4px 0 0; font-size: 1.6rem; line-height: 1.25; font-weight: 650; overflow-wrap: anywhere; }
+.home-hero .pet-companion-greeting { margin: 0; color: var(--ink-soft); font-size: 1rem; }
+.home-checkin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 76px;
+  padding: 14px 24px;
+  border-radius: 999px;
+  background: var(--green-700);
+  color: #fff;
+  text-align: center;
+  text-decoration: none;
+  box-shadow: 0 8px 22px rgba(74, 115, 86, 0.22);
+}
+.home-checkin:hover { background: #3F6449; }
+.home-checkin:focus-visible { outline: 3px solid var(--green-300); outline-offset: 3px; }
+.home-checkin-title { font-size: 1.2rem; font-weight: 700; }
+.home-checkin-sub { font-size: 0.88rem; opacity: 0.9; line-height: 1.3; }
+.home-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 24px 22px;
+  background: #fff;
+  border-radius: 24px;
+  box-shadow: 0 6px 22px rgba(61, 58, 53, 0.06), 0 1px 3px rgba(61, 58, 53, 0.05);
+  color: var(--ink);
+  text-align: center;
+  text-decoration: none;
+}
+.home-card-link:hover { box-shadow: 0 8px 26px rgba(61, 58, 53, 0.09), 0 1px 3px rgba(61, 58, 53, 0.06); }
+.home-card-link:focus-visible { outline: 2px solid var(--green-500); outline-offset: 3px; }
+.home-card-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green-700); }
+.home-quote { margin: 0; font-size: 1.15rem; font-style: italic; line-height: 1.5; overflow-wrap: anywhere; }
+.home-caption { font-size: 0.82rem; color: var(--ink-soft); }
+@media (max-width: 360px) {
+  .home { gap: 22px; }
+  .home-greeting { font-size: 1.4rem; }
+  .home-checkin-sub { font-size: 0.8rem; }
+}
+
+.positives { scroll-margin-top: 76px; }

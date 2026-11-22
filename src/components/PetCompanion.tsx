@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { listEntriesBetween, todayKey } from '../lib/journal';
 import { loadSettings, type PetKind } from '../lib/settings';
 
@@ -36,8 +36,11 @@ export function PetThumb({ kind, size = 56 }: { kind: PetKind; size?: number }) 
   );
 }
 
-/** The companion on Home: pet, optional name, and one gentle greeting line. Renders nothing for "None". */
-export default function PetCompanion() {
+/**
+ * The companion on Home: pet, optional name, and one gentle greeting line. Renders nothing for "None".
+ * Optional `children` (e.g. Home's time-of-day greeting) are shown between the pet and its greeting line.
+ */
+export default function PetCompanion({ children }: { children?: ReactNode } = {}) {
   const [{ companion, petName }] = useState(loadSettings);
   const [showedUpToday, setShowedUpToday] = useState<boolean | null>(null);
   const [tapCount, setTapCount] = useState(0);
@@ -86,6 +89,7 @@ export default function PetCompanion() {
         </span>
       </button>
       {name && <span className="pet-companion-name">{name}</span>}
+      {children}
       <p className="pet-companion-greeting" aria-live="polite">
         {greeting}
       </p>

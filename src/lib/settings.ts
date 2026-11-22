@@ -9,12 +9,15 @@ export type AppSettings = {
   petName: string;
   /** Ids of Learn lessons I've marked "Finished reading". */
   readLessons: string[];
+  /** "What should Thrive call you?" ('' = greet without a name). */
+  userName: string;
 };
 
 export const PET_NAME_MAX = 20;
+export const USER_NAME_MAX = 30;
 
 const KEY = 'thrive.settings';
-const DEFAULTS: AppSettings = { companion: 'none', petName: '', readLessons: [] };
+const DEFAULTS: AppSettings = { companion: 'none', petName: '', readLessons: [], userName: '' };
 
 /** Earlier versions called the hippo "yoshi"; keep that choice instead of resetting it. */
 const RENAMED: Record<string, Companion> = { yoshi: 'hippo' };
@@ -34,6 +37,7 @@ export function normalizeSettings(value: unknown): AppSettings {
     readLessons: Array.isArray(parsed.readLessons)
       ? [...new Set(parsed.readLessons.filter((id): id is string => typeof id === 'string'))]
       : [],
+    userName: typeof parsed.userName === 'string' ? parsed.userName.slice(0, USER_NAME_MAX) : DEFAULTS.userName,
   };
 }
 

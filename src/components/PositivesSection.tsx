@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { POSITIVE_MAX, addStandalonePositive, listAllPositives, type PositiveItem } from '../lib/positives';
 import { formatShortDay, todayKey } from '../lib/journal';
 
@@ -25,6 +26,17 @@ export default function PositivesSection() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [params, setParams] = useSearchParams();
+  const sectionRef = useRef<HTMLElement>(null);
+
+  // Deep links from Home: /growth?section=positives scrolls here; ?add=positive also opens the form.
+  useEffect(() => {
+    const wantsAdd = params.get('add') === 'positive';
+    if (!wantsAdd && params.get('section') !== 'positives') return;
+    if (wantsAdd) setAdding(true);
+    setParams({}, { replace: true });
+    requestAnimationFrame(() => sectionRef.current?.scrollIntoView({ block: 'start' }));
+  }, [params, setParams]);
 
   const refresh = useCallback(async (keepFeatured?: PositiveItem | null) => {
     try {
@@ -66,7 +78,7 @@ export default function PositivesSection() {
   }
 
   return (
-    <section className="positives" aria-labelledby="positives-heading">
+    <section className="positives" aria-labelledby="positives-heading" ref={sectionRef}>
       <h2 id="positives-heading" className="section-title">
         Positives
       </h2>

@@ -2,7 +2,15 @@ import { useState } from 'react';
 import PageShell from '../components/PageShell';
 import MyDataSection from '../components/MyDataSection';
 import { PET_ART, PetThumb } from '../components/PetCompanion';
-import { PET_KINDS, PET_NAME_MAX, loadSettings, saveSettings, type AppSettings, type Companion } from '../lib/settings';
+import {
+  PET_KINDS,
+  PET_NAME_MAX,
+  USER_NAME_MAX,
+  loadSettings,
+  saveSettings,
+  type AppSettings,
+  type Companion,
+} from '../lib/settings';
 
 const OPTIONS: Companion[] = [...PET_KINDS, 'none'];
 
@@ -18,6 +26,28 @@ export default function Settings() {
 
   return (
     <PageShell title="Settings" subtitle="Make Thrive your own.">
+      <section className="card settings-section" aria-labelledby="about-heading">
+        <h2 id="about-heading" className="settings-heading">
+          About you
+        </h2>
+        <div className="field">
+          <label htmlFor="user-name">
+            What should Thrive call you? <span className="optional">(optional)</span>
+          </label>
+          <input
+            id="user-name"
+            type="text"
+            className="input"
+            value={settings.userName}
+            maxLength={USER_NAME_MAX}
+            autoComplete="given-name"
+            placeholder="Your first name or a nickname"
+            onChange={(e) => update({ userName: e.target.value })}
+          />
+          <p className="hint">Used only for the greeting on Home. Leave it blank to be greeted without a name.</p>
+        </div>
+      </section>
+
       <section className="card settings-section" aria-labelledby="companion-heading">
         <h2 id="companion-heading" className="settings-heading">
           Companion
