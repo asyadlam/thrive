@@ -1,4 +1,5 @@
 :root {
+  --after-action: 14px; /* space between a section's add/create button and the card or form below it */
   --green-50: #F1F6F2;
   --green-100: #DDEADF;
   --green-300: #A9C9B1;
@@ -534,7 +535,9 @@ textarea.input.talk-body {
 .data-actions .btn-primary { flex: none; }
 
 /* ---------- My Life: goals ---------- */
-.goals-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.goals-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: var(--after-action); }
+/* a one-line description stays snug under its heading; the gap then comes after it instead */
+.goals-header + .habits-hint { margin-top: calc(2px - var(--after-action)); }
 .goals-header .section-title { margin: 0; }
 .btn-small { min-height: 40px; padding: 0 14px; font-size: 0.9rem; }
 .goal-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
@@ -610,7 +613,7 @@ textarea.input.goal-note-input { min-height: 64px; }
 .remember-text { margin: 2px 0 0; font-size: 1.15rem; line-height: 1.4; overflow-wrap: anywhere; }
 .remember-empty { margin: 2px 0 0; color: var(--ink-soft); }
 .remember-next { margin-top: 8px; }
-.positives-add { margin: 16px 0 12px; }
+.positives-add { margin: 16px 0 var(--after-action); }
 .positive-form { display: flex; flex-direction: column; gap: 10px; }
 .positive-form label { font-weight: 650; }
 .positive-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
@@ -740,7 +743,7 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
   overflow-wrap: anywhere;
 }
 .affirmation-mine { font-size: 0.8rem; font-weight: 600; color: var(--green-700); margin-top: -4px; }
-.affirmations-add { margin: 16px 0 4px; }
+.affirmations-add { margin: 16px 0 var(--after-action); }
 .my-affirmations { margin-top: 8px; }
 .affirmation-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .affirmation-item {
@@ -755,7 +758,7 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 
 /* ---------- My Life: habits ---------- */
 .habits { margin-top: 32px; }
-.habits-hint { margin: 2px 0 8px; }
+.habits-hint { margin: 2px 0 var(--after-action); }
 .habit-form { display: flex; flex-direction: column; gap: 16px; margin-bottom: 12px; }
 .habit-list .habit-form { margin-bottom: 0; }
 .habit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
@@ -1007,3 +1010,148 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 }
 
 .positives { scroll-margin-top: 76px; }
+
+/* ---------- Companion: small size (page headers) ---------- */
+.pet-small { display: inline-flex; flex-shrink: 0; }
+.pet-small .pet-companion-img {
+  height: 56px;
+  filter: drop-shadow(0 4px 4px rgba(61, 58, 53, 0.16));
+}
+.page-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.page-title-text { min-width: 0; }
+.page-title-row .subtitle { margin-bottom: 20px; }
+.page-title-row .pet-small { margin-bottom: 16px; }
+
+/* ---------- Small animations (transform + opacity only, all under ~400ms) ---------- */
+/* 1. Page content fades in when switching pages */
+.page-fade { animation: page-fade-in 260ms ease-out backwards; }
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 2. Cards float up gently, with a tiny stagger. "backwards" means no transform is left
+      behind afterwards (so pop-up dialogs inside cards still position correctly). */
+.page-fade :is(
+  .card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row,
+  .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item
+) {
+  animation: card-float-up 300ms ease-out backwards;
+}
+.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(2) { animation-delay: 30ms; }
+.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(3) { animation-delay: 60ms; }
+.page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item):nth-child(n + 4) { animation-delay: 90ms; }
+.page-fade li:nth-child(2) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 30ms; }
+.page-fade li:nth-child(3) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 60ms; }
+.page-fade li:nth-child(n + 4) > :is(.goal-item, .habit-card, .list-link, .talk-list-item, .card) { animation-delay: 90ms; }
+@keyframes card-float-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 3. Buttons give a small press when tapped */
+:is(button, .btn-primary, .btn-secondary, .btn-danger, .btn-danger-outline, .home-checkin, .home-action, .choice-card, .quick-action, .lesson-card, .list-link, .help-button, .icon-button) {
+  transition: transform 120ms ease-out;
+}
+:is(button, .btn-primary, .btn-secondary, .btn-danger, .btn-danger-outline, .home-checkin, .home-action, .choice-card, .quick-action, .lesson-card, .list-link, .help-button, .icon-button):active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* 4. "Another one" cross-fades the card content */
+.crossfade { transition: opacity 150ms ease-in-out; }
+.crossfade.faded { opacity: 0; }
+
+/* 5. Reduced motion: switch all of these off (the pet's bob and bounce are already off) */
+@media (prefers-reduced-motion: reduce) {
+  .page-fade,
+  .page-fade :is(.card, .home-card, .home-checkin, .goal-item, .habit-card, .list-link, .letter-row, .positive-item, .ladder-step, .list-item, .affirmation-item, .talk-list-item) {
+    animation: none !important;
+  }
+  :is(button, .btn-primary, .btn-secondary, .btn-danger, .btn-danger-outline, .home-checkin, .home-action, .choice-card, .quick-action, .lesson-card, .list-link, .help-button, .icon-button) {
+    transition: none !important;
+  }
+  :is(button, .btn-primary, .btn-secondary, .btn-danger, .btn-danger-outline, .home-checkin, .home-action, .choice-card, .quick-action, .lesson-card, .list-link, .help-button, .icon-button):active {
+    transform: none !important;
+  }
+  .crossfade { transition: none !important; }
+  .pet-companion-bob,
+  .pet-companion-img.bounce { animation: none !important; }
+}
+
+/* ---------- Pet tap: one small floating effect (heart / two hearts / sparkles / stars) ---------- */
+.pet-companion-tap { position: relative; }
+.pet-fx {
+  position: absolute;
+  left: 50%;
+  top: 4%;
+  font-size: 26px; /* every shape is sized in em, so this scales the whole effect */
+  width: 2em;
+  height: 1.4em;
+  pointer-events: none;
+  z-index: 2;
+  animation: pet-fx-float 800ms ease-out forwards;
+}
+.pet-small .pet-fx { font-size: 15px; top: -4px; }
+.pet-fx-shape { position: absolute; display: block; overflow: visible; }
+@keyframes pet-fx-float {
+  0% { opacity: 0; transform: translate(-50%, 0.3em) scale(0.6); }
+  20% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -1.4em) scale(1.05); }
+}
+
+/* ---------- Pet tap: a short kind message in a speech bubble (~3s) ---------- */
+.pet-stage { position: relative; display: inline-block; }
+.page-title-row { position: relative; } /* the header bubble is placed against the whole title row */
+.pet-bubble {
+  position: absolute;
+  z-index: 5;
+  width: max-content;
+  padding: 8px 12px;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid var(--stone);
+  box-shadow: 0 4px 14px rgba(61, 58, 53, 0.1);
+  color: var(--ink);
+  font-size: 0.85rem;
+  font-weight: 500;
+  line-height: 1.3;
+  text-align: left;
+  overflow-wrap: break-word;
+  pointer-events: none;
+  animation: pet-bubble-life 3000ms ease forwards;
+}
+.pet-bubble::before { /* the little tail pointing at the pet */
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1px solid var(--stone);
+  border-right: 0;
+  border-bottom: 0;
+}
+/* Home: beside the big pet, to its right */
+.pet-stage .pet-bubble {
+  left: calc(100% - 6px);
+  top: 10px;
+  max-width: min(170px, calc(50vw - 70px));
+}
+.pet-stage .pet-bubble::before { left: -6px; top: 14px; transform: rotate(-45deg); }
+/* Page headers: just under the header (title + subtitle), right-aligned under the small pet */
+.pet-small .pet-bubble {
+  right: 0;
+  top: calc(100% - 14px);
+  max-width: min(240px, calc(100vw - 48px));
+}
+.pet-small .pet-bubble::before { right: 22px; top: -6px; transform: rotate(45deg); }
+@keyframes pet-bubble-life {
+  0% { opacity: 0; transform: translateY(4px) scale(0.96); }
+  8% { opacity: 1; transform: none; }
+  85% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet-fx { display: none; }
+  .pet-bubble { animation: none; } /* the message simply appears, then disappears after ~3s */
+}

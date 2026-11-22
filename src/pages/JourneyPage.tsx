@@ -21,6 +21,7 @@ import {
   type Journey,
   type JourneyStep,
 } from '../lib/journeys';
+import EmptyState from '../components/EmptyState';
 
 type Status = 'loading' | 'ready' | 'missing' | 'error';
 type Confirm =
@@ -249,7 +250,7 @@ export default function JourneyPage() {
       )}
 
       {journey.steps.length === 0 ? (
-        <div className="card placeholder">No steps yet. What's one small thing that would feel a little brave?</div>
+        <EmptyState>No steps yet. What's one small thing that would feel a little brave?</EmptyState>
       ) : (
         <ol className="ladder">
           {journey.steps.map((step, i) => (

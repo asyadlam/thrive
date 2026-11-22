@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LIST_TITLE_MAX, createList, listLists, type UserList } from '../lib/lists';
+import EmptyState from './EmptyState';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -107,7 +108,7 @@ export default function ListsSection() {
         </p>
       )}
       {status === 'ready' && lists.length === 0 && !creating && (
-        <div className="card placeholder">No lists yet. Start one whenever you like.</div>
+        <EmptyState>No lists yet. Start one whenever you like.</EmptyState>
       )}
       {status === 'ready' && lists.length > 0 && (
         <ul className="list-index">

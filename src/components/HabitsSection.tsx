@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import HabitForm from './HabitForm';
 import ConfirmDialog from './ConfirmDialog';
 import { deleteHabit, listHabits, saveHabit, type Habit, type HabitDraft } from '../lib/habits';
+import EmptyState from './EmptyState';
 
 type Status = 'loading' | 'ready' | 'error';
 /** What's open: nothing, the "add" form, or one habit being edited (by id). */
@@ -91,7 +92,7 @@ export default function HabitsSection() {
       )}
 
       {status === 'ready' && habits.length === 0 && editing !== 'new' && (
-        <div className="card placeholder">No habits yet. Add a swap whenever one comes to mind.</div>
+        <EmptyState>No habits yet. Add a swap whenever one comes to mind.</EmptyState>
       )}
 
       {status === 'ready' && habits.length > 0 && (

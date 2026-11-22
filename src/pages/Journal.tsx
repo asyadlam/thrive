@@ -24,7 +24,7 @@ export default function Journal() {
   }, [date]);
 
   return (
-    <PageShell title="Journal" subtitle="A space for your thoughts and reflections.">
+    <PageShell title="Journal" subtitle="A space for your thoughts and reflections." pet>
       <h2 className="section-title">What would help right now?</h2>
 
       <div className="choice-list">

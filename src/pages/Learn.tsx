@@ -8,7 +8,7 @@ export default function Learn() {
   const [readIds] = useState(() => new Set(loadSettings().readLessons));
 
   return (
-    <PageShell title="Learn" subtitle="Ideas and tools to help you thrive.">
+    <PageShell title="Learn" subtitle="Ideas and tools to help you thrive." pet>
       <ul className="lesson-list">
         {LESSONS.map((lesson) => {
           const read = readIds.has(lesson.id);

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom';
 import { POSITIVE_MAX, addStandalonePositive, listAllPositives, type PositiveItem } from '../lib/positives';
 import { formatShortDay, todayKey } from '../lib/journal';
+import { useCrossFade } from './useCrossFade';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -26,6 +27,7 @@ export default function PositivesSection() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const fade = useCrossFade(featured, (a, b) => a?.key === b?.key);
   const [params, setParams] = useSearchParams();
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -89,8 +91,10 @@ export default function PositivesSection() {
           <p className="hint">Loading…</p>
         ) : featured ? (
           <>
-            <p className="remember-text">{featured.text}</p>
-            <span className="hint">{positiveDate(featured.date)}</span>
+            <div className={`crossfade${fade.faded ? ' faded' : ''}`}>
+              <p className="remember-text">{(fade.shown ?? featured).text}</p>
+              <span className="hint">{positiveDate((fade.shown ?? featured).date)}</span>
+            </div>
             {items.length > 1 && (
               <button
                 type="button"

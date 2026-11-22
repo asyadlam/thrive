@@ -22,6 +22,7 @@ import {
   todayKey,
   type JournalEntry,
 } from '../lib/journal';
+import EmptyState from '../components/EmptyState';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -146,7 +147,7 @@ export default function LookBackPage() {
             {status === 'loading' ? (
               <p className="hint">Loading…</p>
             ) : selectedEntries.length === 0 ? (
-              <div className="card placeholder">No entries on this day.</div>
+              <EmptyState>No entries on this day.</EmptyState>
             ) : (
               <ul className="talk-list">
                 {selectedEntries.map((e) => (

@@ -5,7 +5,7 @@ import ListsSection from '../components/ListsSection';
 
 export default function MyLife() {
   return (
-    <PageShell title="My Life" subtitle="The people, places and things that matter to you.">
+    <PageShell title="My Life" subtitle="The people, places and things that matter to you." pet>
       <GoalsSection />
       <HabitsSection />
       <ListsSection />

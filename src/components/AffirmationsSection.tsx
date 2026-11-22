@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import ConfirmDialog from './ConfirmDialog';
+import { useCrossFade } from './useCrossFade';
 import {
   AFFIRMATION_MAX,
   addCustomAffirmation,
@@ -26,6 +27,8 @@ export default function AffirmationsSection() {
   const [loadFailed, setLoadFailed] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<CustomAffirmation | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const fade = useCrossFade(shown, (a, b) => a.key === b.key && a.text === b.text);
 
   const pool = useCallback(
     (custom: CustomAffirmation[]): AffirmationItem[] => [
@@ -96,10 +99,12 @@ export default function AffirmationsSection() {
       </h2>
 
       <div className="card affirmation-card">
-        <p className="affirmation-text" aria-live="polite">
-          {shown.text}
-        </p>
-        {shown.mine && <span className="affirmation-mine">One of yours</span>}
+        <div className={`crossfade${fade.faded ? ' faded' : ''}`}>
+          <p className="affirmation-text" aria-live="polite">
+            {fade.shown.text}
+          </p>
+          {fade.shown.mine && <span className="affirmation-mine">One of yours</span>}
+        </div>
         <button
           type="button"
           className="btn-secondary btn-small"

@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { JOURNEY_TITLE_MAX, createJourney, journeySummary, listJourneys, type Journey } from '../lib/journeys';
+import EmptyState from './EmptyState';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -107,7 +108,7 @@ export default function JourneysSection() {
         </p>
       )}
       {status === 'ready' && journeys.length === 0 && !creating && (
-        <div className="card placeholder">No journeys yet. Start one whenever you feel ready.</div>
+        <EmptyState>No journeys yet. Start one whenever you feel ready.</EmptyState>
       )}
       {status === 'ready' && journeys.length > 0 && (
         <ul className="list-index">

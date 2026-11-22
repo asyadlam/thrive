@@ -13,6 +13,7 @@ import {
   toggleItem,
   type UserList,
 } from '../lib/lists';
+import EmptyState from '../components/EmptyState';
 
 type Status = 'loading' | 'ready' | 'missing' | 'error';
 
@@ -190,7 +191,7 @@ export default function ListPage() {
       )}
 
       {list.items.length === 0 ? (
-        <div className="card placeholder">Nothing here yet. Add the first item above.</div>
+        <EmptyState>Nothing here yet. Add the first item above.</EmptyState>
       ) : (
         <ul className="list-items">
           {list.items.map((item) => (

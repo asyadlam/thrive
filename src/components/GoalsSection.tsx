@@ -4,6 +4,7 @@ import GoalForm from './GoalForm';
 import ConfirmDialog from './ConfirmDialog';
 import { deleteGoal, listGoals, saveGoal, setGoalCompleted, type Goal, type GoalDraft } from '../lib/goals';
 import { formatShortDay, todayKey } from '../lib/journal';
+import EmptyState from './EmptyState';
 
 type Status = 'loading' | 'ready' | 'error';
 /** What's open: nothing, the "add" form, or one goal being edited (by id). */
@@ -152,7 +153,7 @@ export default function GoalsSection() {
       {status === 'ready' && (
         <>
           {active.length === 0 && editing !== 'new' ? (
-            <div className="card placeholder">No active goals. Add one whenever you're ready.</div>
+            <EmptyState>No active goals. Add one whenever you're ready.</EmptyState>
           ) : (
             <ul className="goal-list">{active.map(renderGoal)}</ul>
           )}

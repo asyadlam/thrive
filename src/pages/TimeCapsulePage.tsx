@@ -15,6 +15,7 @@ import {
   type LetterSummary,
   type SealType,
 } from '../lib/letters';
+import EmptyState from '../components/EmptyState';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -232,7 +233,7 @@ export default function TimeCapsulePage() {
         </p>
       )}
       {status === 'ready' && letters.length === 0 && !writing && (
-        <div className="card placeholder">Letters you write will wait here until their day.</div>
+        <EmptyState>Letters you write will wait here until their day.</EmptyState>
       )}
       {status === 'ready' && letters.length > 0 && (
         <ul className="letter-list">
