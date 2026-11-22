@@ -3,6 +3,9 @@
   chat page; nothing here saves it. Only a summary the person confirms is saved (see saveTalkSummary).
 */
 
+import { formatLongDay, todayKey } from './journal';
+import { downloadFile } from './backup';
+
 export type ChatMessage = { role: 'user' | 'assistant'; content: string };
 export type TalkMode = 'open' | 'reply' | 'close' | 'summary';
 export type TalkError = 'daily_limit' | 'failed';
@@ -15,6 +18,23 @@ export class TalkFailure extends Error {
   ) {
     super(code);
   }
+}
+
+/**
+ * Saves the conversation as a plain text file, built right here on the device from the chat on screen.
+ * Only happens when the person taps "Download transcript"; the app itself keeps no copy.
+ */
+export function downloadTranscript(entryTitle: string, messages: ChatMessage[]) {
+  const day = todayKey();
+  const lines = [
+    'Thrive — Talk about this',
+    formatLongDay(day),
+    `Entry: ${entryTitle}`,
+    '',
+    ...messages.map((m) => `${m.role === 'user' ? 'You' : 'Companion'}: ${m.content}`),
+    '',
+  ];
+  downloadFile(`thrive-talk-${day}.txt`, lines.join('\n'), 'text/plain;charset=utf-8');
 }
 
 /** A conversation wraps up at about this many messages. */

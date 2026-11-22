@@ -20,6 +20,7 @@ import {
   idbGetAll,
   idbPutMany,
 } from './db';
+import { talkSummariesOf, withSummaryList, type JournalEntry } from './journal';
 import type { UserList } from './lists';
 import type { Journey } from './journeys';
 
@@ -34,6 +35,7 @@ export type MergeCounts = {
   journeys: number;
   journeySteps: number;
   affirmations: number;
+  talkSummaries: number;
 };
 
 export type MergePlan = {
@@ -55,6 +57,7 @@ const zero = (): MergeCounts => ({
   journeys: 0,
   journeySteps: 0,
   affirmations: 0,
+  talkSummaries: 0,
 });
 
 type WithId = { id: string };
@@ -105,7 +108,36 @@ export async function planMerge(backup: CheckedBackup): Promise<MergePlan> {
     if (out.length) writes[store] = out;
   }
 
-  await flat(JOURNAL_STORE, backup.entries, 'entries');
+  // Journal entries: new ids are added. A journal page that's already here keeps everything as it is,
+  // and only gains talk summaries whose ids it doesn't have yet (never duplicated, never removed).
+  if (backup.entries && backup.entries.length) {
+    const current = new Map((await idbGetAll<JournalEntry>(JOURNAL_STORE)).map((e) => [e.id, e]));
+    const out: JournalEntry[] = [];
+    for (const entry of backup.entries) {
+      const mine = current.get(entry.id);
+      if (!mine) {
+        out.push(entry);
+        added.entries += 1;
+        continue;
+      }
+      skipped += 1;
+      if (mine.type !== 'talk' || entry.type !== 'talk') continue;
+      const have = talkSummariesOf(mine);
+      const haveIds = new Set(have.map((s) => s.id));
+      const incoming = talkSummariesOf(entry);
+      const fresh = incoming.filter((s) => !haveIds.has(s.id));
+      skipped += incoming.length - fresh.length;
+      if (fresh.length) {
+        added.talkSummaries += fresh.length;
+        out.push({
+          ...withSummaryList(mine),
+          talkSummaries: [...have, ...fresh].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    }
+    if (out.length) writes[JOURNAL_STORE] = out;
+  }
   await flat(LETTERS_STORE, backup.letters, 'letters');
   await flat(GOALS_STORE, backup.goals, 'goals');
   await flat(HABITS_STORE, backup.habits, 'habits');
@@ -147,6 +179,7 @@ const LABELS: [keyof MergeCounts, string, string][] = [
   ['journeys', 'journey', 'journeys'],
   ['journeySteps', 'journey step', 'journey steps'],
   ['affirmations', 'affirmation of your own', 'affirmations of your own'],
+  ['talkSummaries', 'talk summary', 'talk summaries'],
 ];
 
 /** e.g. "1 journal entry, 2 list items" (only collections with something added). */

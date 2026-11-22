@@ -1,8 +1,9 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
-import { LIMITS, formatDay, formatTime, getTalkEntry, saveTalkEntry, todayKey, type TalkEntry } from '../lib/journal';
+import { LIMITS, formatDay, formatTime, getTalkEntry, saveTalkEntry, talkSummariesOf, todayKey, type TalkEntry } from '../lib/journal';
 import DictationButton from '../components/DictationButton';
+import TalkSummaries from '../components/TalkSummaries';
 
 type Status = 'loading' | 'ready' | 'not-found' | 'error';
 
@@ -180,11 +181,10 @@ export default function TalkEntryPage() {
         </form>
       )}
 
-      {status === 'ready' && entry?.talkSummary && (
-        <section className="card talk-summary-card" aria-label="From your talk">
-          <span className="saved-label">From your talk</span>
-          <p>{entry.talkSummary}</p>
-        </section>
+      {status === 'ready' && entry && talkSummariesOf(entry).length > 0 && (
+        <div className="card talk-summary-card">
+          <TalkSummaries entry={entry} />
+        </div>
       )}
     </PageShell>
   );

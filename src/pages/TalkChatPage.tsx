@@ -5,7 +5,15 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import { PET_ART } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
 import { loadSettings } from '../lib/settings';
-import { MAX_CHAT_MESSAGES, TalkFailure, askCompanion, soundsLikeCrisis, type ChatMessage, type TalkMode } from '../lib/talk';
+import {
+  MAX_CHAT_MESSAGES,
+  TalkFailure,
+  askCompanion,
+  downloadTranscript,
+  soundsLikeCrisis,
+  type ChatMessage,
+  type TalkMode,
+} from '../lib/talk';
 
 /** One chat bubble. `crisis` shows the Get Help card under it. Kept only in memory, never saved. */
 type Bubble = ChatMessage & { crisis?: boolean };
@@ -196,7 +204,14 @@ export default function TalkChatPage() {
 
       {(phase === 'chatting' || phase === 'ended') && (
         <div className="chat">
-          <p className="chat-note">This chat isn’t saved.</p>
+          <div className="chat-top">
+            <p className="chat-note">This chat isn’t saved.</p>
+            {messages.length > 0 && (
+              <button type="button" className="btn-secondary btn-small" onClick={() => downloadTranscript(title, toApi(messages))}>
+                Download transcript
+              </button>
+            )}
+          </div>
 
           <ol className="chat-list" aria-live="polite" aria-label="Conversation">
             {messages.map((m, i) => (
@@ -306,6 +321,9 @@ export default function TalkChatPage() {
               )}
               {summary.state === 'saved' && <p className="save-status">Saved to your entry, under “From your talk”.</p>}
               {!id && <p className="hint">This page wasn’t saved, so there’s nowhere to keep a summary this time.</p>}
+              <button type="button" className="btn-secondary chat-back" onClick={() => downloadTranscript(title, toApi(messages))}>
+                Download transcript
+              </button>
               <Link to={backTo} state={backState} className="btn-secondary chat-back">
                 Back to your entry
               </Link>

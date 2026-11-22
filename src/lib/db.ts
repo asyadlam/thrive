@@ -1,6 +1,6 @@
 // Minimal promise wrapper around IndexedDB (no extra dependencies).
 const DB_NAME = 'thrive';
-const DB_VERSION = 9;
+const DB_VERSION = 10; // 10: talk summaries became a list (see the migration below)
 
 /** All journal entries (quick and talk) live in this one store, keyed by `id`. */
 export const JOURNAL_STORE = 'journal';
@@ -60,6 +60,33 @@ function openDb(): Promise<IDBDatabase> {
         }
         if (!db.objectStoreNames.contains(JOURNEYS_STORE)) {
           db.createObjectStore(JOURNEYS_STORE, { keyPath: 'id' });
+        }
+        // Version 10: a journal page's single talk summary becomes the first item of its summaries list.
+        // (Same id and shape as talkSummariesOf in journal.ts, so backups and merges line up.)
+        if (event.oldVersion >= 1 && event.oldVersion < 10 && db.objectStoreNames.contains(JOURNAL_STORE)) {
+          const journal = tx.objectStore(JOURNAL_STORE);
+          const cursorReq = journal.openCursor();
+          cursorReq.onsuccess = () => {
+            const cursor = cursorReq.result;
+            if (!cursor) return;
+            const entry = cursor.value as {
+              id: string;
+              type: string;
+              updatedAt: string;
+              talkSummary?: unknown;
+              talkSummaries?: { id: string; text: string; createdAt: string }[];
+            };
+            if (entry.type === 'talk' && 'talkSummary' in entry) {
+              const { talkSummary, ...rest } = entry;
+              const list = Array.isArray(entry.talkSummaries) ? [...entry.talkSummaries] : [];
+              const legacyId = `summary-${entry.id}-legacy`;
+              if (typeof talkSummary === 'string' && talkSummary.trim() && !list.some((s) => s.id === legacyId)) {
+                list.unshift({ id: legacyId, text: talkSummary.trim(), createdAt: entry.updatedAt });
+              }
+              cursor.update(list.length ? { ...rest, talkSummaries: list } : rest);
+            }
+            cursor.continue();
+          };
         }
         // Move quick entries saved by version 1 into the new store, then drop the old one.
         if (event.oldVersion < 2 && db.objectStoreNames.contains(LEGACY_ENTRIES_STORE)) {

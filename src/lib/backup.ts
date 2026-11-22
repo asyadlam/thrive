@@ -3,13 +3,18 @@ import {
   formatLongDay,
   formatTime,
   isIsoTime,
+  legacySummaryId,
   listAllEntries,
   newId,
   quickId,
+  talkSummariesOf,
+  formatTalkSummaryDate,
   todayKey,
   withMetadata,
+  withSummaryList,
   type JournalEntry,
   type Mood,
+  type TalkSummary,
 } from './journal';
 import { loadSettings, normalizeSettings, saveSettings, type AppSettings } from './settings';
 import { goalFromBackup, listAllGoals, type Goal } from './goals';
@@ -62,7 +67,7 @@ export async function buildBackup(): Promise<Backup> {
     ...FORMAT,
     exportedAt: new Date().toISOString(),
     settings: loadSettings(),
-    entries: await listAllEntries(),
+    entries: (await listAllEntries()).map((e) => (e.type === 'talk' ? withSummaryList(e) : e)), // summaries as a list
     goals: await listAllGoals(),
     positives: await listStandalonePositives(),
     letters: await lettersForBackup(),
@@ -115,10 +120,29 @@ function checkEntry(raw: unknown, i: number): JournalEntry {
   if (e.type === 'talk') {
     if (!isStr(e.title) || !isStr(e.body)) fail('title or text');
     const id = isStr(e.id) && e.id.startsWith('talk-') ? e.id : `talk-${newId()}`;
-    const { talkSummary, ...rest } = e;
-    // "From your talk" is optional: kept when it's text, dropped otherwise (older backups simply don't have it)
-    const summary = isStr(talkSummary) && talkSummary.trim() ? { talkSummary } : {};
-    return withMetadata({ ...(rest as object), ...summary, type: 'talk', date, id } as JournalEntry);
+    // "From your talk" summaries are optional. Keep each one that has text (filling in a missing id or date);
+    // an older backup's single summary becomes the first item, with the same id it gets on this device.
+    const { talkSummary, talkSummaries, ...rest } = e;
+    const updatedAt = isStr(e.updatedAt) ? e.updatedAt : new Date().toISOString();
+    const list: TalkSummary[] = [];
+    if (Array.isArray(talkSummaries)) {
+      for (const raw of talkSummaries as unknown[]) {
+        const s = (raw ?? {}) as Record<string, unknown>;
+        if (!isStr(s.text) || !s.text.trim()) continue;
+        list.push({
+          id: isStr(s.id) && s.id ? s.id : `summary-${newId()}`,
+          text: s.text,
+          createdAt: isStr(s.createdAt) && !Number.isNaN(Date.parse(s.createdAt)) ? s.createdAt : updatedAt,
+        });
+      }
+    }
+    const legacyId = legacySummaryId(id);
+    if (isStr(talkSummary) && talkSummary.trim() && !list.some((s) => s.id === legacyId)) {
+      list.unshift({ id: legacyId, text: talkSummary.trim(), createdAt: updatedAt });
+    }
+    const unique = list.filter((s, i) => list.findIndex((o) => o.id === s.id) === i);
+    const summaries = unique.length ? { talkSummaries: unique } : {};
+    return withMetadata({ ...(rest as object), ...summaries, type: 'talk', date, id } as JournalEntry);
   }
   return fail('unknown entry type');
 }
@@ -308,7 +332,11 @@ export async function buildReadableText(): Promise<string> {
       lines.push(`Journal page · ${formatTime(e.createdAt)}`);
       if (e.title) lines.push(`Title: ${e.title}`);
       lines.push('', e.body);
-      if (e.talkSummary) lines.push('', 'From your talk:', e.talkSummary);
+      const summaries = talkSummariesOf(e);
+      if (summaries.length) {
+        lines.push('', 'From your talk:');
+        for (const s of [...summaries].reverse()) lines.push(`  • ${formatTalkSummaryDate(s.createdAt)}: ${s.text}`);
+      }
     }
     lines.push('');
   }

@@ -27,9 +27,44 @@ export type TalkEntry = EntryBase & {
   type: 'talk';
   title: string;
   body: string;
-  /** Optional: a short summary saved from a "Talk about this" conversation (shown under "From your talk"). */
+  /** Summaries saved from "Talk about this" chats (shown under "From your talk"). Each save adds one. */
+  talkSummaries?: TalkSummary[];
+  /** Older single-summary field, from before summaries became a list. Read only to migrate it. */
   talkSummary?: string;
 };
+
+/** "Sunday, November 22, 2026 at 9:41 PM" for a saved summary. */
+export const formatTalkSummaryDate = (iso: string) => `${formatLongDay(todayKey(new Date(iso)))} at ${formatTime(iso)}`;
+
+/** One saved summary of a "Talk about this" conversation. */
+export type TalkSummary = { id: string; text: string; createdAt: string };
+
+/** The id an old single summary gets when it becomes the first item of the list (the same everywhere). */
+export const legacySummaryId = (entryId: string) => `summary-${entryId}-legacy`;
+
+const isSummary = (v: unknown): v is TalkSummary =>
+  !!v &&
+  typeof (v as TalkSummary).id === 'string' &&
+  typeof (v as TalkSummary).text === 'string' &&
+  typeof (v as TalkSummary).createdAt === 'string';
+
+/** All of an entry's saved summaries, oldest first, including an old single summary (migrated). */
+export function talkSummariesOf(entry: TalkEntry): TalkSummary[] {
+  const list = Array.isArray(entry.talkSummaries) ? entry.talkSummaries.filter(isSummary) : [];
+  const old = typeof entry.talkSummary === 'string' ? entry.talkSummary.trim() : '';
+  const legacyId = legacySummaryId(entry.id);
+  if (old && !list.some((s) => s.id === legacyId)) list.unshift({ id: legacyId, text: old, createdAt: entry.updatedAt });
+  return list;
+}
+
+/** The entry in the current shape: summaries as a list, the old single field gone. */
+export function withSummaryList<T extends TalkEntry>(entry: T): T {
+  const summaries = talkSummariesOf(entry);
+  const { talkSummary: _old, talkSummaries: _list, ...rest } = entry;
+  void _old;
+  void _list;
+  return (summaries.length ? { ...rest, talkSummaries: summaries } : rest) as T;
+}
 
 export type JournalEntry = QuickEntry | TalkEntry;
 
@@ -107,7 +142,7 @@ export async function saveTalkEntry(draft: TalkDraft, existing?: TalkEntry): Pro
     date: existing?.date ?? todayKey(),
     title: draft.title.trim(),
     body: draft.body, // kept exactly as written; no length limit
-    ...(existing?.talkSummary ? { talkSummary: existing.talkSummary } : {}), // editing the page keeps its talk summary
+    ...(existing && talkSummariesOf(existing).length ? { talkSummaries: talkSummariesOf(existing) } : {}), // editing keeps every talk summary
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -118,14 +153,17 @@ export async function saveTalkEntry(draft: TalkDraft, existing?: TalkEntry): Pro
 
 export const TALK_SUMMARY_MAX = 1000;
 
-/** Saves a short "From your talk" summary on a journal page (replacing any earlier one). */
+/** Adds a "From your talk" summary to a journal page. Earlier summaries are always kept. */
 export async function saveTalkSummary(entryId: string, summary: string): Promise<TalkEntry> {
   const existing = await getTalkEntry(entryId);
   if (!existing) throw new Error('This journal page couldn’t be found on this device.');
+  const now = new Date().toISOString();
+  const current = withSummaryList(existing);
+  const added: TalkSummary = { id: `summary-${newId()}`, text: summary.trim().slice(0, TALK_SUMMARY_MAX), createdAt: now };
   const updated: TalkEntry = {
-    ...existing,
-    talkSummary: summary.trim().slice(0, TALK_SUMMARY_MAX),
-    updatedAt: new Date().toISOString(),
+    ...current,
+    talkSummaries: [...talkSummariesOf(current), added],
+    updatedAt: now,
   };
   await idbPut(JOURNAL_STORE, updated);
   keepStorage();
