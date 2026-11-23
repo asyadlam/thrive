@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { POSITIVE_MAX, addStandalonePositive, listAllPositives, type PositiveItem } from '../lib/positives';
+import { POSITIVE_MAX, addStandalonePositive, deletePositive, listAllPositives, type PositiveItem } from '../lib/positives';
+import ConfirmDialog from './ConfirmDialog';
 import { formatShortDay, todayKey } from '../lib/journal';
 import { useCrossFade } from './useCrossFade';
 import { SeeMore, previewOf, scrollToSection } from './ListPreview';
@@ -29,6 +30,8 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState('');
+  const [confirm, setConfirm] = useState<PositiveItem | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const fade = useCrossFade(featured, (a, b) => a?.key === b?.key);
   const [params, setParams] = useSearchParams();
   const sectionRef = useRef<HTMLElement>(null);
@@ -78,6 +81,21 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
       setError("Couldn't save this positive. Please try again.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm) return;
+    setDeleting(true);
+    try {
+      await deletePositive(confirm);
+      setMessage('Deleted.');
+      await refresh(featured?.key === confirm.key ? null : featured);
+    } catch {
+      setMessage("Couldn't delete this positive. Please try again.");
+    } finally {
+      setDeleting(false);
+      setConfirm(null);
     }
   }
 
@@ -184,10 +202,29 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
           {previewOf(items, full).map((item) => (
             <li key={item.key} className="positive-item">
               <span className="positive-text">{item.text}</span>
-              <span className="positive-date">{positiveDate(item.date)}</span>
+              <span className="positive-side">
+                <span className="positive-date">{positiveDate(item.date)}</span>
+                <button type="button" className="positive-delete" aria-label={`Delete "${item.text}"`} onClick={() => setConfirm(item)}>
+                  ×
+                </button>
+              </span>
             </li>
           ))}
         </ul>
+      )}
+      {confirm && (
+        <ConfirmDialog
+          title="Delete this positive?"
+          message={
+            confirm.source === 'journal'
+              ? `"${confirm.text}" will be removed from your positives and from your quick entry on ${positiveDate(confirm.date)}. The rest of that entry stays as it is.`
+              : `"${confirm.text}" will be removed from your positives.`
+          }
+          confirmLabel="Delete"
+          busy={deleting}
+          onConfirm={() => void handleDelete()}
+          onCancel={() => setConfirm(null)}
+        />
       )}
       {!full && items.length > 3 && <SeeMore to="/growth/positives" a11yLabel="See all your positives" />}
     </section>

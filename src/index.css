@@ -637,6 +637,13 @@ textarea.input.goal-note-input { min-height: 64px; }
 }
 .positive-text { overflow-wrap: anywhere; min-width: 0; }
 .positive-date { flex-shrink: 0; font-size: 0.8rem; color: var(--ink-soft); }
+.positive-side { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin: -8px -8px -8px 0; }
+.positive-delete {
+  width: 36px; height: 36px; border: 0; border-radius: 10px; background: transparent;
+  font-size: 1.2rem; line-height: 1; color: var(--ink-faint); cursor: pointer;
+}
+.positive-delete:hover { background: #FBEFEB; color: var(--help-dark); }
+.positive-delete:focus-visible { outline: 2px solid var(--help); outline-offset: -2px; }
 
 /* ---------- Journal: Time Capsule ---------- */
 .write-letter-btn { width: 100%; flex: none; margin-bottom: 12px; }

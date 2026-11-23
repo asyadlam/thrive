@@ -1,5 +1,5 @@
-import { POSITIVES_STORE, idbGetAll, idbPut } from './db';
-import { LIMITS, isIsoTime, listAllEntries, newId, todayKey } from './journal';
+import { POSITIVES_STORE, idbDelete, idbGetAll, idbPut } from './db';
+import { LIMITS, getEntry, isIsoTime, listAllEntries, newId, saveQuickEntry, todayKey } from './journal';
 import { isDayKey } from './goals';
 
 /** A positive saved on its own, without a journal entry. */
@@ -55,6 +55,26 @@ export async function listAllPositives(): Promise<PositiveItem[]> {
   }
   // Newest day first; within a day, most recently written first (lines of one entry keep their order).
   return items.sort((a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt));
+}
+
+/**
+ * Deletes one positive. A standalone one is removed from the positives store. One that came from a quick entry is
+ * removed from that entry's "One positive" lines (the rest of the entry stays exactly as it was).
+ */
+export async function deletePositive(item: PositiveItem): Promise<void> {
+  if (item.source === 'standalone') {
+    await idbDelete(POSITIVES_STORE, item.key);
+    return;
+  }
+  const [entryId, index] = item.key.split('#');
+  const entry = await getEntry(entryId);
+  if (entry?.type !== 'quick') return; // already gone
+  const i = Number(index);
+  // Remove the line at its position if it still says the same thing; otherwise the first line with that text.
+  const at = entry.positives[i] === item.text ? i : entry.positives.indexOf(item.text);
+  if (at < 0) return;
+  const positives = entry.positives.filter((_, n) => n !== at);
+  await saveQuickEntry(entry.date, { mood: entry.mood, positives, note: entry.note, intention: entry.intention }, entry);
 }
 
 /** Check one standalone positive from a backup file; null if unusable. Fills missing id/timestamps. */
