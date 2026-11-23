@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import EmptyState from './EmptyState';
-import { SeeMore, previewOf, useSectionAnchor } from './ListPreview';
+import { SeeMore, useSectionAnchor } from './ListPreview';
 import { DREAMS_BASE } from '../lib/book';
 import { formatShortDay, listAllEntries, talkEntryLabel, type JournalEntry } from '../lib/journal';
 
@@ -48,7 +48,7 @@ export default function DreamsSection({ full = false }: { full?: boolean }) {
       {dreams && dreams.length === 0 && <EmptyState>Nothing here yet. When a dream stays with you, write it down here.</EmptyState>}
       {dreams && dreams.length > 0 && (
         <ul className="list-index">
-          {previewOf(dreams, full).map((d) => (
+          {(full ? dreams : dreams.slice(0, 1)).map((d) => ( // on the Journal tab: just the latest
             <li key={d.id}>
               <Link to={d.type === 'talk' ? `${DREAMS_BASE}/talk/${d.id}` : `${DREAMS_BASE}/entry/${d.id}`} className="list-link">
                 <span className="list-link-main">
@@ -61,7 +61,9 @@ export default function DreamsSection({ full = false }: { full?: boolean }) {
           ))}
         </ul>
       )}
-      {!full && dreams && dreams.length > 3 && <SeeMore to={DREAMS_BASE} a11yLabel="See all your dreams" />}
+      {!full && dreams && dreams.length > 1 && (
+        <SeeMore to={DREAMS_BASE} label={`See all ${dreams.length}`} a11yLabel="See all your dreams" />
+      )}
     </section>
   );
 }
