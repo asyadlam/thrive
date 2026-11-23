@@ -1,8 +1,8 @@
 import { LISTS_STORE, idbDelete, idbGet, idbGetAll, idbPut } from './db';
 import { isIsoTime, newId } from './journal';
-import { LIST_KINDS, type ListItem, type ListKind, type UserList } from './listParts';
+import { LIST_KINDS, isBuiltInList, type ListItem, type ListKind, type UserList } from './listParts';
 
-export { kindOf, STARTER_LISTS, type ListItem, type ListKind, type UserList } from './listParts';
+export { isBuiltInList, kindOf, STARTER_LISTS, type ListItem, type ListKind, type UserList } from './listParts';
 
 export const LIST_TITLE_MAX = 80;
 export const LIST_ITEM_MAX = 140;
@@ -18,7 +18,13 @@ export async function listLists(): Promise<UserList[]> {
 }
 
 export const getList = (id: string) => idbGet<UserList>(LISTS_STORE, id);
-export const deleteList = (id: string) => idbDelete(LISTS_STORE, id);
+
+/** Deletes a list. The built-in Wishlist and Bucket list can never be deleted. */
+export async function deleteList(id: string): Promise<void> {
+  const list = await getList(id);
+  if (list && isBuiltInList(list)) throw new Error('This list is built in, so it can’t be deleted.');
+  await idbDelete(LISTS_STORE, id);
+}
 
 /** A new plain list (items can be checked off and deleted). */
 export async function createList(title: string): Promise<UserList> {
@@ -41,6 +47,7 @@ async function save(list: UserList): Promise<UserList> {
 }
 
 export function renameList(list: UserList, title: string): Promise<UserList> {
+  if (isBuiltInList(list)) return Promise.resolve(list); // the built-in lists keep their names
   return save({ ...list, title: title.trim().slice(0, LIST_TITLE_MAX), updatedAt: now() });
 }
 
@@ -93,6 +100,43 @@ export function clearChecked(list: UserList): Promise<UserList> {
   return save({ ...list, items: list.items.filter((i) => !i.checked), updatedAt: now() });
 }
 
+/** Whole cents, so repeated adding never drifts (0.1 + 0.2 stays 0.30). */
+const cents = (n: number) => Math.round(n * 100) / 100;
+
+/** Money put aside: adds `amount` (or takes it out when negative). Never goes below $0. */
+export function addSaved(list: UserList, itemId: string, amount: number): Promise<UserList> {
+  const t = now();
+  return save({
+    ...list,
+    items: list.items.map((i) => (i.id === itemId ? { ...i, saved: Math.max(0, cents((i.saved ?? 0) + amount)), updatedAt: t } : i)),
+    updatedAt: t,
+  });
+}
+
+/** Back to $0 saved for this item. */
+export function resetSaved(list: UserList, itemId: string): Promise<UserList> {
+  const t = now();
+  return save({ ...list, items: list.items.map((i) => (i.id === itemId ? { ...i, saved: 0, updatedAt: t } : i)), updatedAt: t });
+}
+
+/**
+ * The number in a price or cost as typed: "$40" → 40, "$1,299.99" → 1299.99, "around 25" → 25.
+ * null when there's no usable number (then no savings bar is shown).
+ */
+export function priceAmount(price: string | undefined): number | null {
+  if (!price) return null;
+  const m = price.replace(/,(?=\d{3}(\D|$))/g, '').match(/\d+(?:[.,]\d{1,2})?/);
+  if (!m) return null;
+  const n = Number(m[0].replace(',', '.'));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** "$15", "$15.50", "$1,299.99". */
+export function dollars(n: number): string {
+  const whole = Number.isInteger(cents(n));
+  return `$${cents(n).toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
 export function deleteItem(list: UserList, itemId: string): Promise<UserList> {
   return save({ ...list, items: list.items.filter((i) => i.id !== itemId), updatedAt: now() });
 }
@@ -120,6 +164,7 @@ export function listFromBackup(raw: unknown): UserList | null {
       ...(i.doneAt !== undefined ? { doneAt: isIsoTime(i.doneAt) ? i.doneAt : null } : {}),
       ...(typeof i.note === 'string' ? { note: i.note.slice(0, LIST_NOTE_MAX) } : {}),
       ...(typeof i.price === 'string' ? { price: i.price.slice(0, LIST_PRICE_MAX) } : {}),
+      ...(typeof i.saved === 'number' && Number.isFinite(i.saved) && i.saved > 0 ? { saved: Math.round(i.saved * 100) / 100 } : {}),
       createdAt: created,
       updatedAt: isIsoTime(i.updatedAt) ? i.updatedAt : created,
     });

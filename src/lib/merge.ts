@@ -16,6 +16,8 @@ import {
   LETTERS_STORE,
   MEASUREMENTS_STORE,
   MEMORIES_STORE,
+  HEALTH_STORE,
+  MEDICATIONS_STORE,
   ROUTINE_STORE,
   WISHLIST_STORE,
   BUCKETLIST_STORE,
@@ -44,6 +46,8 @@ export type MergeCounts = {
   affirmations: number;
   talkSummaries: number;
   memories: number;
+  health: number;
+  medications: number;
   measurementKinds: number;
   measurementValues: number;
   routine: number;
@@ -74,6 +78,8 @@ const zero = (): MergeCounts => ({
   affirmations: 0,
   talkSummaries: 0,
   memories: 0,
+  health: 0,
+  medications: 0,
   measurementKinds: 0,
   measurementValues: 0,
   routine: 0,
@@ -166,6 +172,8 @@ export async function planMerge(backup: CheckedBackup): Promise<MergePlan> {
   await flat(POSITIVES_STORE, backup.positives, 'positives');
   await flat(AFFIRMATIONS_STORE, backup.affirmations, 'affirmations');
   await flat(MEMORIES_STORE, backup.memories, 'memories'); // only notes whose id isn't here yet
+  await flat(HEALTH_STORE, backup.health, 'health'); // a day already logged here is kept as it is
+  await flat(MEDICATIONS_STORE, backup.medications, 'medications');
   await flat(ROUTINE_STORE, backup.routine, 'routine');
   await flat(WISHLIST_STORE, backup.wishlist, 'wishlist');
   await flat(BUCKETLIST_STORE, backup.bucketlist, 'bucketlist');
@@ -246,6 +254,8 @@ const LABELS: [keyof MergeCounts, string, string][] = [
   ['affirmations', 'affirmation of your own', 'affirmations of your own'],
   ['talkSummaries', 'talk summary', 'talk summaries'],
   ['memories', 'companion memory note', 'companion memory notes'],
+  ['health', 'Health Journey day', 'Health Journey days'],
+  ['medications', 'medication/vitamin', 'medications/vitamins'],
   ['measurementKinds', 'measurement', 'measurements'],
   ['measurementValues', 'measurement value', 'measurement values'],
   ['routine', 'routine entry', 'routine entries'],

@@ -10,6 +10,7 @@ import {
   deleteItem,
   deleteList,
   getList,
+  isBuiltInList,
   kindOf,
   renameList,
   toggleItem,
@@ -150,6 +151,8 @@ export default function ListPage() {
             </button>
           </div>
         </form>
+      ) : isBuiltInList(list) ? (
+        <p className="hint list-builtin">This list is built in, so it can't be deleted.</p>
       ) : (
         <div className="list-actions">
           <button

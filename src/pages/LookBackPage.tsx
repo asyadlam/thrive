@@ -24,6 +24,7 @@ import {
   type JournalEntry,
 } from '../lib/journal';
 import EmptyState from '../components/EmptyState';
+import { loadSettings } from '../lib/settings';
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -61,12 +62,15 @@ export default function LookBackPage() {
 
   const [status, setStatus] = useState<Status>('loading');
   const [byDay, setByDay] = useState<Map<string, DayEntry[]>>(new Map());
+  const [{ showDreams }] = useState(loadSettings);
+  const marks = showDreams ? MARKS : MARKS.filter((m) => m.mark !== 'dream');
 
   useEffect(() => {
     let active = true;
     setStatus('loading');
     const { start, end } = monthRange(shown);
-    Promise.all([listEntriesBetween(start, end), listEntriesBetween(start, end, 'dreams')])
+    // Dreams only appear when Dreams & Nightmares is turned on in Settings.
+    Promise.all([listEntriesBetween(start, end), showDreams ? listEntriesBetween(start, end, 'dreams') : Promise.resolve([])])
       .then(([journal, dreams]) => {
         if (!active) return;
         const map = new Map<string, DayEntry[]>();
@@ -152,7 +156,7 @@ export default function LookBackPage() {
           })}
         </div>
         <ul className="calendar-legend" aria-label="What the marks mean">
-          {MARKS.map((m) => (
+          {marks.map((m) => (
             <li key={m.mark}>
               <span className={`day-mark ${m.mark}`} aria-hidden="true" />
               {m.label}

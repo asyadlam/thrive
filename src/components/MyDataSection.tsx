@@ -229,6 +229,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     if (b.lists) has.push(plural(b.lists.length, 'list', 'lists'));
     if (b.journeys) has.push(plural(b.journeys.length, 'journey', 'journeys'));
     if (b.memories) has.push(plural(b.memories.length, 'companion memory note', 'companion memory notes'));
+    if (b.health) has.push(plural(b.health.length, 'Health Journey day', 'Health Journey days'));
     const saved = b.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(b.exportedAt)))}` : '';
     const replaced = [plural(b.currentCount, 'entry', 'entries')];
     if (b.dreams) replaced.push(plural(b.currentDreams, 'dream entry', 'dream entries'));

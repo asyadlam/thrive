@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { LIMITS, MAX_POSITIVES, MOODS, type Mood, type QuickDraft, type QuickEntry } from '../lib/journal';
+import { LIMITS, MOODS, type Mood, type QuickDraft, type QuickEntry } from '../lib/journal';
 import DictationButton from './DictationButton';
 
 type Props = {
@@ -10,17 +10,13 @@ type Props = {
 
 export default function EntryForm({ initial, onSave, onCancel }: Props) {
   const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
-  const [positives, setPositives] = useState<string[]>(() => {
-    const p = initial?.positives ?? [];
-    return p.length ? [...p] : [''];
-  });
+  // Quick entries no longer ask for a positive (that lives in Growth → Positives). Positives saved on older
+  // entries are kept exactly as they were when the entry is edited.
+  const positives = initial?.positives ?? [];
   const [note, setNote] = useState(initial?.note ?? '');
   const [intention, setIntention] = useState(initial?.intention ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const updatePositive = (i: number, value: string) =>
-    setPositives((prev) => prev.map((p, idx) => (idx === i ? value : p)));
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -61,27 +57,6 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
         </div>
       </fieldset>
 
-      <fieldset className="field">
-        <legend>One positive</legend>
-        <p className="hint">Something good from today, big or small. Up to {MAX_POSITIVES} short lines.</p>
-        {positives.map((p, i) => (
-          <input
-            key={i}
-            type="text"
-            className="input"
-            value={p}
-            maxLength={LIMITS.positive}
-            aria-label={`Positive, line ${i + 1}`}
-            placeholder={i === 0 ? 'e.g. Had a good chat with a friend' : 'Another good thing'}
-            onChange={(e) => updatePositive(i, e.target.value)}
-          />
-        ))}
-        {positives.length < MAX_POSITIVES && (
-          <button type="button" className="btn-link" onClick={() => setPositives((prev) => [...prev, ''])}>
-            + Add a line
-          </button>
-        )}
-      </fieldset>
 
       <div className="field">
         <DictationButton value={note} onChange={setNote} maxLength={LIMITS.note} label="your note">

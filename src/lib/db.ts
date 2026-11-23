@@ -1,9 +1,9 @@
 // Minimal promise wrapper around IndexedDB (no extra dependencies).
 import { foldIntoJourneys } from './journeyParts';
-import { foldIntoLists } from './listParts';
+import { ensureBuiltInLists, foldIntoLists } from './listParts';
 import { asLengthKind } from './measureParts';
 const DB_NAME = 'thrive';
-const DB_VERSION = 17; // 17: every measurement is a length (cm). 16: Wishlist + Bucket list move into My Life lists, with starter lists. 15: Dreams & Nightmares journal (its own store). 10: talk summaries became a list (see the migration below). 11: companion memory notes. 12: My Life profile. 13: bucket list. 14: goals + habit swaps move into journeys
+const DB_VERSION = 19; // 19: Wishlist and Bucket list are built in (added back if missing). 18: Health Journey (days + medications). 17: every measurement is a length (cm). 16: Wishlist + Bucket list move into My Life lists, with starter lists. 15: Dreams & Nightmares journal (its own store). 10: talk summaries became a list (see the migration below). 11: companion memory notes. 12: My Life profile. 13: bucket list. 14: goals + habit swaps move into journeys
 
 /** All journal entries (quick and talk) live in this one store, keyed by `id`. */
 export const JOURNAL_STORE = 'journal';
@@ -33,6 +33,10 @@ export const ROUTINE_STORE = 'routine';
 export const WISHLIST_STORE = 'wishlist';
 /** …and my bucket list (added in version 13). */
 export const BUCKETLIST_STORE = 'bucketlist';
+/** Health Journey (added in version 18): one record per logged day, keyed by `id` ("health-YYYY-MM-DD"), */
+export const HEALTH_STORE = 'health';
+/** …and my own medication list, keyed by `id`. */
+export const MEDICATIONS_STORE = 'medications';
 /** Fear & Confidence journeys, each holding its ladder of steps (added in version 9), keyed by `id`. */
 export const JOURNEYS_STORE = 'journeys';
 /** Version 1 kept quick entries in "entries", keyed by date. */
@@ -83,7 +87,7 @@ function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(MEMORIES_STORE)) {
           db.createObjectStore(MEMORIES_STORE, { keyPath: 'id' });
         }
-        for (const name of [MEASUREMENTS_STORE, ROUTINE_STORE, WISHLIST_STORE, BUCKETLIST_STORE]) {
+        for (const name of [MEASUREMENTS_STORE, ROUTINE_STORE, WISHLIST_STORE, BUCKETLIST_STORE, HEALTH_STORE, MEDICATIONS_STORE]) {
           if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: 'id' });
         }
         // Version 10: a journal page's single talk summary becomes the first item of its summaries list.
@@ -155,6 +159,17 @@ function openDb(): Promise<IDBDatabase> {
               }),
             ),
           );
+        }
+        // Version 19: the Wishlist and Bucket list are built in. If either was deleted (or renamed) before, it comes
+        // back (empty, or with its own name); every item and every other list stays exactly as it was.
+        if (event.oldVersion >= 16 && event.oldVersion < 19 && db.objectStoreNames.contains(LISTS_STORE)) {
+          const store = tx.objectStore(LISTS_STORE);
+          const r = store.getAll();
+          r.onsuccess = () => {
+            const before = r.result as { id: string }[];
+            const byId = new Map(before.map((l) => [l.id, l]));
+            for (const l of ensureBuiltInLists(r.result, new Date().toISOString())) if (byId.get(l.id) !== l) store.put(l);
+          };
         }
         // Version 17: Measurements no longer have a type: every kind is a length in cm. A weight or plain-number kind
         // keeps all its numbers exactly as they were and notes its old type and unit (formerType / formerUnit).

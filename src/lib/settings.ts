@@ -21,6 +21,10 @@ export type AppSettings = {
   aboutMe: string;
   /** My Life "About me": blood type, one of BLOOD_TYPES, or '' if not set. Optional; nothing relies on it. */
   bloodType: BloodType | '';
+  /** Journal "Health Journey": shown only when I turn it on in Settings (off by default). */
+  showHealth: boolean;
+  /** Journal "Dreams & Nightmares": shown only when I turn it on in Settings (off by default). */
+  showDreams: boolean;
   /** My Life "About me": height in cm, or null if not set. A single current value, not a history. */
   heightCm: number | null;
   /** My Life "About me": weight in kg, or null if not set. A single current value, not a history. */
@@ -94,6 +98,8 @@ const DEFAULTS: AppSettings = {
   bloodType: '',
   heightCm: null,
   weightKg: null,
+  showHealth: false,
+  showDreams: false,
 };
 
 /** Earlier versions called the hippo "yoshi"; keep that choice instead of resetting it. */
@@ -120,6 +126,8 @@ export function normalizeSettings(value: unknown): AppSettings {
     birthYear: isBirthday(parsed.birthday) && isBirthYear(parsed.birthYear, parsed.birthday) ? parsed.birthYear : null,
     aboutMe: typeof parsed.aboutMe === 'string' ? parsed.aboutMe.slice(0, ABOUT_ME_MAX) : '',
     bloodType: isBloodType(parsed.bloodType) ? parsed.bloodType : '',
+    showHealth: parsed.showHealth === true, // only ever on by my own choice
+    showDreams: parsed.showDreams === true,
     heightCm: inRange(parsed.heightCm, HEIGHT_CM) ? roundOne(parsed.heightCm) : null,
     weightKg: inRange(parsed.weightKg, WEIGHT_KG) ? roundOne(parsed.weightKg) : null,
   };

@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import DreamsSection from '../components/DreamsSection';
+import HealthSection from '../components/HealthSection';
+import { loadSettings } from '../lib/settings';
 import { CalendarIcon, JournalIcon, LetterIcon, MyLifeIcon } from '../components/icons';
 import { formatTime, getQuickEntry, listTalkEntries, talkEntryLabel, todayKey, type TalkEntry } from '../lib/journal';
 
@@ -9,6 +11,7 @@ export default function Journal() {
   const date = useMemo(() => todayKey(), []);
   const [quickDone, setQuickDone] = useState(false);
   const [talkEntries, setTalkEntries] = useState<TalkEntry[]>([]);
+  const [{ showHealth, showDreams }] = useState(loadSettings);
 
   useEffect(() => {
     let active = true;
@@ -35,7 +38,7 @@ export default function Journal() {
           </span>
           <span className="quick-action-text">
             <strong>Quick entry</strong>
-            <span>Mood, one positive, a short note and tomorrow's intention.</span>
+            <span>Mood, a short note and tomorrow's intention.</span>
             {quickDone && <span className="done-badge">Done for today · tap to view</span>}
           </span>
           <span className="quick-action-arrow" aria-hidden="true">›</span>
@@ -64,16 +67,6 @@ export default function Journal() {
         <span className="quick-action-arrow" aria-hidden="true">›</span>
       </Link>
 
-      <Link to="/journal/time-capsule" className="card choice-card look-back-card">
-        <span className="quick-action-icon look-back-icon">
-          <LetterIcon />
-        </span>
-        <span className="quick-action-text">
-          <strong>Time Capsule</strong>
-          <span>Write a letter to future me.</span>
-        </span>
-        <span className="quick-action-arrow" aria-hidden="true">›</span>
-      </Link>
 
       {talkEntries.length > 0 && (
         <>
@@ -91,7 +84,20 @@ export default function Journal() {
         </>
       )}
 
-      <DreamsSection />
+      <hr className="journal-divider" />
+
+      {showDreams && <DreamsSection />}
+      {showHealth && <HealthSection />}
+      <Link to="/journal/time-capsule" className="card choice-card look-back-card time-capsule-card">
+        <span className="quick-action-icon look-back-icon">
+          <LetterIcon />
+        </span>
+        <span className="quick-action-text">
+          <strong>Time Capsule</strong>
+          <span>Write a letter to future me.</span>
+        </span>
+        <span className="quick-action-arrow" aria-hidden="true">›</span>
+      </Link>
     </PageShell>
   );
 }

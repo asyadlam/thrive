@@ -1744,9 +1744,12 @@ select.input { appearance: auto; }
 .list-link-meta { font-size: 0.8rem; font-weight: 400; color: var(--ink-soft); }
 .list-ideas { display: flex; flex-direction: column; gap: 8px; }
 .list-idea-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.rich-list-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.rich-list-top { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.rich-list-top .save-status { order: 2; }
+.rich-list-top .save-status:empty { display: none; }
 .rich-list-top .save-status { margin: 0; }
-.rich-list-top .btn-secondary { margin-left: auto; padding: 0 5px; font-size: 0.9rem; white-space: nowrap; }
+.rich-list-top .btn-secondary { padding: 0 5px; font-size: 0.9rem; white-space: nowrap; }
+.rich-list-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px 14px; margin-left: auto; }
 .rich-list .rich-form { margin-bottom: 12px; }
 .rich-list .wish-item { background: #fff; border: 1px solid var(--sand); border-radius: 14px; }
 .rich-list .wish-got-area { border-top-color: var(--stone); }
@@ -1760,3 +1763,117 @@ select.input { appearance: auto; }
 }
 .list-clear-link:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; border-radius: 8px; }
 .wish-item.done { opacity: 0.7; }
+
+/* ---------- Wishlist / Bucket list savings: a slim, calm progress bar (never a bill) ---------- */
+.wish-item:has(.saving) { flex-wrap: wrap; }
+.saving { flex: 1 0 100%; padding: 0 14px 12px; display: flex; flex-direction: column; gap: 6px; }
+.saving-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.saving-amount { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
+.saving-of { font-weight: 400; color: var(--ink-soft); }
+.saving-ready { font-size: 0.85rem; font-weight: 700; color: var(--green-700); }
+.saving-ready::before { content: '✓ '; }
+.saving-bar { height: 8px; border-radius: 999px; background: var(--sand); overflow: hidden; }
+.saving-fill { display: block; height: 100%; border-radius: inherit; background: var(--green-300); transition: width 300ms ease; }
+.saving.ready .saving-fill { background: var(--green-500); }
+.saving-toggle {
+  align-self: flex-start; min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 0.85rem;
+  font-weight: 700; color: var(--green-700); cursor: pointer;
+}
+.saving-toggle:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; border-radius: 6px; }
+.saving-form { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+.saving-row { display: flex; align-items: center; gap: 8px; }
+.saving-input { position: relative; width: 130px; }
+.saving-input .input { width: 100%; padding-left: 30px; background: #fff; }
+.saving-dollar { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); font-weight: 700; pointer-events: none; }
+.saving-links { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.saving-links .saving-toggle:not(:last-child) { color: var(--ink-soft); font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .saving-fill { transition: none; } }
+
+/* ---------- Journal: Health Journey (optional, all by hand) ---------- */
+.health { margin-top: 12px; scroll-margin-top: 76px; }
+.health-form { display: flex; flex-direction: column; gap: 18px; }
+.health-form .field { margin: 0; }
+.health-number { width: 170px; }
+.health-number .input { padding-right: 60px; }
+.health-form .measure-chips { margin: 0 0 4px; }
+.water-row { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 2px; max-width: 340px; }
+.glass {
+  width: 100%; height: 44px; padding: 4px 0; border: 0; border-radius: 10px; background: transparent; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.glass svg { width: 24px; height: 28px; }
+.glass-outline { fill: none; stroke: var(--green-300); stroke-width: 1.6; stroke-linejoin: round; }
+.glass-water { fill: transparent; transition: fill 200ms ease; }
+.glass.full .glass-water { fill: var(--green-300); }
+.glass.full .glass-outline { stroke: var(--green-500); }
+.glass:hover { background: var(--green-50); }
+.glass:focus-visible { outline: 2px solid var(--green-500); outline-offset: 1px; }
+.health-meds .list-item { background: #fff; }
+.health-meds .list-item.taken .list-check { background: var(--green-500); border-color: var(--green-500); }
+.health-med-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.health-med-row { cursor: default; }
+.health-day-links { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+.health-today-link { border: 0; background: none; font: inherit; cursor: pointer; }
+.health-pick { margin: 12px 0; display: flex; flex-direction: column; gap: 8px; }
+.health-pick label { font-weight: 700; }
+.health-pick-row { display: flex; gap: 8px; align-items: center; }
+.health-pick-row .input { flex: 1; min-width: 0; }
+.health-days { margin-top: 0; }
+.health-meds-page { display: flex; flex-direction: column; gap: 12px; }
+.health-meds-page > .save-status { margin: 0; }
+.health-meds-page > .save-status:empty { display: none; }
+.health-meds-label { margin: 8px 0 -4px; }
+@media (prefers-reduced-motion: reduce) { .glass-water { transition: none; } }
+
+/* Health Journey calendar (same look as Look back) */
+.health .health-calendar, .health-days-page .health-calendar { margin-top: 12px; }
+.health .health-calendar { background: var(--inset); }
+.health-calendar .day:disabled { color: var(--stone); cursor: default; background: transparent; }
+.health-calendar-hint { text-align: center; margin-top: 10px; }
+
+/* Health Journey: a single card on the Journal tab; Today + calendar live on its own page */
+.health-card { margin-top: 12px; scroll-margin-top: 76px; padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.health-card-main { display: flex; align-items: center; gap: 14px; padding: 16px; color: var(--ink); text-decoration: none; }
+.health-card-main .quick-action-text strong { display: block; }
+.health-today-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 16px 16px; padding: 12px 16px;
+  background: var(--inset); border-radius: var(--row-radius); color: var(--ink); text-decoration: none;
+}
+.health-today-row:hover { background: #F4EEE3; }
+.health-card-main:focus-visible, .health-today-row:focus-visible { outline: 2px solid var(--green-500); outline-offset: -2px; border-radius: var(--row-radius); }
+/* Journal tab: everyday writing above the line; Dreams, Health Journey and Time Capsule below it */
+.journal-divider { border: 0; border-top: 1px solid var(--stone); margin: 24px 4px 20px; }
+.journal-divider + :is(.dreams, .health-card, .time-capsule-card) { margin-top: 0; }
+.dreams + .health-card, .dreams + .time-capsule-card, .health-card + .time-capsule-card { margin-top: 12px; }
+.health-days-page .health-calendar { margin-top: 12px; }
+.health-meds-link { margin-top: 12px; }
+.health-day-links:empty { display: none; }
+
+.list-builtin { margin: 0 0 16px; }
+
+/* Health Journey: calorie logs (newest shown; the rest behind "See all") */
+.calorie-field { gap: 10px; }
+.calorie-label { font-weight: 700; }
+.calorie-total { display: flex; flex-direction: column; gap: 2px; }
+.calorie-total-number { font-size: 1.15rem; font-weight: 700; color: var(--green-700); }
+.food-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.food-item { display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 14px; background: var(--inset); border-radius: var(--row-radius); }
+.food-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.food-name { font-weight: 600; overflow-wrap: anywhere; }
+.food-kcal { font-weight: 700; color: var(--ink); white-space: nowrap; }
+.food-links { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 16px; }
+.food-toggle { color: var(--ink-soft); }
+.food-form { display: flex; flex-direction: column; gap: 10px; padding: 14px; background: var(--inset); border-radius: var(--row-radius); }
+.food-form .field { margin: 0; }
+.food-form .input { background: #fff; }
+.food-grams { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.food-gram label { font-size: 0.85rem; }
+.food-number { width: 100%; }
+.food-number .input { padding-right: 30px; }
+.food-number .about-unit { right: 12px; }
+.calorie-field .about-number-row .hint { flex: 1; }
+
+/* Health Journey calendar: the day's calories under the date */
+.health-calendar .day { min-height: 48px; }
+.day-kcal { font-size: 0.62rem; font-weight: 700; line-height: 1; color: var(--green-700); letter-spacing: -0.01em; white-space: nowrap; }
+.health-calendar .day.today .day-kcal { color: var(--green-700); }

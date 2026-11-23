@@ -30,6 +30,8 @@ import {
   LETTERS_STORE,
   MEASUREMENTS_STORE,
   MEMORIES_STORE,
+  HEALTH_STORE,
+  MEDICATIONS_STORE,
   POSITIVES_STORE,
   ROUTINE_STORE,
   WISHLIST_STORE,
@@ -48,7 +50,8 @@ import {
   type RoutineItem,
   type WishItem,
 } from './profile';
-import { foldIntoLists } from './listParts';
+import { ensureBuiltInLists, foldIntoLists } from './listParts';
+import { healthDayFromBackup, listHealthDays, listMedications, medicationFromBackup, type HealthDay, type Medication } from './health';
 import { listMemories, memoryFromBackup, type MemoryNote } from './memory';
 import { habitFromBackup, listHabits, type Habit } from './habits';
 import { listFromBackup, listLists, type UserList } from './lists';
@@ -79,8 +82,9 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
    version 15: My Life has one Lists section. Each list has a kind (todo / wishlist / bucket / groceries / custom);
                wishlist and bucket list items live inside the Wishlist and Bucket list lists (with note, price and
                doneAt), so the separate wishlist and bucketlist arrays are no longer written. Older files' wishlist and
-               bucketlist items are moved into those lists on restore and merge (see listParts.ts). */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 15 } as const;
+               bucketlist items are moved into those lists on restore and merge (see listParts.ts).
+   version 16: same, plus Health Journey: health: [...] (one record per logged day) and medications: [...] */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 16 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
@@ -88,6 +92,8 @@ export type Backup = typeof FORMAT & {
   settings: AppSettings;
   entries: JournalEntry[];
   dreams: JournalEntry[];
+  health: HealthDay[];
+  medications: Medication[];
   goals: Goal[];
   positives: StandalonePositive[];
   letters: BackupLetter[];
@@ -106,6 +112,8 @@ export async function buildBackup(): Promise<Backup> {
     exportedAt: new Date().toISOString(),
     settings: loadSettings(),
     entries: (await listAllEntries()).map((e) => (e.type === 'talk' ? withSummaryList(e) : e)), // summaries as a list
+    health: await listHealthDays(),
+    medications: await listMedications(),
     dreams: (await listAllEntries('dreams')).map((e) => (e.type === 'talk' ? withSummaryList(e) : e)),
     goals: await listAllGoals(),
     positives: await listStandalonePositives(),
@@ -199,6 +207,9 @@ export type CheckedBackup = {
   talkCount: number;
   /** null = an older backup made before Dreams & Nightmares existed (current dream entries are kept). */
   dreams: JournalEntry[] | null;
+  /** null = an older backup made before Health Journey existed (current health days / medications are kept). */
+  health: HealthDay[] | null;
+  medications: Medication[] | null;
   /** null = an older backup made before goals existed (current goals are kept). */
   goals: Goal[] | null;
   /** null = an older backup made before standalone positives existed (current ones are kept). */
@@ -399,6 +410,8 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
   const routine = readCollection(d.routine, routineItemFromBackup, 'routine', 'Routine entry');
   const wishlist = readCollection(d.wishlist, wishFromBackup, 'wishlist', 'Wishlist item');
   const bucketlist = readCollection(d.bucketlist, bucketItemFromBackup, 'bucket list', 'Bucket list item');
+  const health = readCollection(d.health, healthDayFromBackup, 'health days', 'Health day');
+  const medications = readCollection(d.medications, medicationFromBackup, 'medications', 'Medication');
   // The old Wishlist and Bucket list now live inside lists: fold any from this backup in (same ids as the device upgrade).
   if (lists && (wishlist || bucketlist)) {
     lists = foldIntoLists(lists, wishlist ?? [], bucketlist ?? [], { addStarters: false, stamp: new Date().toISOString() });
@@ -419,6 +432,8 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     quickCount: entries.filter((e) => e.type === 'quick').length,
     talkCount: entries.filter((e) => e.type === 'talk').length,
     dreams,
+    health,
+    medications,
     goals,
     positives,
     letters,
@@ -443,9 +458,12 @@ export async function applyBackup(backup: CheckedBackup): Promise<void> {
   if (backup.letters) stores[LETTERS_STORE] = backup.letters;
   if (backup.affirmations) stores[AFFIRMATIONS_STORE] = backup.affirmations;
   if (backup.lists) {
-    stores[LISTS_STORE] = backup.legacyLists
-      ? foldIntoLists(backup.lists, [], [], { addStarters: true, stamp: new Date().toISOString() })
-      : backup.lists;
+    const stamp = new Date().toISOString();
+    // The Wishlist and Bucket list are built in, so a restore always has them.
+    stores[LISTS_STORE] = ensureBuiltInLists(
+      backup.legacyLists ? foldIntoLists(backup.lists, [], [], { addStarters: true, stamp }) : backup.lists,
+      stamp,
+    );
     // The wishlist and bucket list live inside lists now; their old stores stay empty.
     stores[WISHLIST_STORE] = [];
     stores[BUCKETLIST_STORE] = [];
@@ -462,6 +480,8 @@ export async function applyBackup(backup: CheckedBackup): Promise<void> {
     stores[HABITS_STORE] = [];
   }
   if (backup.memories) stores[MEMORIES_STORE] = backup.memories;
+  if (backup.health) stores[HEALTH_STORE] = backup.health;
+  if (backup.medications) stores[MEDICATIONS_STORE] = backup.medications;
   if (backup.measurements) stores[MEASUREMENTS_STORE] = backup.measurements;
   if (backup.routine) stores[ROUTINE_STORE] = backup.routine;
   await idbReplaceStores(stores);

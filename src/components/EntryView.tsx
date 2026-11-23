@@ -12,7 +12,7 @@ export default function EntryView({ entry, onEdit, onDelete }: Props) {
 
       {entry.positives.length > 0 && (
         <div className="saved-block">
-          <span className="saved-label">One positive</span>
+          <span className="saved-label">Positive</span>
           <ul>
             {entry.positives.map((p, i) => (
               <li key={i}>{p}</li>

@@ -8,7 +8,9 @@
  * What a list is for. Older lists have no kind and are plain checklists ("custom").
  * - todo, groceries, custom: items can be checked off and deleted.
  * - wishlist: items have an optional price and note; "Got it" moves one to "Got it 🎉" with the date.
- * - bucket: items have an optional note; "Did it" moves one to "Done it ✨" with the date.
+ *   With a price, money put aside for it is tracked in `saved` (a progress bar, never a bill).
+ * - bucket: items have an optional note and cost (kept in `price`); "Did it" moves one to "Done it ✨" with the date.
+ *   With a cost, money put aside is tracked in `saved`, the same as the wishlist.
  */
 export type ListKind = 'todo' | 'wishlist' | 'bucket' | 'groceries' | 'custom';
 export const LIST_KINDS: ListKind[] = ['todo', 'wishlist', 'bucket', 'groceries', 'custom'];
@@ -22,8 +24,10 @@ export type ListItem = {
   doneAt?: string | null;
   /** Wishlist and bucket list: optional note. */
   note?: string;
-  /** Wishlist: optional price, as typed ("$40"). */
+  /** Wishlist price / bucket list cost (optional), as typed ("$40"). */
   price?: string;
+  /** Dollars put aside for it so far (wishlist and bucket list items with a price). Missing = $0. */
+  saved?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -49,6 +53,34 @@ export const STARTER_LISTS: { id: string; title: string; kind: ListKind }[] = [
 ];
 export const WISHLIST_LIST_ID = 'list-wishlist';
 export const BUCKET_LIST_ID = 'list-bucket';
+
+/**
+ * The Wishlist and the Bucket list are built in: they can't be deleted or renamed (their items can be changed
+ * freely). Every other list — To do, Groceries and my own — is a simple check-off list I can rename or delete.
+ */
+export const isBuiltInList = (list: Pick<UserList, 'kind'>) => {
+  const k = kindOf(list);
+  return k === 'wishlist' || k === 'bucket';
+};
+const BUILT_IN = STARTER_LISTS.filter((s) => s.kind === 'wishlist' || s.kind === 'bucket');
+
+/**
+ * Makes sure the two built-in lists exist with their own names: a missing one is added back (empty), and one that
+ * was renamed before they became built in gets its name back. Items are never touched. Lists that need no change
+ * are returned as they were.
+ */
+export function ensureBuiltInLists(lists: UserList[], stamp: string): UserList[] {
+  const out = [...lists];
+  for (const b of BUILT_IN) {
+    const i = out.findIndex((l) => l.id === b.id || kindOf(l) === b.kind);
+    if (i < 0) {
+      out.push({ id: b.id, title: b.title, kind: b.kind, items: [], createdAt: stamp, updatedAt: stamp });
+    } else if (out[i].title !== b.title || out[i].kind !== b.kind) {
+      out[i] = { ...out[i], title: b.title, kind: b.kind };
+    }
+  }
+  return out;
+}
 
 type OldWish = { id: string; name: string; price?: string; note?: string; gotAt?: string | null; createdAt: string; updatedAt: string };
 type OldBucket = { id: string; name: string; note?: string; doneAt?: string | null; createdAt: string; updatedAt: string };

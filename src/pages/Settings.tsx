@@ -136,6 +136,42 @@ export default function Settings() {
         )}
       </section>
 
+      <section className="card settings-section" aria-labelledby="dreams-setting-heading">
+        <h2 id="dreams-setting-heading" className="settings-heading">
+          Dreams &amp; Nightmares
+        </h2>
+        <p className="hint">A place in your Journal to write down dreams that stay with you.</p>
+        <label className="switch-row">
+          <span>Show Dreams &amp; Nightmares</span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="switch"
+            checked={settings.showDreams}
+            onChange={(e) => update({ showDreams: e.target.checked })}
+          />
+        </label>
+        {!settings.showDreams && <p className="hint">Off: it doesn't appear anywhere. Any dreams you wrote earlier stay saved.</p>}
+      </section>
+
+      <section className="card settings-section" aria-labelledby="health-heading">
+        <h2 id="health-heading" className="settings-heading">
+          Health Journey
+        </h2>
+        <p className="hint">A small daily log in your Journal — calories, exercise, steps, water and medications/vitamins, all typed in by you.</p>
+        <label className="switch-row">
+          <span>Show Health Journey</span>
+          <input
+            type="checkbox"
+            role="switch"
+            className="switch"
+            checked={settings.showHealth}
+            onChange={(e) => update({ showHealth: e.target.checked })}
+          />
+        </label>
+        {!settings.showHealth && <p className="hint">Off: it doesn't appear anywhere. Anything you logged earlier stays saved.</p>}
+      </section>
+
       <MyDataSection
         onRestored={() => {
           setSettings(loadSettings());
