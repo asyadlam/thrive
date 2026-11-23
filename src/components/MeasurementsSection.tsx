@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import ConfirmDialog from './ConfirmDialog';
 import EmptyState from './EmptyState';
 import { formatShortDay, todayKey } from '../lib/journal';
@@ -88,7 +89,7 @@ export default function MeasurementsSection() {
       setMessage(`${kind.name} added.`);
       openKind(kind.id, false);
     } catch {
-      setAddError("Couldn't save this on this device. Please try again.");
+      setAddError(SAVE_FAILED);
     } finally {
       setBusy(false);
     }

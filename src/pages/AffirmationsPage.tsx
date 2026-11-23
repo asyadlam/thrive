@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { useCrossFade } from '../components/useCrossFade';
@@ -76,7 +77,7 @@ export default function AffirmationsPage() {
       await refresh();
       setShown({ key: saved.id, text: saved.text, mine: true });
     } catch {
-      setError("Couldn't save this affirmation. Please try again.");
+      setError(SAVE_FAILED);
     } finally {
       setSaving(false);
     }

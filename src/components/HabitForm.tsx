@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import { HABIT_FIELD_MAX, type Habit, type HabitDraft } from '../lib/habits';
 
 /** Example hints for the three parts of the sentence. */
@@ -60,7 +61,7 @@ export default function HabitForm({ initial, examples = PHONE_EXAMPLE, onSave, o
     try {
       await onSave({ trigger, oldHabit, newHabit });
     } catch {
-      setError("Couldn't save this swap. Please try again.");
+      setError(SAVE_FAILED);
       setSaving(false);
     }
   }

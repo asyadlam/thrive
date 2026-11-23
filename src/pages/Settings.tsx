@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import AccountSection from '../components/AccountSection';
 import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import MyDataSection from '../components/MyDataSection';
@@ -171,6 +172,8 @@ export default function Settings() {
         </label>
         {!settings.showHealth && <p className="hint">Off: it doesn't appear anywhere. Anything you logged earlier stays saved.</p>}
       </section>
+
+      <AccountSection />
 
       <MyDataSection
         onRestored={() => {

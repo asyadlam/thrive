@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -507,7 +508,7 @@ export function MedicationsPage() {
       setMessage(`${med.name} added.`);
       await refresh();
     } catch {
-      setError("Couldn't save this on this device. Please try again.");
+      setError(SAVE_FAILED);
     }
   }
 

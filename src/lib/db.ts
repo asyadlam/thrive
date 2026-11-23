@@ -43,6 +43,38 @@ export const JOURNEYS_STORE = 'journeys';
 const LEGACY_ENTRIES_STORE = 'entries';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
+let current: IDBDatabase | null = null;
+
+/** Errors that mean the connection was closed under us (worth reopening and trying again). */
+function isClosedConnection(err: unknown): boolean {
+  const name = (err as { name?: string } | null)?.name ?? '';
+  const message = String((err as { message?: string } | null)?.message ?? '').toLowerCase();
+  return name === 'InvalidStateError' || name === 'TransactionInactiveError' || message.includes('closing') || message.includes('closed');
+}
+
+const RETRIES = 3;
+
+/**
+ * Runs some work on the database. If it fails because the connection closed, the connection is reopened and the
+ * work is tried again, up to 3 more times, before the error is passed on.
+ */
+async function withDb<T>(work: (db: IDBDatabase) => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await work(await openDb());
+    } catch (err) {
+      if (attempt >= RETRIES || !isClosedConnection(err)) throw err;
+      try {
+        current?.close();
+      } catch {
+        /* already closed */
+      }
+      current = null;
+      dbPromise = null;
+      await new Promise((r) => setTimeout(r, 60 * (attempt + 1)));
+    }
+  }
+}
 
 function openDb(): Promise<IDBDatabase> {
   if (!dbPromise) {
@@ -197,7 +229,20 @@ function openDb(): Promise<IDBDatabase> {
       };
       req.onsuccess = () => {
         const db = req.result;
-        db.onversionchange = () => db.close();
+        // If the browser (or a newer Thrive in another tab) closes this connection, forget it so the next
+        // save opens a fresh one instead of failing.
+        const forget = () => {
+          if (current === db) {
+            current = null;
+            dbPromise = null;
+          }
+        };
+        db.onversionchange = () => {
+          db.close();
+          forget();
+        };
+        db.onclose = forget;
+        current = db;
         resolve(db);
       };
       req.onerror = () => reject(req.error ?? new Error('Could not open on-device storage.'));
@@ -214,7 +259,7 @@ function run<T>(
   mode: IDBTransactionMode,
   action: (store: IDBObjectStore) => IDBRequest,
 ): Promise<T> {
-  return openDb().then(
+  return withDb(
     (db) =>
       new Promise<T>((resolve, reject) => {
         const tx = db.transaction(storeName, mode);
@@ -242,7 +287,7 @@ export const idbGetAll = <T>(storeName: string) => run<T[]>(storeName, 'readonly
 
 /** Replace everything in a store in ONE transaction: if any write fails, nothing changes. */
 export function idbReplaceAll<T>(storeName: string, values: T[]): Promise<void> {
-  return openDb().then(
+  return withDb(
     (db) =>
       new Promise<void>((resolve, reject) => {
         const tx = db.transaction(storeName, 'readwrite');
@@ -259,7 +304,7 @@ export function idbReplaceAll<T>(storeName: string, values: T[]): Promise<void> 
 /** Replace the contents of several stores in ONE transaction: all succeed, or nothing changes. */
 export function idbReplaceStores(contents: Record<string, unknown[]>): Promise<void> {
   const names = Object.keys(contents);
-  return openDb().then(
+  return withDb(
     (db) =>
       new Promise<void>((resolve, reject) => {
         const tx = db.transaction(names, 'readwrite');
@@ -279,7 +324,7 @@ export function idbReplaceStores(contents: Record<string, unknown[]>): Promise<v
 export function idbPutMany(contents: Record<string, unknown[]>): Promise<void> {
   const names = Object.keys(contents).filter((n) => contents[n].length > 0);
   if (names.length === 0) return Promise.resolve();
-  return openDb().then(
+  return withDb(
     (db) =>
       new Promise<void>((resolve, reject) => {
         const tx = db.transaction(names, 'readwrite');

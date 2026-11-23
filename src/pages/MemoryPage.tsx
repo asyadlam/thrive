@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { MEMORY_MAX, addMemory, deleteMemory, forgetAllMemories, listMemories, updateMemory, type MemoryNote } from '../lib/memory';
@@ -54,7 +55,7 @@ export default function MemoryPage() {
       setEditing(null);
       await refresh();
     } catch {
-      setError("Couldn't save this note on this device. Please try again.");
+      setError(SAVE_FAILED);
     } finally {
       setBusy(false);
     }

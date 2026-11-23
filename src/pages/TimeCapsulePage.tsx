@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -85,7 +86,7 @@ export default function TimeCapsulePage() {
       );
       await refresh();
     } catch {
-      setError("Couldn't seal this letter. Please try again.");
+      setError(SAVE_FAILED);
     } finally {
       setSaving(false);
     }

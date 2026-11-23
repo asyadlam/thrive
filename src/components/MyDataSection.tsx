@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useRef, useState, type ChangeEvent } from 'react';
 import ConfirmDialog from './ConfirmDialog';
 import {
   BackupError,
@@ -11,7 +11,7 @@ import {
   readableFileName,
   type CheckedBackup,
 } from '../lib/backup';
-import { formatLongDay, listAllEntries, todayKey } from '../lib/journal';
+import { formatLongDay, formatTime, listAllEntries, todayKey } from '../lib/journal';
 import { getLastBackupAt, setLastBackupAt } from '../lib/settings';
 import { listAllGoals } from '../lib/goals';
 import { listStandalonePositives } from '../lib/positives';
@@ -23,10 +23,26 @@ import { listJourneys } from '../lib/journeys';
 import { listMemories } from '../lib/memory';
 import { listMeasurementKinds, listRoutine } from '../lib/profile';
 import { applyMerge, describeCounts, planMerge, totalAdded, type MergePlan } from '../lib/merge';
+import {
+  CloudError,
+  backUpToCloud,
+  cloudBackupInfo,
+  fetchCloudBackup,
+  getLastCloudBackupAt,
+  getSession,
+  isLinkedDevice,
+  markRestoredFromCloud,
+  onSessionChange,
+} from '../lib/cloud';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** "Monday, November 23, 2026 at 4:05 PM". */
+const cloudWhen = (iso: string) => `${formatLongDay(todayKey(new Date(iso)))} at ${formatTime(iso)}`;
+
 type Message = { kind: 'ok' | 'error'; text: string } | null;
+/** A checked backup waiting for the restore confirm; `cloudAt` is set when it's the cloud copy. */
+type Pending = CheckedBackup & Current & { cloudAt?: string };
 type Current = {
   currentCount: number;
   currentDreams: number;
@@ -48,7 +64,34 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   const [mergePlan, setMergePlan] = useState<MergePlan | null>(null);
   const mergeInput = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<Message>(null);
-  const [pending, setPending] = useState<(CheckedBackup & Current) | null>(null);
+  const [pending, setPending] = useState<Pending | null>(null);
+  // Cloud backup (only when logged in)
+  const [signedIn, setSignedIn] = useState(false);
+  const [lastCloud, setLastCloud] = useState<string | null>(getLastCloudBackupAt);
+  const [cloudBusy, setCloudBusy] = useState<null | 'backup' | 'reading'>(null);
+  const [cloudMessage, setCloudMessage] = useState<Message>(null);
+  const [confirmCloudReplace, setConfirmCloudReplace] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const follow = (on: boolean) => {
+      if (!active) return;
+      setSignedIn(on);
+      if (on) {
+        cloudBackupInfo()
+          .then((info) => active && setLastCloud(info?.updatedAt ?? null))
+          .catch(() => undefined);
+      }
+    };
+    getSession()
+      .then((s) => follow(!!s))
+      .catch(() => undefined);
+    const stop = onSessionChange((s) => follow(!!s));
+    return () => {
+      active = false;
+      stop();
+    };
+  }, []);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const overdue = lastBackupAt !== null && Date.now() - Date.parse(lastBackupAt) > 30 * DAY_MS;
@@ -83,6 +126,40 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     }
   }
 
+  /** A checked backup plus how much is on this device now (for the restore confirm). */
+  async function withCurrent(checked: CheckedBackup, cloudAt?: string): Promise<Pending> {
+    const [current, dreams, goals, positives, letters, affirmations, habits, lists, journeys, memories, measurements, routine] = await Promise.all([
+      listAllEntries(),
+      listAllEntries('dreams'),
+      listAllGoals(),
+      listStandalonePositives(),
+      listAllLetterIds(),
+      listCustomAffirmations(),
+      listHabits(),
+      listLists(),
+      listJourneys(),
+      listMemories(),
+      listMeasurementKinds(),
+      listRoutine(),
+    ]);
+    return {
+      ...checked,
+      ...(cloudAt ? { cloudAt } : {}),
+      currentCount: current.length,
+      currentDreams: dreams.length,
+      currentGoals: goals.length,
+      currentPositives: positives.length,
+      currentLetters: letters.length,
+      currentAffirmations: affirmations.length,
+      currentHabits: habits.length,
+      currentLists: lists.length,
+      currentJourneys: journeys.length,
+      currentMemories: memories.length,
+      currentMeasurements: measurements.length,
+      currentRoutine: routine.length,
+    };
+  }
+
   // Step 1: pick + check the file. Nothing in the app changes here.
   async function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -91,36 +168,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('reading');
     setMessage(null);
     try {
-      const [checked, current, dreams, goals, positives, letters, affirmations, habits, lists, journeys, memories, measurements, routine] = await Promise.all([
-        readBackupFile(file),
-        listAllEntries(),
-        listAllEntries('dreams'),
-        listAllGoals(),
-        listStandalonePositives(),
-        listAllLetterIds(),
-        listCustomAffirmations(),
-        listHabits(),
-        listLists(),
-        listJourneys(),
-        listMemories(),
-        listMeasurementKinds(),
-        listRoutine(),
-      ]);
-      setPending({
-        ...checked,
-        currentCount: current.length,
-        currentDreams: dreams.length,
-        currentGoals: goals.length,
-        currentPositives: positives.length,
-        currentLetters: letters.length,
-        currentAffirmations: affirmations.length,
-        currentHabits: habits.length,
-        currentLists: lists.length,
-        currentJourneys: journeys.length,
-        currentMemories: memories.length,
-        currentMeasurements: measurements.length,
-        currentRoutine: routine.length,
-      });
+      setPending(await withCurrent(await readBackupFile(file)));
     } catch (err) {
       setMessage({
         kind: 'error',
@@ -137,6 +185,10 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('restoring');
     try {
       await applyBackup(pending);
+      if (pending.cloudAt) {
+        await markRestoredFromCloud(pending.cloudAt);
+        setLastCloud(pending.cloudAt);
+      }
       const total = pending.entries.length;
       setPending(null);
       const goalsText = pending.goals ? `, ${pending.goals.length} ${pending.goals.length === 1 ? 'goal' : 'goals'}` : '';
@@ -149,7 +201,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         : '';
       setMessage({
         kind: 'ok',
-        text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${dreamsText}${goalsText}${positivesText}${lettersText}${
+        text: `${pending.cloudAt ? 'Restored from the cloud: ' : 'Restored '}${total} ${total === 1 ? 'entry' : 'entries'}${dreamsText}${goalsText}${positivesText}${lettersText}${
           pending.affirmations
             ? `, ${pending.affirmations.length} ${pending.affirmations.length === 1 ? 'affirmation' : 'affirmations'} of your own`
             : ''
@@ -220,7 +272,14 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     }
   }
 
-  function restoreMessage(b: CheckedBackup & Current) {
+  function restoreMessage(b: Pending) {
+    if (b.cloudAt) {
+      return `This replaces everything on this device with your cloud copy from ${cloudWhen(b.cloudAt)}. The cloud copy wins: anything you added or changed on this device since then will be replaced. ${fileRestoreMessage(b)}`;
+    }
+    return fileRestoreMessage(b);
+  }
+
+  function fileRestoreMessage(b: Pending) {
     const has = [plural(b.quickCount, 'quick entry', 'quick entries'), plural(b.talkCount, 'journal page', 'journal pages')];
     if (b.dreams) has.push(plural(b.dreams.length, 'dream entry', 'dream entries'));
     if (b.positives) has.push(plural(b.positives.length, 'saved positive', 'saved positives'));
@@ -252,6 +311,49 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
       .join(' or ');
     const goalsNote = missing ? ` This older backup has no ${missing}, so your current ones will stay as they are.` : '';
     return `This backup has ${has.join(', ')}${saved}. Restoring will replace everything currently in Thrive on this device — ${replaced.join(', ')} and your settings.${goalsNote} This can't be undone, so download a backup of what's here first if you might want it.`;
+  }
+
+  /** Back up to cloud. If there's already a cloud copy this device hasn't made or restored, ask first. */
+  async function handleCloudBackup(confirmed = false) {
+    setCloudBusy('backup');
+    setCloudMessage(null);
+    try {
+      if (!confirmed) {
+        const info = await cloudBackupInfo();
+        if (info && !(await isLinkedDevice())) {
+          setConfirmCloudReplace(info.updatedAt);
+          return;
+        }
+      }
+      setConfirmCloudReplace(null);
+      const at = await backUpToCloud();
+      setLastCloud(at);
+      setCloudMessage({ kind: 'ok', text: 'Backed up to the cloud.' });
+    } catch (err) {
+      setConfirmCloudReplace(null);
+      setCloudMessage({ kind: 'error', text: err instanceof CloudError ? err.message : 'Couldn’t back up to the cloud. Please try again.' });
+    } finally {
+      setCloudBusy(null);
+    }
+  }
+
+  /** Restore from cloud: download and check it, then the same confirm as Restore from backup. */
+  async function handleCloudRestore() {
+    setCloudBusy('reading');
+    setCloudMessage(null);
+    setMessage(null);
+    try {
+      const copy = await fetchCloudBackup();
+      if (!copy) {
+        setCloudMessage({ kind: 'ok', text: 'There’s no cloud backup for this account yet.' });
+        return;
+      }
+      setPending(await withCurrent(copy.backup, copy.updatedAt));
+    } catch (err) {
+      setCloudMessage({ kind: 'error', text: err instanceof CloudError ? err.message : 'Couldn’t download your cloud backup. Please try again.' });
+    } finally {
+      setCloudBusy(null);
+    }
   }
 
   return (
@@ -305,9 +407,42 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         {message?.text ?? ''}
       </p>
 
+      {signedIn && (
+        <div className="cloud-backup">
+          <h3 className="saved-label">Cloud backup</h3>
+          <div className="data-actions">
+            <button type="button" className="btn-secondary" onClick={() => void handleCloudBackup()} disabled={cloudBusy !== null || busy !== null}>
+              {cloudBusy === 'backup' ? 'Backing up…' : 'Back up to cloud'}
+            </button>
+            <button type="button" className="btn-secondary" onClick={() => void handleCloudRestore()} disabled={cloudBusy !== null || busy !== null}>
+              {cloudBusy === 'reading' ? 'Checking…' : 'Restore from cloud'}
+            </button>
+          </div>
+          <p className="hint cloud-last">
+            Last cloud backup: <strong>{lastCloud ? cloudWhen(lastCloud) : 'Never'}</strong>
+          </p>
+          <p className="hint">This is a backup, not live sync: this device keeps working on its own, and a daily cloud backup happens quietly when you open Thrive.</p>
+          <p className={cloudMessage?.kind === 'error' ? 'form-error' : 'save-status'} role={cloudMessage?.kind === 'error' ? 'alert' : 'status'}>
+            {cloudMessage?.text ?? ''}
+          </p>
+        </div>
+      )}
+
+      {confirmCloudReplace && (
+        <ConfirmDialog
+          title="Replace your cloud copy?"
+          message={`Your cloud backup from ${cloudWhen(confirmCloudReplace)} will be replaced with what's on this device now. If that cloud copy has things this device doesn't, restore from the cloud first instead.`}
+          confirmLabel="Replace cloud copy"
+          busy={cloudBusy === 'backup'}
+          busyLabel="Backing up…"
+          onConfirm={() => void handleCloudBackup(true)}
+          onCancel={() => setConfirmCloudReplace(null)}
+        />
+      )}
+
       {pending && (
         <ConfirmDialog
-          title="Replace everything with this backup?"
+          title={pending.cloudAt ? 'Restore from your cloud copy?' : 'Replace everything with this backup?'}
           message={restoreMessage(pending)}
           confirmLabel="Replace everything"
           busy={busy === 'restoring'}

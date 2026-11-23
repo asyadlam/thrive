@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
+import { READ_FAILED, SAVE_FAILED } from '../lib/messages';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { LIMITS, formatDay, formatTime, getTalkEntry, saveTalkEntry, talkSummariesOf, todayKey, type TalkEntry } from '../lib/journal';
@@ -42,7 +43,8 @@ export default function TalkEntryPage() {
       })
       .catch((err: unknown) => {
         if (!active) return;
-        setLoadError(err instanceof Error ? err.message : 'Could not open on-device storage.');
+        void err;
+        setLoadError(READ_FAILED);
         setStatus('error');
       });
     return () => {
@@ -68,7 +70,8 @@ export default function TalkEntryPage() {
       if (!id) navigate(`${base}/talk/${saved.id}`, { replace: true, state: from ? { from } : null });
       return saved;
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong while saving.');
+      void err;
+      setError(SAVE_FAILED);
       return null;
     } finally {
       setSaving(false);
@@ -101,7 +104,7 @@ export default function TalkEntryPage() {
 
       {status === 'error' && (
         <div className="card form-error" role="alert">
-          {loadError} Journal entries can't be saved in this browser right now.
+          {loadError}
         </div>
       )}
 

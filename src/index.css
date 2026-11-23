@@ -1877,3 +1877,13 @@ select.input { appearance: auto; }
 .health-calendar .day { min-height: 48px; }
 .day-kcal { font-size: 0.62rem; font-weight: 700; line-height: 1; color: var(--green-700); letter-spacing: -0.01em; white-space: nowrap; }
 .health-calendar .day.today .day-kcal { color: var(--green-700); }
+
+/* Settings: Account and cloud backup */
+.account-form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.account-form .field { margin: 0; }
+.account-switch { align-self: flex-start; }
+.account-email { color: var(--ink); overflow-wrap: anywhere; }
+.cloud-backup { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--sand); display: flex; flex-direction: column; gap: 10px; }
+.cloud-backup .saved-label { margin: 0; }
+.cloud-backup .hint, .cloud-backup .save-status { margin: 0; }
+.cloud-backup .save-status:empty { display: none; }

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { READ_FAILED } from '../lib/messages';
 import PageShell from '../components/PageShell';
 import EntryForm from '../components/EntryForm';
 import EntryView from '../components/EntryView';
@@ -28,7 +29,8 @@ export default function QuickEntryPage() {
       })
       .catch((err: unknown) => {
         if (!active) return;
-        setLoadError(err instanceof Error ? err.message : 'Could not open on-device storage.');
+        void err;
+        setLoadError(READ_FAILED);
         setStatus('error');
       });
     return () => {
@@ -55,7 +57,7 @@ export default function QuickEntryPage() {
 
       {status === 'error' && (
         <div className="card form-error" role="alert">
-          {loadError} Journal entries can't be saved in this browser right now.
+          {loadError}
         </div>
       )}
 

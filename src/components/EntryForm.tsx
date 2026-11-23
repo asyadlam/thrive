@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import { LIMITS, MOODS, type Mood, type QuickDraft, type QuickEntry } from '../lib/journal';
 import DictationButton from './DictationButton';
 
@@ -29,7 +30,8 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
     try {
       await onSave({ mood, positives, note, intention });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong while saving.');
+      void err;
+      setError(SAVE_FAILED);
       setSaving(false);
     }
   }

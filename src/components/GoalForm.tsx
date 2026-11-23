@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import { GOAL_LIMITS, type Goal, type GoalDraft } from '../lib/goals';
 
 type Props = {
@@ -28,7 +29,7 @@ export default function GoalForm({ initial, onSave, onCancel, extraActions }: Pr
     try {
       await onSave({ title, note, targetDate });
     } catch {
-      setError("Couldn't save this goal. Please try again.");
+      setError(SAVE_FAILED);
       setSaving(false);
     }
   }

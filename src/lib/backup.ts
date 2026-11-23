@@ -268,6 +268,11 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
   } catch {
     throw new BackupError("That file isn't a Thrive backup (it couldn't be read).");
   }
+  return checkBackup(data);
+}
+
+/** Checks a backup that's already parsed (a file's contents, or a cloud copy) exactly like a backup file. */
+export function checkBackup(data: unknown): CheckedBackup {
   const d = data as Record<string, unknown> | null;
   if (!d || d.app !== FORMAT.app || d.kind !== FORMAT.kind) {
     throw new BackupError("That file isn't a Thrive backup.");

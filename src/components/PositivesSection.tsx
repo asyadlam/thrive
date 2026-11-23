@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import { useSearchParams } from 'react-router-dom';
 import { POSITIVE_MAX, addStandalonePositive, deletePositive, listAllPositives, type PositiveItem } from '../lib/positives';
 import ConfirmDialog from './ConfirmDialog';
@@ -86,7 +87,7 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
       setMessage('Saved. Thanks for noticing that.');
       await refresh();
     } catch {
-      setError("Couldn't save this positive. Please try again.");
+      setError(SAVE_FAILED);
     } finally {
       setSaving(false);
     }

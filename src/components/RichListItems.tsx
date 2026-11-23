@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import ConfirmDialog from './ConfirmDialog';
 import EmptyState from './EmptyState';
 import { formatShortDay, todayKey } from '../lib/journal';
@@ -149,7 +150,7 @@ export default function RichListItems({ list, kind, apply }: Props) {
     const existing = list.items.find((i) => i.id === editing);
     const ok = await apply((l) => (existing ? editItem(l, existing.id, draft) : addItem(l, draft)));
     setBusy(false);
-    if (!ok) return setError("Couldn't save this on this device. Please try again.");
+    if (!ok) return setError(SAVE_FAILED);
     setMessage(existing ? 'Saved.' : copy.added);
     setEditing(null);
   }

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { SAVE_FAILED } from '../lib/messages';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -59,7 +60,7 @@ export default function ListPage() {
       setFailed('');
       return true;
     } catch {
-      setFailed("Couldn't save that change. Please try again.");
+      setFailed(SAVE_FAILED);
       return false;
     }
   }
@@ -73,7 +74,7 @@ export default function ListPage() {
     const text = newItem;
     setNewItem('');
     setItemError(null);
-    await apply((l) => addItem(l, text));
+    if (!(await apply((l) => addItem(l, text)))) setNewItem(text); // didn't save: put what I typed back
     addInput.current?.focus(); // ready for the next one
   }
 
