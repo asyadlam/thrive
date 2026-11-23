@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
+import NewDevicePrompt from './NewDevicePrompt';
 import { GearIcon, HelpIcon } from './icons';
 
 /** Which page this is, for the fade. "/journal/talk/<id>" counts as "/journal/talk" (saving a new page adds the id). */
@@ -43,6 +44,7 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+      <NewDevicePrompt />
       <BottomNav />
     </div>
   );

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import Welcome from './pages/Welcome';
-import { needsWelcome } from './lib/cloud';
+import { WELCOME_EVENT, needsWelcome } from './lib/cloud';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Journal from './pages/Journal';
@@ -29,6 +29,15 @@ export default function App() {
   // One-time Welcome: only until the person logs in or chooses local-only use on this device.
   const [welcome, setWelcome] = useState(needsWelcome);
   const navigate = useNavigate();
+  // Log out / Delete account bring the Welcome screen back straight away (local data untouched).
+  useEffect(() => {
+    const show = () => {
+      window.scrollTo(0, 0);
+      setWelcome(true);
+    };
+    window.addEventListener(WELCOME_EVENT, show);
+    return () => window.removeEventListener(WELCOME_EVENT, show);
+  }, []);
   if (welcome) {
     return (
       <Welcome

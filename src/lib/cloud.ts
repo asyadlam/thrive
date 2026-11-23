@@ -22,6 +22,31 @@ const LINKED_KEY = 'thrive.cloudLinkedUser';
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** The one-time Welcome choice on this device: 'account' (logged in here at least once) or 'local'. */
 const WELCOME_KEY = 'thrive.welcomeChoice';
+/** Set right after an explicit Log out or Delete account: the Welcome screen shows (once) as a doorway. */
+const WELCOME_AGAIN_KEY = 'thrive.welcomeAgain';
+/** Fired to bring up the Welcome screen straight away (App listens for it). */
+export const WELCOME_EVENT = 'thrive:welcome';
+export type WelcomeReason = 'logout' | 'deleted';
+
+/** Why the Welcome screen is being shown again (null on a first open). */
+export function welcomeReason(): WelcomeReason | null {
+  try {
+    const v = localStorage.getItem(WELCOME_AGAIN_KEY);
+    return v === 'logout' || v === 'deleted' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** After Log out / Delete account: show the Welcome screen now (it stays until a choice is made on it). */
+function welcomeAgain(reason: WelcomeReason) {
+  try {
+    localStorage.setItem(WELCOME_AGAIN_KEY, reason);
+  } catch {
+    /* the screen still shows now; it just won't be remembered across a reload */
+  }
+  window.dispatchEvent(new CustomEvent(WELCOME_EVENT, { detail: reason }));
+}
 
 /**
  * Show the Welcome screen? Only when accounts are set up, nobody has ever logged in on this device, and
@@ -30,6 +55,7 @@ const WELCOME_KEY = 'thrive.welcomeChoice';
 export function needsWelcome(): boolean {
   if (!cloudAvailable()) return false;
   try {
+    if (welcomeReason()) return true; // right after Log out / Delete account, until a choice is made
     if (localStorage.getItem(WELCOME_KEY)) return false;
     // Already logged in here (Supabase keeps its session in a "sb-…-auth-token" entry): open straight to Home.
     for (let i = 0; i < localStorage.length; i++) {
@@ -47,6 +73,7 @@ export function rememberWelcomeChoice(choice: 'account' | 'local'): void {
   try {
     // Logging in always wins over an earlier "local" choice; "local" never replaces "account".
     if (choice === 'account' || !localStorage.getItem(WELCOME_KEY)) localStorage.setItem(WELCOME_KEY, choice);
+    localStorage.removeItem(WELCOME_AGAIN_KEY); // a choice was made: back to the normal first-open rule
   } catch {
     /* nothing to remember */
   }
@@ -140,6 +167,7 @@ export async function logOut(): Promise<void> {
   } catch {
     /* nothing to forget */
   }
+  welcomeAgain('logout');
 }
 
 /* ---------------- Cloud backup ---------------- */
@@ -268,4 +296,5 @@ export async function deleteAccount(): Promise<void> {
   } catch {
     /* nothing to forget */
   }
+  welcomeAgain('deleted');
 }

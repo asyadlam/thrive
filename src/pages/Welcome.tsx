@@ -1,11 +1,14 @@
 import { AccountForm } from '../components/AccountSection';
-import { rememberWelcomeChoice } from '../lib/cloud';
+import { useState } from 'react';
+import { rememberWelcomeChoice, welcomeReason } from '../lib/cloud';
 
 /**
  * The one-time Welcome screen (shown before Home only until the person logs in or chooses local-only use on this
  * device — see needsWelcome in lib/cloud.ts). Never shown again after either choice.
  */
 export default function Welcome({ onDone }: { onDone: () => void }) {
+  const [reason] = useState(welcomeReason);
+
   function continueLocal() {
     rememberWelcomeChoice('local');
     onDone();
@@ -15,7 +18,14 @@ export default function Welcome({ onDone }: { onDone: () => void }) {
     <main className="welcome">
       <div className="welcome-inner">
         <img src="/logo-wordmark.png" alt="Thrive" className="welcome-logo" />
-        <p className="welcome-greeting">Welcome. This is a calm, private space for you.</p>
+        <p className="welcome-greeting">{reason ? 'Welcome back. This is still your calm, private space.' : 'Welcome. This is a calm, private space for you.'}</p>
+        {reason && (
+          <div className="welcome-note" role="status">
+            {reason === 'deleted' && <p>Your account and cloud backup are deleted.</p>}
+            {reason === 'logout' && <p>You're logged out.</p>}
+            <p>Your journal on this device is still here.</p>
+          </div>
+        )}
 
         <section className="card welcome-card" aria-labelledby="welcome-account">
           <h1 id="welcome-account" className="settings-heading">

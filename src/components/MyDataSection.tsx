@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import ConfirmDialog from './ConfirmDialog';
 import {
   BackupError,
@@ -71,6 +72,8 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   const [cloudBusy, setCloudBusy] = useState<null | 'backup' | 'reading'>(null);
   const [cloudMessage, setCloudMessage] = useState<Message>(null);
   const [confirmCloudReplace, setConfirmCloudReplace] = useState<string | null>(null);
+  const [params, setParams] = useSearchParams();
+  const restoreRequested = params.get('restore') === 'cloud';
 
   useEffect(() => {
     let active = true;
@@ -337,6 +340,15 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     }
   }
 
+  // Arriving from the "new device" prompt (?restore=cloud): start the usual Restore from cloud once logged in.
+  useEffect(() => {
+    if (!restoreRequested || !signedIn) return;
+    setParams({}, { replace: true });
+    void handleCloudRestore();
+    window.setTimeout(() => document.getElementById('my-data-heading')?.scrollIntoView({ block: 'start' }), 50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restoreRequested, signedIn]);
+
   /** Restore from cloud: download and check it, then the same confirm as Restore from backup. */
   async function handleCloudRestore() {
     setCloudBusy('reading');
@@ -410,6 +422,11 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
       {signedIn && (
         <div className="cloud-backup">
           <h3 className="saved-label">Cloud backup</h3>
+          <p className="cloud-where">
+            {lastCloud
+              ? `Your journal lives on this device. The cloud holds a backup copy from ${cloudWhen(lastCloud)}.`
+              : 'Your journal lives on this device. There is no cloud backup yet.'}
+          </p>
           <div className="data-actions">
             <button type="button" className="btn-secondary" onClick={() => void handleCloudBackup()} disabled={cloudBusy !== null || busy !== null}>
               {cloudBusy === 'backup' ? 'Backing up…' : 'Back up to cloud'}
