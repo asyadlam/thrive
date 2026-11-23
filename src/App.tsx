@@ -1,4 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { useState } from 'react';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import Welcome from './pages/Welcome';
+import { needsWelcome } from './lib/cloud';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Journal from './pages/Journal';
@@ -23,6 +26,19 @@ import MemoryPage from './pages/MemoryPage';
 import Help from './pages/Help';
 
 export default function App() {
+  // One-time Welcome: only until the person logs in or chooses local-only use on this device.
+  const [welcome, setWelcome] = useState(needsWelcome);
+  const navigate = useNavigate();
+  if (welcome) {
+    return (
+      <Welcome
+        onDone={() => {
+          setWelcome(false);
+          navigate('/', { replace: true });
+        }}
+      />
+    );
+  }
   return (
     <Routes>
       <Route element={<Layout />}>

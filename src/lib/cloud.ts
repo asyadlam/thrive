@@ -20,6 +20,37 @@ const LAST_CLOUD_KEY = 'thrive.lastCloudBackupAt';
 /** The account this device has backed up to or restored from — automatic backups only run for that account. */
 const LINKED_KEY = 'thrive.cloudLinkedUser';
 const DAY_MS = 24 * 60 * 60 * 1000;
+/** The one-time Welcome choice on this device: 'account' (logged in here at least once) or 'local'. */
+const WELCOME_KEY = 'thrive.welcomeChoice';
+
+/**
+ * Show the Welcome screen? Only when accounts are set up, nobody has ever logged in on this device, and
+ * "Continue without an account" was never chosen here. Synchronous, so the app never flashes the wrong screen.
+ */
+export function needsWelcome(): boolean {
+  if (!cloudAvailable()) return false;
+  try {
+    if (localStorage.getItem(WELCOME_KEY)) return false;
+    // Already logged in here (Supabase keeps its session in a "sb-…-auth-token" entry): open straight to Home.
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i) ?? '';
+      if (key.startsWith('sb-') && key.endsWith('-auth-token')) return false;
+    }
+    return true;
+  } catch {
+    return false; // storage unavailable: never block the app
+  }
+}
+
+/** Remembers the Welcome choice on this device, so the Welcome screen never shows again. */
+export function rememberWelcomeChoice(choice: 'account' | 'local'): void {
+  try {
+    // Logging in always wins over an earlier "local" choice; "local" never replaces "account".
+    if (choice === 'account' || !localStorage.getItem(WELCOME_KEY)) localStorage.setItem(WELCOME_KEY, choice);
+  } catch {
+    /* nothing to remember */
+  }
+}
 
 let client: Promise<SupabaseClient> | null = null;
 
@@ -86,6 +117,7 @@ export async function signUp(email: string, password: string): Promise<'signed-i
   if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
     throw new CloudError('There’s already an account with that email. Try logging in.');
   }
+  if (data.session) rememberWelcomeChoice('account');
   return data.session ? 'signed-in' : 'confirm';
 }
 
@@ -94,6 +126,7 @@ export async function logIn(email: string, password: string): Promise<void> {
   if (!sb) throw new CloudError('Accounts aren’t set up for this app yet.');
   const { error } = await sb.auth.signInWithPassword({ email: email.trim(), password });
   if (error) throw friendly(error, 'Couldn’t log in. Please try again.');
+  rememberWelcomeChoice('account');
 }
 
 /** Logs out. Everything on this device stays exactly as it is. */

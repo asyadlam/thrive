@@ -1887,3 +1887,21 @@ select.input { appearance: auto; }
 .cloud-backup .saved-label { margin: 0; }
 .cloud-backup .hint, .cloud-backup .save-status { margin: 0; }
 .cloud-backup .save-status:empty { display: none; }
+
+/* One-time Welcome screen (account or local-only) */
+.welcome { min-height: 100vh; min-height: 100dvh; background: var(--cream); display: flex; justify-content: center; padding: calc(32px + var(--safe-t)) 16px calc(32px + var(--safe-b)); }
+.welcome-inner { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; }
+.welcome-logo { display: block; width: 150px; height: auto; margin: 12px auto 0; }
+.welcome-greeting { margin: 0 0 4px; text-align: center; font-size: 1.1rem; font-weight: 600; color: var(--ink); }
+.welcome-card { padding: 20px; }
+.welcome-card .settings-heading { margin: 0 0 4px; }
+.welcome-card .account-form { margin-top: 14px; }
+.welcome-card .save-status:empty { display: none; }
+.welcome-local { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 4px; }
+.welcome-local .welcome-local-btn {
+  min-height: 48px; padding: 0 20px; border: 1.5px solid var(--green-300); border-radius: 999px; background: #fff;
+  color: var(--green-700); font-size: 1rem; font-weight: 700; text-decoration: none;
+}
+.welcome-local .welcome-local-btn:hover { background: var(--green-50); }
+.welcome-local .hint { text-align: center; padding: 0 8px; }
+.account-local { color: var(--ink); font-weight: 600; margin-bottom: 4px; }
