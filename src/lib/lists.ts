@@ -88,6 +88,11 @@ export function setItemDone(list: UserList, itemId: string, done: boolean): Prom
   });
 }
 
+/** Removes every checked-off item (to do, groceries and custom lists only); unchecked items are never touched. */
+export function clearChecked(list: UserList): Promise<UserList> {
+  return save({ ...list, items: list.items.filter((i) => !i.checked), updatedAt: now() });
+}
+
 export function deleteItem(list: UserList, itemId: string): Promise<UserList> {
   return save({ ...list, items: list.items.filter((i) => i.id !== itemId), updatedAt: now() });
 }

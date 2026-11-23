@@ -6,6 +6,7 @@ import {
   LIST_ITEM_MAX,
   LIST_TITLE_MAX,
   addItem,
+  clearChecked,
   deleteItem,
   deleteList,
   getList,
@@ -30,6 +31,7 @@ export default function ListPage() {
   const [title, setTitle] = useState('');
   const [titleError, setTitleError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [failed, setFailed] = useState('');
   const addInput = useRef<HTMLInputElement>(null);
@@ -99,6 +101,9 @@ export default function ListPage() {
   const back = { to: '/my-life?section=lists', label: 'My Life' };
   const kind = list ? kindOf(list) : 'custom';
   const rich = kind === 'wishlist' || kind === 'bucket';
+  // Checked items sink to the bottom (each group keeps the order the items were added in).
+  const ordered = list ? [...list.items.filter((i) => !i.checked), ...list.items.filter((i) => i.checked)] : [];
+  const checkedCount = ordered.filter((i) => i.checked).length;
 
   if (status !== 'ready' || !list) {
     return (
@@ -204,7 +209,7 @@ export default function ListPage() {
         <EmptyState>Nothing here yet. Add the first item above.</EmptyState>
       ) : (
         <ul className="list-items">
-          {list.items.map((item) => (
+          {ordered.map((item) => (
             <li key={item.id} className={`list-item${item.checked ? ' checked' : ''}`}>
               <label className="list-item-main">
                 <input type="checkbox" checked={item.checked} onChange={() => apply((l) => toggleItem(l, item.id))} />
@@ -224,6 +229,27 @@ export default function ListPage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {!rich && checkedCount > 0 && (
+        <div className="list-clear">
+          <button type="button" className="list-clear-link" onClick={() => setConfirmClear(true)}>
+            Clear checked
+          </button>
+        </div>
+      )}
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="Clear checked items?"
+          message={`${checkedCount === 1 ? 'The 1 checked item' : `The ${checkedCount} checked items`} will be removed from "${list.title}". Unchecked items stay as they are.`}
+          confirmLabel="Clear"
+          onConfirm={() => {
+            setConfirmClear(false);
+            void apply((l) => clearChecked(l));
+          }}
+          onCancel={() => setConfirmClear(false)}
+        />
       )}
 
       {confirmDelete && (

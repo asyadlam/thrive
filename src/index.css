@@ -644,6 +644,7 @@ textarea.input.goal-note-input { min-height: 64px; }
 }
 .positive-delete:hover { background: #FBEFEB; color: var(--help-dark); }
 .positive-delete:focus-visible { outline: 2px solid var(--help); outline-offset: -2px; }
+.positives-archive { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 14px; text-align: center; }
 
 /* ---------- Journal: Time Capsule ---------- */
 .write-letter-btn { width: 100%; flex: none; margin-bottom: 12px; }
@@ -1749,3 +1750,13 @@ select.input { appearance: auto; }
 .rich-list .rich-form { margin-bottom: 12px; }
 .rich-list .wish-item { background: #fff; border: 1px solid var(--sand); border-radius: 14px; }
 .rich-list .wish-got-area { border-top-color: var(--stone); }
+
+/* Checked-off items sink to the bottom, crossed out and faded; "Clear checked" removes them (checklists only). */
+.list-item.checked { opacity: 0.6; }
+.list-clear { display: flex; justify-content: center; margin-top: 12px; }
+.list-clear-link {
+  min-height: 40px; padding: 0 12px; border: 0; background: none; font: inherit; font-size: 0.9rem;
+  color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.list-clear-link:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; border-radius: 8px; }
+.wish-item.done { opacity: 0.7; }

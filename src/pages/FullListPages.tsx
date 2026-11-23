@@ -21,7 +21,7 @@ export function AllListsPage() {
 
 export function PositivesPage() {
   return (
-    <PageShell title="Positives" subtitle="Every good moment you've saved, newest first." back={GROWTH('positives')}>
+    <PageShell title="Positives" subtitle="Your most recent good moments, newest first." back={GROWTH('positives')}>
       <PositivesSection full />
     </PageShell>
   );

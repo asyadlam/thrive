@@ -5,6 +5,10 @@ import ConfirmDialog from './ConfirmDialog';
 import { formatShortDay, todayKey } from '../lib/journal';
 import { useCrossFade } from './useCrossFade';
 import { SeeMore, previewOf, scrollToSection } from './ListPreview';
+import { downloadFile } from '../lib/backup';
+
+/** How many positives the Positives page shows. Older ones stay saved and are in the downloadable file. */
+export const LIVE_POSITIVES = 20;
 
 type Status = 'loading' | 'ready' | 'error';
 
@@ -20,7 +24,11 @@ function pickRandom(items: PositiveItem[], avoidKey?: string): PositiveItem | nu
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
-/** Positives. On Growth: a positive to remember + the 3 newest; `full` (the Positives page) lists them all. */
+/**
+ * Positives. On Growth: a positive to remember (picked from all of them) + the 3 newest. `full` (the Positives page)
+ * shows the 20 most recent. Nothing is ever removed because of that limit: every positive stays saved (and in
+ * backups), and "Download all positives" saves a readable file with every one of them.
+ */
 export default function PositivesSection({ full = false }: { full?: boolean }) {
   const [status, setStatus] = useState<Status>('loading');
   const [items, setItems] = useState<PositiveItem[]>([]);
@@ -82,6 +90,14 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
     } finally {
       setSaving(false);
     }
+  }
+
+  /** A readable file with every positive ever saved, newest first. */
+  function downloadAll() {
+    const lines = [`Thrive · My positives`, `Saved ${positiveDate(todayKey())}, ${todayKey().slice(0, 4)} · ${items.length} ${items.length === 1 ? 'positive' : 'positives'}`, ''];
+    for (const item of items) lines.push(`${positiveDate(item.date)}${item.date.slice(0, 4) === todayKey().slice(0, 4) ? `, ${item.date.slice(0, 4)}` : ''} — ${item.text}`);
+    downloadFile(`thrive-positives-${todayKey()}.txt`, lines.join('\n') + '\n', 'text/plain;charset=utf-8');
+    setMessage('Downloaded all your positives.');
   }
 
   async function handleDelete() {
@@ -198,8 +214,8 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
       )}
 
       {status === 'ready' && items.length > 0 && (
-        <ul className="positive-list" aria-label="All your positives, newest first">
-          {previewOf(items, full).map((item) => (
+        <ul className="positive-list" aria-label="Your most recent positives, newest first">
+          {(full ? items.slice(0, LIVE_POSITIVES) : previewOf(items, false)).map((item) => (
             <li key={item.key} className="positive-item">
               <span className="positive-text">{item.text}</span>
               <span className="positive-side">
@@ -225,6 +241,18 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
           onConfirm={() => void handleDelete()}
           onCancel={() => setConfirm(null)}
         />
+      )}
+      {full && items.length > 0 && (
+        <div className="positives-archive">
+          {items.length > LIVE_POSITIVES && (
+            <p className="hint">
+              Showing your {LIVE_POSITIVES} most recent. All {items.length} are kept — download them to see the older ones.
+            </p>
+          )}
+          <button type="button" className="btn-secondary btn-small" onClick={downloadAll}>
+            Download all positives
+          </button>
+        </div>
       )}
       {!full && items.length > 3 && <SeeMore to="/growth/positives" a11yLabel="See all your positives" />}
     </section>
