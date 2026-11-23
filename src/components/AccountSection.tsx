@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { CloudError, cloudAvailable, getSession, logIn, logOut, onSessionChange, signUp } from '../lib/cloud';
+import ConfirmDialog from './ConfirmDialog';
+import { CloudError, cloudAvailable, deleteAccount, getSession, logIn, logOut, onSessionChange, signUp } from '../lib/cloud';
 
 /**
  * The email + password form (Log in, or "New here? Create an account"). Used in Settings → Account and on the
@@ -106,6 +107,9 @@ export default function AccountSection() {
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -133,6 +137,22 @@ export default function AccountSection() {
     }
   }
 
+  async function remove() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      setConfirmDelete(false);
+      setEmail(null);
+      setMessage('Your account and cloud backup are deleted.');
+    } catch (err) {
+      setConfirmDelete(false);
+      setDeleteError(err instanceof CloudError ? err.message : 'Your account couldn’t be deleted just now. Nothing was changed — please try again.');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <section className="card settings-section" aria-labelledby="account-heading">
       <h2 id="account-heading" className="settings-heading">
@@ -153,6 +173,16 @@ export default function AccountSection() {
               {busy ? 'Logging out…' : 'Log out'}
             </button>
           </div>
+          <div className="account-delete">
+            <button type="button" className="account-delete-link" onClick={() => (setDeleteError(null), setConfirmDelete(true))} disabled={busy || deleting}>
+              Delete account
+            </button>
+            {deleteError && (
+              <p className="form-error" role="alert">
+                {deleteError}
+              </p>
+            )}
+          </div>
         </>
       ) : (
         <>
@@ -168,6 +198,18 @@ export default function AccountSection() {
         <p className="save-status" role="status">
           {message}
         </p>
+      )}
+
+      {confirmDelete && (
+        <ConfirmDialog
+          title="Delete your account?"
+          message="This deletes your account and your cloud backup. The copy of your journal on this device stays, and Thrive keeps working locally. This cannot be undone."
+          confirmLabel="Delete my account"
+          busy={deleting}
+          busyLabel="Deleting…"
+          onConfirm={() => void remove()}
+          onCancel={() => setConfirmDelete(false)}
+        />
       )}
     </section>
   );

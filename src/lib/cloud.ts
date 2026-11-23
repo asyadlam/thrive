@@ -235,3 +235,37 @@ export async function autoCloudBackup(): Promise<void> {
     /* quiet: it tries again next time the app opens */
   }
 }
+
+/**
+ * Permanently deletes this account and its cloud backup (done on the server by /api/delete-account, which checks
+ * the login token and only deletes that user). The copy on this device stays. Afterwards this device is logged out.
+ */
+export async function deleteAccount(): Promise<void> {
+  const sb = await supabase();
+  const session = await getSession();
+  if (!sb || !session) throw new CloudError('Please log in first.');
+  let res: Response;
+  try {
+    res = await fetch('/api/delete-account', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    });
+  } catch {
+    throw new CloudError('Couldn’t reach Thrive just now. Nothing was deleted — please check your connection and try again.');
+  }
+  if (!res.ok) {
+    throw new CloudError(
+      res.status === 401
+        ? 'Your login has expired. Please log out and log in again, then try once more. Nothing was deleted.'
+        : 'Your account couldn’t be deleted just now. Nothing was changed — please try again in a moment.',
+    );
+  }
+  // The account is gone on the server: forget the login on this device only (the server session no longer exists).
+  await sb.auth.signOut({ scope: 'local' }).catch(() => undefined);
+  try {
+    localStorage.removeItem(LAST_CLOUD_KEY);
+    localStorage.removeItem(LINKED_KEY);
+  } catch {
+    /* nothing to forget */
+  }
+}
