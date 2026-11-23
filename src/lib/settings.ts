@@ -15,9 +15,39 @@ export type AppSettings = {
   companionMemory: boolean;
   /** My Life "About me": birthday as "MM-DD" (no year), or '' if not set. */
   birthday: string;
+  /** My Life "About me": the year I was born (optional, only kept with a birthday), or null if not set. */
+  birthYear: number | null;
   /** My Life "About me": a one-line description ('' if not set). */
   aboutMe: string;
+  /** My Life "About me": blood type, one of BLOOD_TYPES, or '' if not set. Optional; nothing relies on it. */
+  bloodType: BloodType | '';
+  /** My Life "About me": height in cm, or null if not set. A single current value, not a history. */
+  heightCm: number | null;
+  /** My Life "About me": weight in kg, or null if not set. A single current value, not a history. */
+  weightKg: number | null;
 };
+
+/** Sensible bounds for the About me height (cm) and weight (kg) fields. */
+export const HEIGHT_CM = { min: 30, max: 300 } as const;
+export const WEIGHT_KG = { min: 1, max: 700 } as const;
+const inRange = (v: unknown, r: { min: number; max: number }): v is number =>
+  typeof v === 'number' && Number.isFinite(v) && v >= r.min && v <= r.max;
+/** One decimal at most. */
+export const roundOne = (n: number) => Math.round(n * 10) / 10;
+
+/** 165 → "5 ft 5 in" (whole inches). */
+export function feetAndInches(cm: number): string {
+  const total = Math.round(cm / 2.54);
+  return `${Math.floor(total / 12)} ft ${total % 12} in`;
+}
+/** 60 → "132.3 lb". */
+export const poundsFrom = (kg: number) => `${(Math.round((kg / 0.45359237) * 10) / 10).toFixed(1)} lb`;
+/** "165 cm" / "60.5 kg" without a trailing ".0". */
+export const showNumber = (n: number) => String(roundOne(n));
+
+export const BLOOD_TYPES = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Not sure'] as const;
+export type BloodType = (typeof BLOOD_TYPES)[number];
+const isBloodType = (v: unknown): v is BloodType => BLOOD_TYPES.includes(v as BloodType);
 
 export const PET_NAME_MAX = 20;
 export const USER_NAME_MAX = 30;
@@ -30,10 +60,24 @@ export const isBirthday = (v: unknown): v is string => {
   return m >= 1 && m <= 12 && d >= 1 && d <= new Date(2024, m, 0).getDate();
 };
 
-/** "03-04" → "March 4". */
-export function formatBirthday(v: string): string {
+/** Earliest year the birthday year picker offers. */
+export const FIRST_BIRTH_YEAR = 1900;
+
+/** A year that fits this birthday: a whole year from 1900 to this year, and a real date (no Feb 29 in 2023). */
+export function isBirthYear(year: unknown, birthday: string): year is number {
+  if (typeof year !== 'number' || !Number.isInteger(year) || year < FIRST_BIRTH_YEAR || year > new Date().getFullYear()) return false;
+  if (!isBirthday(birthday)) return false;
+  const [m, d] = birthday.split('-').map(Number);
+  return d <= new Date(year, m, 0).getDate();
+}
+
+/** "03-04" → "March 4"; with a year, "March 4, 1998". */
+export function formatBirthday(v: string, year: number | null = null): string {
   if (!isBirthday(v)) return '';
   const [m, d] = v.split('-').map(Number);
+  if (year !== null && isBirthYear(year, v)) {
+    return new Date(year, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+  }
   return new Date(2024, m - 1, d).toLocaleDateString(undefined, { month: 'long', day: 'numeric' });
 }
 
@@ -45,7 +89,11 @@ const DEFAULTS: AppSettings = {
   userName: '',
   companionMemory: false,
   birthday: '',
+  birthYear: null,
   aboutMe: '',
+  bloodType: '',
+  heightCm: null,
+  weightKg: null,
 };
 
 /** Earlier versions called the hippo "yoshi"; keep that choice instead of resetting it. */
@@ -69,7 +117,11 @@ export function normalizeSettings(value: unknown): AppSettings {
     userName: typeof parsed.userName === 'string' ? parsed.userName.slice(0, USER_NAME_MAX) : DEFAULTS.userName,
     companionMemory: parsed.companionMemory === true, // only ever on by my own choice
     birthday: isBirthday(parsed.birthday) ? parsed.birthday : '',
+    birthYear: isBirthday(parsed.birthday) && isBirthYear(parsed.birthYear, parsed.birthday) ? parsed.birthYear : null,
     aboutMe: typeof parsed.aboutMe === 'string' ? parsed.aboutMe.slice(0, ABOUT_ME_MAX) : '',
+    bloodType: isBloodType(parsed.bloodType) ? parsed.bloodType : '',
+    heightCm: inRange(parsed.heightCm, HEIGHT_CM) ? roundOne(parsed.heightCm) : null,
+    weightKg: inRange(parsed.weightKg, WEIGHT_KG) ? roundOne(parsed.weightKg) : null,
   };
 }
 

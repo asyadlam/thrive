@@ -23,6 +23,7 @@ import {
   AFFIRMATIONS_STORE,
   GOALS_STORE,
   HABITS_STORE,
+  DREAMS_STORE,
   JOURNAL_STORE,
   JOURNEYS_STORE,
   LISTS_STORE,
@@ -37,11 +38,9 @@ import {
 } from './db';
 import {
   bucketItemFromBackup,
-  listBucketList,
   type BucketItem,
   listMeasurementKinds,
   listRoutine,
-  listWishlist,
   measurementKindFromBackup,
   routineItemFromBackup,
   wishFromBackup,
@@ -49,6 +48,7 @@ import {
   type RoutineItem,
   type WishItem,
 } from './profile';
+import { foldIntoLists } from './listParts';
 import { listMemories, memoryFromBackup, type MemoryNote } from './memory';
 import { habitFromBackup, listHabits, type Habit } from './habits';
 import { listFromBackup, listLists, type UserList } from './lists';
@@ -74,14 +74,20 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
    version 12: same, plus bucketlist: [...]
    version 13: Growth journeys hold their goal and habit swaps: each journey is { ..., goal, steps, swaps }.
                goals: [] and habits: [] stay in the file but are empty (older files' goals/habits are turned into
-               journeys on restore and merge — see journeyParts.ts) */
-const FORMAT = { app: 'thrive', kind: 'backup', version: 13 } as const;
+               journeys on restore and merge — see journeyParts.ts)
+   version 14: same, plus dreams: [...] (Dreams & Nightmares entries, same shape as journal entries)
+   version 15: My Life has one Lists section. Each list has a kind (todo / wishlist / bucket / groceries / custom);
+               wishlist and bucket list items live inside the Wishlist and Bucket list lists (with note, price and
+               doneAt), so the separate wishlist and bucketlist arrays are no longer written. Older files' wishlist and
+               bucketlist items are moved into those lists on restore and merge (see listParts.ts). */
+const FORMAT = { app: 'thrive', kind: 'backup', version: 15 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
   exportedAt: string;
   settings: AppSettings;
   entries: JournalEntry[];
+  dreams: JournalEntry[];
   goals: Goal[];
   positives: StandalonePositive[];
   letters: BackupLetter[];
@@ -92,8 +98,6 @@ export type Backup = typeof FORMAT & {
   memories: MemoryNote[];
   measurements: MeasurementKind[];
   routine: RoutineItem[];
-  wishlist: WishItem[];
-  bucketlist: BucketItem[];
 };
 
 export async function buildBackup(): Promise<Backup> {
@@ -102,6 +106,7 @@ export async function buildBackup(): Promise<Backup> {
     exportedAt: new Date().toISOString(),
     settings: loadSettings(),
     entries: (await listAllEntries()).map((e) => (e.type === 'talk' ? withSummaryList(e) : e)), // summaries as a list
+    dreams: (await listAllEntries('dreams')).map((e) => (e.type === 'talk' ? withSummaryList(e) : e)),
     goals: await listAllGoals(),
     positives: await listStandalonePositives(),
     letters: await lettersForBackup(),
@@ -112,14 +117,6 @@ export async function buildBackup(): Promise<Backup> {
     memories: await listMemories(),
     measurements: await listMeasurementKinds(),
     routine: await listRoutine(),
-    wishlist: await (async () => {
-      const { wanted, got } = await listWishlist();
-      return [...wanted, ...got];
-    })(),
-    bucketlist: await (async () => {
-      const { todo, done } = await listBucketList();
-      return [...todo, ...done];
-    })(),
   };
 }
 
@@ -200,6 +197,8 @@ export type CheckedBackup = {
   entries: JournalEntry[];
   quickCount: number;
   talkCount: number;
+  /** null = an older backup made before Dreams & Nightmares existed (current dream entries are kept). */
+  dreams: JournalEntry[] | null;
   /** null = an older backup made before goals existed (current goals are kept). */
   goals: Goal[] | null;
   /** null = an older backup made before standalone positives existed (current ones are kept). */
@@ -210,8 +209,10 @@ export type CheckedBackup = {
   affirmations: CustomAffirmation[] | null;
   /** null = an older backup made before habits existed (current habits are kept). */
   habits: Habit[] | null;
-  /** null = an older backup made before lists existed (current lists are kept). */
+  /** null = an older backup made before lists existed (current lists are kept). Older wishlist / bucket list items are already inside. */
   lists: UserList[] | null;
+  /** True for backups made before starter lists existed: restoring adds any missing starter list (empty). */
+  legacyLists: boolean;
   /**
    * Journeys, with any standalone goals and habit swaps from an older backup already turned into journeys.
    * null = the backup has none of journeys, goals or habits (current journeys are kept).
@@ -273,6 +274,23 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     if (!existing || existing.updatedAt < entry.updatedAt) byId.set(entry.id, entry);
   });
   const entries = [...byId.values()];
+
+  let dreams: JournalEntry[] | null = null;
+  if (d.dreams !== undefined) {
+    if (!Array.isArray(d.dreams)) throw new BackupError("This backup's dream entries aren't valid.");
+    const dreamsById = new Map<string, JournalEntry>();
+    d.dreams.forEach((raw, i) => {
+      let entry: JournalEntry;
+      try {
+        entry = checkEntry(raw, i);
+      } catch {
+        throw new BackupError(`Dream entry ${i + 1} in this backup isn't valid.`);
+      }
+      const existing = dreamsById.get(entry.id);
+      if (!existing || existing.updatedAt < entry.updatedAt) dreamsById.set(entry.id, entry);
+    });
+    dreams = [...dreamsById.values()];
+  }
 
   let goals: Goal[] | null = null; // folded into journeys below
   if (d.goals !== undefined) {
@@ -381,6 +399,11 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
   const routine = readCollection(d.routine, routineItemFromBackup, 'routine', 'Routine entry');
   const wishlist = readCollection(d.wishlist, wishFromBackup, 'wishlist', 'Wishlist item');
   const bucketlist = readCollection(d.bucketlist, bucketItemFromBackup, 'bucket list', 'Bucket list item');
+  // The old Wishlist and Bucket list now live inside lists: fold any from this backup in (same ids as the device upgrade).
+  if (lists && (wishlist || bucketlist)) {
+    lists = foldIntoLists(lists, wishlist ?? [], bucketlist ?? [], { addStarters: false, stamp: new Date().toISOString() });
+  }
+  const legacyLists = d.version < 15;
   // Goals and habit swaps now live inside journeys: fold any from this backup in (same ids as the device upgrade).
   const folded =
     journeys || goals || habits ? (foldIntoJourneys(journeys ?? [], goals ?? [], habits ?? []) as Journey[]) : null;
@@ -395,28 +418,38 @@ export async function readBackupFile(file: File): Promise<CheckedBackup> {
     entries,
     quickCount: entries.filter((e) => e.type === 'quick').length,
     talkCount: entries.filter((e) => e.type === 'talk').length,
+    dreams,
     goals,
     positives,
     letters,
     affirmations,
     habits,
     lists,
+    legacyLists,
     journeys,
     memories,
     measurements,
     routine,
-    wishlist,
-    bucketlist,
+    wishlist: null, // moved into lists above
+    bucketlist: null,
   };
 }
 
 /** Replace everything in the app with a checked backup. All journal data, goals, positives, letters, affirmations, habits, lists and journeys are swapped in one step. */
 export async function applyBackup(backup: CheckedBackup): Promise<void> {
   const stores: Record<string, unknown[]> = { [JOURNAL_STORE]: backup.entries };
+  if (backup.dreams) stores[DREAMS_STORE] = backup.dreams;
   if (backup.positives) stores[POSITIVES_STORE] = backup.positives;
   if (backup.letters) stores[LETTERS_STORE] = backup.letters;
   if (backup.affirmations) stores[AFFIRMATIONS_STORE] = backup.affirmations;
-  if (backup.lists) stores[LISTS_STORE] = backup.lists;
+  if (backup.lists) {
+    stores[LISTS_STORE] = backup.legacyLists
+      ? foldIntoLists(backup.lists, [], [], { addStarters: true, stamp: new Date().toISOString() })
+      : backup.lists;
+    // The wishlist and bucket list live inside lists now; their old stores stay empty.
+    stores[WISHLIST_STORE] = [];
+    stores[BUCKETLIST_STORE] = [];
+  }
   if (backup.journeys) {
     // Goals and habit swaps live inside journeys now; their old stores stay empty.
     let journeys = backup.journeys;
@@ -431,8 +464,6 @@ export async function applyBackup(backup: CheckedBackup): Promise<void> {
   if (backup.memories) stores[MEMORIES_STORE] = backup.memories;
   if (backup.measurements) stores[MEASUREMENTS_STORE] = backup.measurements;
   if (backup.routine) stores[ROUTINE_STORE] = backup.routine;
-  if (backup.wishlist) stores[WISHLIST_STORE] = backup.wishlist;
-  if (backup.bucketlist) stores[BUCKETLIST_STORE] = backup.bucketlist;
   await idbReplaceStores(stores);
   saveSettings(backup.settings);
 }

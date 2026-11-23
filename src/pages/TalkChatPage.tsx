@@ -4,6 +4,7 @@ import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { PET_ART } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
+import { useBook } from '../lib/book';
 import { loadSettings } from '../lib/settings';
 import { MEMORY_MAX, addMemory, listMemories, repeatsExistingNote } from '../lib/memory';
 import {
@@ -52,6 +53,7 @@ export default function TalkChatPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { book, base, page } = useBook();
   const [{ companion, companionMemory }] = useState(loadSettings);
   // Companion memory: the notes I approved earlier (only read when memory is on in Settings).
   const [memoryNotes, setMemoryNotes] = useState<string[] | null>(companionMemory ? null : []);
@@ -73,7 +75,7 @@ export default function TalkChatPage() {
   useEffect(() => {
     if (!id) return;
     let active = true;
-    getTalkEntry(id)
+    getTalkEntry(id, book)
       .then((e) => {
         if (!active) return;
         if (!e) return setPhase('missing');
@@ -105,7 +107,7 @@ export default function TalkChatPage() {
     endRef.current?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'end' });
   }, [messages.length, waiting, phase, summary.state]);
 
-  const backTo = id ? `/journal/talk/${id}` : '/journal/talk';
+  const backTo = id ? `${base}/talk/${id}` : `${base}/talk`;
   const backState = (location.state as { from?: string } | null)?.from ? { from: (location.state as { from: string }).from } : null;
   const entryText = { title: entry?.title ?? '', body: entry?.body ?? '' };
   const toApi = (list: Bubble[]): ChatMessage[] => list.map(({ role, content }) => ({ role, content }));
@@ -204,7 +206,7 @@ export default function TalkChatPage() {
     if (!id) return;
     setSummary({ state: 'saving', text, proposals });
     try {
-      await saveTalkSummary(id, text, toTranscript(messages)); // the chat is kept only now, with its summary
+      await saveTalkSummary(id, text, toTranscript(messages), book); // the chat is kept only now, with its summary
       // Only the notes I left checked become memory.
       const approved = proposals.filter((p) => p.keep && p.text.trim());
       for (const p of approved) await addMemory(p.text);
@@ -228,7 +230,7 @@ export default function TalkChatPage() {
   return (
     <PageShell title="Talk about this" subtitle={title} back={{ to: backTo, label: 'Back to your entry' }}>
       {phase === 'loading' && <div className="card placeholder">Loading…</div>}
-      {phase === 'missing' && <div className="card placeholder">This journal page couldn't be found on this device.</div>}
+      {phase === 'missing' && <div className="card placeholder">This {page.toLowerCase()} couldn't be found on this device.</div>}
 
       {phase === 'consent' && memoryNotes !== null && (
         <ConfirmDialog

@@ -4,77 +4,48 @@ import EmptyState from './EmptyState';
 import { formatShortDay, todayKey } from '../lib/journal';
 import {
   MEASURE_NAME_MAX,
-  MEASURE_UNIT_MAX,
   addMeasurementKind,
   byDate,
+  cmToIn,
   deleteMeasurementEntry,
   deleteMeasurementKind,
-  fromBase,
   listMeasurementKinds,
   logMeasurement,
-  measureType,
-  otherUnit,
-  type DisplayUnit,
-  type MeasureType,
   type MeasurementEntry,
   type MeasurementKind,
 } from '../lib/profile';
 
-const UNITS_KEY = 'thrive.measureUnits';
-type Units = { length: 'cm' | 'in'; weight: 'kg' | 'lb' };
-
-function readUnits(): Units {
-  try {
-    const raw = JSON.parse(localStorage.getItem(UNITS_KEY) ?? '{}') as Partial<Units>;
-    return { length: raw.length === 'in' ? 'in' : 'cm', weight: raw.weight === 'lb' ? 'lb' : 'kg' };
-  } catch {
-    return { length: 'cm', weight: 'kg' };
-  }
-}
-
-const SUGGESTIONS: { name: string; type: MeasureType }[] = [
-  { name: 'Weight', type: 'weight' },
-  { name: 'Waist', type: 'length' },
-  { name: 'Hips', type: 'length' },
-  { name: 'Bust', type: 'length' },
-  { name: 'Thigh', type: 'length' },
-  { name: 'Upper arm', type: 'length' },
-];
-
-const TYPES: { type: MeasureType; label: string; hint: string }[] = [
-  { type: 'length', label: 'Length', hint: 'cm / in' },
-  { type: 'weight', label: 'Weight', hint: 'kg / lb' },
-  { type: 'number', label: 'Just a number', hint: 'shown as-is' },
-];
+/** Names offered when adding a measurement (they just fill in the name). */
+const SUGGESTIONS = ['Waist', 'Hips', 'Bust', 'Thigh', 'Upper arm'];
 
 const dayLabel = (key: string) =>
   key.slice(0, 4) === todayKey().slice(0, 4) ? formatShortDay(key) : `${formatShortDay(key)}, ${key.slice(0, 4)}`;
 
-/** Up to two decimals for a value as typed (70 stays "70", 27.55 stays "27.55"). */
-const asTyped = (n: number) => String(Math.round(n * 100) / 100);
+/** One decimal at most, without a trailing ".0" (70 stays "70", 68.58 shows "68.6"). */
+const upToOne = (n: number) => String(Math.round(n * 10) / 10);
 const oneDecimal = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 
-/** "70 cm · 27.6 in" (the unit it was typed in first), or "12 size" for just-a-number. */
-function showValue(kind: MeasurementKind, e: MeasurementEntry) {
-  const type = measureType(kind);
-  if (type === 'number') return kind.unit ? `${asTyped(e.value)} ${kind.unit}` : asTyped(e.value);
-  const entered: DisplayUnit = e.entered ?? (type === 'weight' ? 'kg' : 'cm');
-  const other = otherUnit(entered);
-  return `${asTyped(fromBase(e.value, entered))} ${entered} · ${oneDecimal(fromBase(e.value, other))} ${other}`;
+/** A value in cm → "70 cm · 27.6 in". */
+const showCm = (cm: number) => `${upToOne(cm)} cm · ${oneDecimal(cmToIn(cm))} in`;
+const showValue = (e: MeasurementEntry) => showCm(e.value);
+
+/** "70" / "70,5" → a number in cm; null for blank, NaN for anything that isn't a sensible length. */
+function readCm(text: string): number | null {
+  const t = text.trim().replace(',', '.');
+  if (!t) return null;
+  const n = Number(t);
+  return Number.isFinite(n) && n > 0 && n < 10000 ? n : NaN;
 }
 
 /** Measurements: a calm record of things I choose to measure — values and dates, nothing more. */
 export default function MeasurementsSection() {
   const [kinds, setKinds] = useState<MeasurementKind[] | null>(null);
   const [failed, setFailed] = useState(false);
-  const [units, setUnits] = useState<Units>(readUnits);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   // Adding a measurement
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  const [type, setType] = useState<MeasureType>('length');
-  const [label, setLabel] = useState('');
   const [addError, setAddError] = useState<string | null>(null);
   // Logging a value
   const [openId, setOpenId] = useState<string | null>(null);
@@ -95,21 +66,10 @@ export default function MeasurementsSection() {
     void refresh();
   }, [refresh]);
 
-  function pickUnits(next: Units) {
-    setUnits(next);
-    try {
-      localStorage.setItem(UNITS_KEY, JSON.stringify(next));
-    } catch {
-      /* the choice just won't be remembered */
-    }
-  }
-
   function startAdding() {
     setAdding(true);
     setOpenId(null);
     setName('');
-    setType('length');
-    setLabel('');
     setAddError(null);
     setMessage('');
   }
@@ -122,7 +82,7 @@ export default function MeasurementsSection() {
     if (same) return setAddError(`You already have ${same.name} — tap it in the list to add a value.`);
     setBusy(true);
     try {
-      const kind = await addMeasurementKind(clean, type, label);
+      const kind = await addMeasurementKind(clean);
       setAdding(false);
       await refresh();
       setMessage(`${kind.name} added.`);
@@ -142,21 +102,14 @@ export default function MeasurementsSection() {
     if (clearMessage) setMessage('');
   }
 
-  const unitFor = (kind: MeasurementKind): DisplayUnit | null => {
-    const t = measureType(kind);
-    return t === 'length' ? units.length : t === 'weight' ? units.weight : null;
-  };
-
   async function log(e: FormEvent, kind: MeasurementKind) {
     e.preventDefault();
-    const n = Number(value.trim().replace(',', '.'));
-    if (!value.trim() || !Number.isFinite(n)) return setError('Please enter a number, like 70 or 70.5.');
-    const unit = unitFor(kind);
-    if (unit && (n <= 0 || n >= 10000)) return setError('Please enter a number, like 70 or 70.5.');
+    const n = readCm(value);
+    if (n === null || Number.isNaN(n)) return setError('Please enter a number in cm, like 70 or 70.5.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setError('Please pick a date.');
     setBusy(true);
     try {
-      await logMeasurement(kind, n, unit, date);
+      await logMeasurement(kind, n, date);
       setValue('');
       setDate(todayKey());
       setMessage(`${kind.name} saved.`);
@@ -195,20 +148,6 @@ export default function MeasurementsSection() {
     }
   }
 
-  const switcher = (title: string, options: readonly string[], current: string, onPick: (u: string) => void) => (
-    <div className="measure-switch" role="group" aria-label={`Type ${title.toLowerCase()} in`}>
-      <span className="measure-switch-label">{title}</span>
-      {options.map((u) => (
-        <button key={u} type="button" className={`measure-pill${u === current ? ' active' : ''}`} aria-pressed={u === current} onClick={() => onPick(u)}>
-          {u}
-        </button>
-      ))}
-    </div>
-  );
-
-  const hasLength = !!kinds?.some((k) => measureType(k) === 'length');
-  const hasWeight = !!kinds?.some((k) => measureType(k) === 'weight');
-
   const addForm = (
     <form className="card measure-add" onSubmit={(e) => void add(e)} noValidate>
       <div className="field">
@@ -223,35 +162,14 @@ export default function MeasurementsSection() {
           onChange={(e) => (setName(e.target.value), setAddError(null))}
         />
         <div className="measure-chips" aria-label="Suggestions">
-          {SUGGESTIONS.map((s) => (
-            <button key={s.name} type="button" className="measure-pill" onClick={() => (setName(s.name), setType(s.type), setAddError(null))}>
-              {s.name}
+          {SUGGESTIONS.map((suggestion) => (
+            <button key={suggestion} type="button" className="measure-pill" onClick={() => (setName(suggestion), setAddError(null))}>
+              {suggestion}
             </button>
           ))}
         </div>
+        <p className="hint">Measured in cm — the inches are shown for you.</p>
       </div>
-      <fieldset className="field">
-        <legend>What kind of number is it?</legend>
-        <div className="measure-types">
-          {TYPES.map((t) => (
-            <label key={t.type} className="measure-type">
-              <input type="radio" name="measure-type" value={t.type} checked={type === t.type} onChange={() => setType(t.type)} />
-              <span>
-                <span className="measure-type-label">{t.label}</span>
-                <span className="measure-type-hint">{t.hint}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      {type === 'number' && (
-        <div className="field">
-          <label htmlFor="measure-label">
-            Unit label <span className="optional">(optional)</span>
-          </label>
-          <input id="measure-label" className="input measure-label-input" value={label} maxLength={MEASURE_UNIT_MAX} placeholder="e.g. size, reps, %" onChange={(e) => setLabel(e.target.value)} />
-        </div>
-      )}
       {addError && <p className="form-error" role="alert">{addError}</p>}
       <div className="form-actions">
         <button type="submit" className="btn-primary" disabled={busy}>
@@ -286,13 +204,6 @@ export default function MeasurementsSection() {
         <EmptyState>No measurements yet. Add your first whenever it feels useful — no pressure either way.</EmptyState>
       )}
 
-      {(hasLength || hasWeight) && (
-        <div className="measure-switches">
-          {hasLength && switcher('Length', ['cm', 'in'], units.length, (u) => pickUnits({ ...units, length: u as Units['length'] }))}
-          {hasWeight && switcher('Weight', ['kg', 'lb'], units.weight, (u) => pickUnits({ ...units, weight: u as Units['weight'] }))}
-        </div>
-      )}
-
       {kinds && kinds.length > 0 && (
         <ul className="measure-list">
           {kinds.map((kind) => {
@@ -300,15 +211,14 @@ export default function MeasurementsSection() {
             const latest = history[history.length - 1];
             const first = history[0];
             const isOpen = openId === kind.id;
-            const unit = unitFor(kind);
-            const inputLabel = unit ? `${kind.name} (${unit})` : kind.unit ? `${kind.name} (${kind.unit})` : kind.name;
+            const typed = isOpen ? readCm(value) : null;
             return (
               <li key={kind.id} className="measure-item">
                 <button type="button" className="measure-row" aria-expanded={isOpen} onClick={() => openKind(kind.id)}>
                   <span className="measure-name">{kind.name}</span>
                   {latest ? (
                     <span className="measure-latest">
-                      <span className="measure-value">{showValue(kind, latest)}</span>
+                      <span className="measure-value">{showValue(latest)}</span>
                       <span className="measure-date">{dayLabel(latest.date)}</span>
                     </span>
                   ) : (
@@ -320,16 +230,25 @@ export default function MeasurementsSection() {
                   <div className="measure-panel">
                     <form className="measure-form" onSubmit={(e) => void log(e, kind)} noValidate>
                       <div className="field">
-                        <label htmlFor={`${kind.id}-value`}>{inputLabel}</label>
-                        <input
-                          id={`${kind.id}-value`}
-                          className="input"
-                          inputMode="decimal"
-                          value={value}
-                          placeholder="e.g. 70"
-                          autoFocus
-                          onChange={(e) => (setValue(e.target.value), setError(null))}
-                        />
+                        <label htmlFor={`${kind.id}-value`}>{kind.name}</label>
+                        <div className="about-number-row">
+                          <span className="about-number">
+                            <input
+                              id={`${kind.id}-value`}
+                              className="input"
+                              inputMode="decimal"
+                              value={value}
+                              placeholder="e.g. 70"
+                              autoFocus
+                              aria-describedby={`${kind.id}-in`}
+                              onChange={(e) => (setValue(e.target.value), setError(null))}
+                            />
+                            <span className="about-unit" aria-hidden="true">cm</span>
+                          </span>
+                          <span id={`${kind.id}-in`} className="about-convert" aria-live="polite">
+                            {typed !== null && !Number.isNaN(typed) ? `${oneDecimal(cmToIn(typed))} in` : ''}
+                          </span>
+                        </div>
                       </div>
                       <div className="field">
                         <label htmlFor={`${kind.id}-date`}>Date</label>
@@ -353,7 +272,7 @@ export default function MeasurementsSection() {
                           {[...history].reverse().map((e) => (
                             <li key={e.id}>
                               <span className="measure-history-main">
-                                <span className="measure-value">{showValue(kind, e)}</span>
+                                <span className="measure-value">{showValue(e)}</span>
                                 <span className="measure-date">
                                   {dayLabel(e.date)}
                                   {e.id === first.id && <span className="measure-start"> · Starting point</span>}
@@ -384,7 +303,7 @@ export default function MeasurementsSection() {
       {confirmEntry && (
         <ConfirmDialog
           title="Delete this value?"
-          message={`${confirmEntry.kind.name}: ${showValue(confirmEntry.kind, confirmEntry.entry)} on ${dayLabel(confirmEntry.entry.date)}. This can't be undone.`}
+          message={`${confirmEntry.kind.name}: ${showValue(confirmEntry.entry)} on ${dayLabel(confirmEntry.entry.date)}. This can't be undone.`}
           confirmLabel="Delete"
           busy={busy}
           onConfirm={() => void removeEntry()}

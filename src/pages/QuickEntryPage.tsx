@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import PageShell from '../components/PageShell';
 import EntryForm from '../components/EntryForm';
 import EntryView from '../components/EntryView';
+import { useBook } from '../lib/book';
 import { formatDay, getQuickEntry, saveQuickEntry, todayKey, type QuickDraft, type QuickEntry } from '../lib/journal';
 
 type Status = 'loading' | 'ready' | 'error';
 
 export default function QuickEntryPage() {
   const date = useMemo(() => todayKey(), []);
+  const { book, home } = useBook();
 
   const [status, setStatus] = useState<Status>('loading');
   const [loadError, setLoadError] = useState('');
@@ -17,7 +19,7 @@ export default function QuickEntryPage() {
 
   useEffect(() => {
     let active = true;
-    getQuickEntry(date)
+    getQuickEntry(date, book)
       .then((saved) => {
         if (!active) return;
         setEntry(saved);
@@ -32,10 +34,10 @@ export default function QuickEntryPage() {
     return () => {
       active = false;
     };
-  }, [date]);
+  }, [date, book]);
 
   async function handleSave(draft: QuickDraft) {
-    const saved = await saveQuickEntry(date, draft, entry);
+    const saved = await saveQuickEntry(date, draft, entry, book);
     setEntry(saved);
     setEditing(false);
     setJustSaved(true);
@@ -48,7 +50,7 @@ export default function QuickEntryPage() {
   }
 
   return (
-    <PageShell title="Quick entry" subtitle={formatDay(date)} back={{ to: '/journal', label: 'Journal' }}>
+    <PageShell title="Quick entry" subtitle={formatDay(date)} back={home}>
       {status === 'loading' && <div className="card placeholder">Loading…</div>}
 
       {status === 'error' && (

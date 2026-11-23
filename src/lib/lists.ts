@@ -1,40 +1,36 @@
 import { LISTS_STORE, idbDelete, idbGet, idbGetAll, idbPut } from './db';
 import { isIsoTime, newId } from './journal';
+import { LIST_KINDS, type ListItem, type ListKind, type UserList } from './listParts';
+
+export { kindOf, STARTER_LISTS, type ListItem, type ListKind, type UserList } from './listParts';
 
 export const LIST_TITLE_MAX = 80;
 export const LIST_ITEM_MAX = 140;
-
-export type ListItem = {
-  id: string;
-  text: string;
-  checked: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
-
-/** A personal list ("Things that help me", "People I can call"). Items are kept inside it, in the order added. */
-export type UserList = {
-  id: string;
-  title: string;
-  items: ListItem[];
-  createdAt: string;
-  updatedAt: string;
-};
+export const LIST_NOTE_MAX = 200;
+export const LIST_PRICE_MAX = 20;
 
 const now = () => new Date().toISOString();
 
-/** All lists, in the order I made them. */
+/** All lists, the most recently used first. */
 export async function listLists(): Promise<UserList[]> {
   const all = await idbGetAll<UserList>(LISTS_STORE);
-  return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.createdAt.localeCompare(a.createdAt));
 }
 
 export const getList = (id: string) => idbGet<UserList>(LISTS_STORE, id);
 export const deleteList = (id: string) => idbDelete(LISTS_STORE, id);
 
+/** A new plain list (items can be checked off and deleted). */
 export async function createList(title: string): Promise<UserList> {
   const t = now();
-  const list: UserList = { id: `list-${newId()}`, title: title.trim().slice(0, LIST_TITLE_MAX), items: [], createdAt: t, updatedAt: t };
+  const list: UserList = {
+    id: `list-${newId()}`,
+    title: title.trim().slice(0, LIST_TITLE_MAX),
+    kind: 'custom',
+    items: [],
+    createdAt: t,
+    updatedAt: t,
+  };
   await idbPut(LISTS_STORE, list);
   return list;
 }
@@ -48,10 +44,29 @@ export function renameList(list: UserList, title: string): Promise<UserList> {
   return save({ ...list, title: title.trim().slice(0, LIST_TITLE_MAX), updatedAt: now() });
 }
 
-export function addItem(list: UserList, text: string): Promise<UserList> {
+export type ItemDraft = { text: string; note?: string; price?: string };
+
+const clean = (d: ItemDraft) => ({
+  text: d.text.trim().slice(0, LIST_ITEM_MAX),
+  ...(d.note !== undefined ? { note: d.note.trim().slice(0, LIST_NOTE_MAX) } : {}),
+  ...(d.price !== undefined ? { price: d.price.trim().slice(0, LIST_PRICE_MAX) } : {}),
+});
+
+export function addItem(list: UserList, draft: string | ItemDraft): Promise<UserList> {
   const t = now();
-  const item: ListItem = { id: `item-${newId()}`, text: text.trim().slice(0, LIST_ITEM_MAX), checked: false, createdAt: t, updatedAt: t };
+  const d = typeof draft === 'string' ? { text: draft } : draft;
+  const item: ListItem = { id: `item-${newId()}`, checked: false, ...clean(d), createdAt: t, updatedAt: t };
   return save({ ...list, items: [...list.items, item], updatedAt: t });
+}
+
+/** Edit an item's text / note / price (wishlist and bucket list). */
+export function editItem(list: UserList, itemId: string, draft: ItemDraft): Promise<UserList> {
+  const t = now();
+  return save({
+    ...list,
+    items: list.items.map((i) => (i.id === itemId ? { ...i, ...clean(draft), updatedAt: t } : i)),
+    updatedAt: t,
+  });
 }
 
 export function toggleItem(list: UserList, itemId: string): Promise<UserList> {
@@ -63,9 +78,21 @@ export function toggleItem(list: UserList, itemId: string): Promise<UserList> {
   });
 }
 
+/** "Got it" / "Did it" (with today's date), or back to the list if tapped by mistake. */
+export function setItemDone(list: UserList, itemId: string, done: boolean): Promise<UserList> {
+  const t = now();
+  return save({
+    ...list,
+    items: list.items.map((i) => (i.id === itemId ? { ...i, checked: done, doneAt: done ? t : null, updatedAt: t } : i)),
+    updatedAt: t,
+  });
+}
+
 export function deleteItem(list: UserList, itemId: string): Promise<UserList> {
   return save({ ...list, items: list.items.filter((i) => i.id !== itemId), updatedAt: now() });
 }
+
+const okId = (v: unknown) => typeof v === 'string' && v.trim().length > 0 && v.length <= 200;
 
 /** Check one list (and its items) from a backup file; null if unusable. Fills missing ids/timestamps. */
 export function listFromBackup(raw: unknown): UserList | null {
@@ -81,20 +108,23 @@ export function listFromBackup(raw: unknown): UserList | null {
     if (typeof i.text !== 'string' || !i.text.trim()) return null;
     const created = isIsoTime(i.createdAt) ? i.createdAt : isIsoTime(i.updatedAt) ? i.updatedAt : listCreated;
     items.push({
-      ...(i as object),
-      id: typeof i.id === 'string' && i.id.startsWith('item-') ? i.id : `item-${newId()}`,
+      // item- for list items; wish- and bucket- for items that came from the old Wishlist / Bucket list
+      id: okId(i.id) ? (i.id as string) : `item-${newId()}`,
       text: i.text,
       checked: i.checked === true,
+      ...(i.doneAt !== undefined ? { doneAt: isIsoTime(i.doneAt) ? i.doneAt : null } : {}),
+      ...(typeof i.note === 'string' ? { note: i.note.slice(0, LIST_NOTE_MAX) } : {}),
+      ...(typeof i.price === 'string' ? { price: i.price.slice(0, LIST_PRICE_MAX) } : {}),
       createdAt: created,
       updatedAt: isIsoTime(i.updatedAt) ? i.updatedAt : created,
-    } as ListItem);
+    });
   }
   return {
-    ...(l as object),
     id: typeof l.id === 'string' && l.id.startsWith('list-') ? l.id : `list-${newId()}`,
     title: l.title,
+    ...(LIST_KINDS.includes(l.kind as ListKind) ? { kind: l.kind as ListKind } : {}),
     items,
     createdAt: listCreated,
     updatedAt: isIsoTime(l.updatedAt) ? l.updatedAt : listCreated,
-  } as UserList;
+  };
 }

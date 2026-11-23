@@ -20,6 +20,7 @@ import {
   listEntriesBetween,
   talkEntryLabel,
   todayKey,
+  type Book,
   type JournalEntry,
 } from '../lib/journal';
 import EmptyState from '../components/EmptyState';
@@ -28,11 +29,21 @@ type Status = 'loading' | 'ready' | 'error';
 
 const monthParam = ({ year, month }: YearMonth) => `${year}-${String(month + 1).padStart(2, '0')}`;
 
-function sortForDay(entries: JournalEntry[]) {
-  // Quick entry first, then journal pages oldest → newest.
-  return [...entries].sort((a, b) =>
-    a.type !== b.type ? (a.type === 'quick' ? -1 : 1) : a.createdAt.localeCompare(b.createdAt),
-  );
+/** An entry on the calendar, with which journal it's from (dreams are stored separately). */
+type DayEntry = JournalEntry & { book: Book };
+/** The three kinds of writing a day can show: a quick entry, a journal page, a dream or nightmare. */
+type Mark = 'quick' | 'page' | 'dream';
+const markOf = (e: DayEntry): Mark => (e.book === 'dreams' ? 'dream' : e.type === 'quick' ? 'quick' : 'page');
+const MARKS: { mark: Mark; label: string }[] = [
+  { mark: 'page', label: 'Journal entry' },
+  { mark: 'quick', label: 'Quick entry' },
+  { mark: 'dream', label: 'Dream or nightmare' },
+];
+
+function sortForDay(entries: DayEntry[]) {
+  // Quick entry first, then journal pages oldest → newest, then dreams oldest → newest.
+  const rank = (e: DayEntry) => ({ quick: 0, page: 1, dream: 2 })[markOf(e)];
+  return [...entries].sort((a, b) => rank(a) - rank(b) || a.createdAt.localeCompare(b.createdAt));
 }
 
 export default function LookBackPage() {
@@ -49,17 +60,19 @@ export default function LookBackPage() {
   }, [params, selectedDay, thisMonth]);
 
   const [status, setStatus] = useState<Status>('loading');
-  const [byDay, setByDay] = useState<Map<string, JournalEntry[]>>(new Map());
+  const [byDay, setByDay] = useState<Map<string, DayEntry[]>>(new Map());
 
   useEffect(() => {
     let active = true;
     setStatus('loading');
     const { start, end } = monthRange(shown);
-    listEntriesBetween(start, end)
-      .then((entries) => {
+    Promise.all([listEntriesBetween(start, end), listEntriesBetween(start, end, 'dreams')])
+      .then(([journal, dreams]) => {
         if (!active) return;
-        const map = new Map<string, JournalEntry[]>();
-        for (const e of entries) map.set(e.date, [...(map.get(e.date) ?? []), e]);
+        const map = new Map<string, DayEntry[]>();
+        const add = (e: DayEntry) => map.set(e.date, [...(map.get(e.date) ?? []), e]);
+        journal.forEach((e) => add({ ...e, book: 'journal' }));
+        dreams.forEach((e) => add({ ...e, book: 'dreams' }));
         setByDay(map);
         setStatus('ready');
       })
@@ -111,10 +124,13 @@ export default function LookBackPage() {
           {monthCells(shown).map((day, i) => {
             if (day === null) return <span key={`blank-${i}`} aria-hidden="true" />;
             const key = dayKey(shown.year, shown.month, day);
-            const count = byDay.get(key)?.length ?? 0;
+            const entries = byDay.get(key) ?? [];
+            const count = entries.length;
+            const kinds = new Set(entries.map(markOf));
+            const kindsText = MARKS.filter((m) => kinds.has(m.mark)).map((m) => m.label.toLowerCase()).join(', ');
             const isToday = key === today;
             const isSelected = key === selectedDay;
-            const label = `${formatDay(key)}, ${count === 0 ? 'no entries' : count === 1 ? '1 entry' : `${count} entries`}`;
+            const label = `${formatDay(key)}, ${count === 0 ? 'no entries' : `${count === 1 ? '1 entry' : `${count} entries`}: ${kindsText}`}`;
             return (
               <button
                 key={key}
@@ -126,11 +142,23 @@ export default function LookBackPage() {
                 onClick={() => selectDay(key)}
               >
                 <span className="day-number">{day}</span>
-                <span className={`day-dot${count > 0 ? ' visible' : ''}`} aria-hidden="true" />
+                <span className="day-marks" aria-hidden="true">
+                  {MARKS.filter((m) => kinds.has(m.mark)).map((m) => (
+                    <span key={m.mark} className={`day-mark ${m.mark}`} />
+                  ))}
+                </span>
               </button>
             );
           })}
         </div>
+        <ul className="calendar-legend" aria-label="What the marks mean">
+          {MARKS.map((m) => (
+            <li key={m.mark}>
+              <span className={`day-mark ${m.mark}`} aria-hidden="true" />
+              {m.label}
+            </li>
+          ))}
+        </ul>
         {status === 'error' && (
           <p className="form-error" role="alert">
             Couldn't read your entries on this device.
@@ -152,7 +180,7 @@ export default function LookBackPage() {
               <ul className="talk-list">
                 {selectedEntries.map((e) => (
                   <li key={e.id}>
-                    <Link to={`/journal/entry/${e.id}`} className="talk-list-item">
+                    <Link to={`${e.book === 'dreams' ? '/journal/dreams' : '/journal'}/entry/${e.id}`} className="talk-list-item">
                       {e.type === 'quick' ? (
                         <>
                           <span className="entry-item-main">
@@ -164,7 +192,9 @@ export default function LookBackPage() {
                         <>
                           <span className="entry-item-main">
                             <span className={`talk-list-label${e.title ? '' : ' untitled'}`}>{talkEntryLabel(e)}</span>
-                            <span className="hint">Journal page · {formatTime(e.createdAt)}</span>
+                            <span className="hint">
+                              {e.book === 'dreams' ? 'Dream' : 'Journal page'} · {formatTime(e.createdAt)}
+                            </span>
                           </span>
                         </>
                       )}

@@ -10,6 +10,7 @@
 import type { CheckedBackup } from './backup';
 import {
   AFFIRMATIONS_STORE,
+  DREAMS_STORE,
   JOURNAL_STORE,
   JOURNEYS_STORE,
   LETTERS_STORE,
@@ -30,6 +31,7 @@ import { listJourneys, type Journey } from './journeys';
 
 export type MergeCounts = {
   entries: number;
+  dreams: number;
   letters: number;
   goals: number;
   habits: number;
@@ -59,6 +61,7 @@ export type MergePlan = {
 
 const zero = (): MergeCounts => ({
   entries: 0,
+  dreams: 0,
   letters: 0,
   goals: 0,
   habits: 0,
@@ -126,36 +129,39 @@ export async function planMerge(backup: CheckedBackup): Promise<MergePlan> {
     if (out.length) writes[store] = out;
   }
 
-  // Journal entries: new ids are added. A journal page that's already here keeps everything as it is,
+  // Journal (and dream) entries: new ids are added. A page that's already here keeps everything as it is,
   // and only gains talk summaries whose ids it doesn't have yet (never duplicated, never removed).
-  if (backup.entries && backup.entries.length) {
-    const current = new Map((await idbGetAll<JournalEntry>(JOURNAL_STORE)).map((e) => [e.id, e]));
+  async function entries(store: string, incoming: JournalEntry[] | null, key: 'entries' | 'dreams') {
+    if (!incoming || !incoming.length) return;
+    const current = new Map((await idbGetAll<JournalEntry>(store)).map((e) => [e.id, e]));
     const out: JournalEntry[] = [];
-    for (const entry of backup.entries) {
+    for (const entry of incoming) {
       const mine = current.get(entry.id);
       if (!mine) {
         out.push(entry);
-        added.entries += 1;
+        added[key] += 1;
         continue;
       }
       skipped += 1;
       if (mine.type !== 'talk' || entry.type !== 'talk') continue;
       const have = talkSummariesOf(mine);
       const haveIds = new Set(have.map((s) => s.id));
-      const incoming = talkSummariesOf(entry);
-      const fresh = incoming.filter((s) => !haveIds.has(s.id));
-      skipped += incoming.length - fresh.length;
+      const fromBackup = talkSummariesOf(entry);
+      const fresh = fromBackup.filter((s) => !haveIds.has(s.id));
+      skipped += fromBackup.length - fresh.length;
       if (fresh.length) {
         added.talkSummaries += fresh.length;
         out.push({
           ...withSummaryList(mine),
-          talkSummaries: [...have, ...fresh].sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+          talkSummaries: [...have, ...fresh].sort((x, y) => x.createdAt.localeCompare(y.createdAt)),
           updatedAt: new Date().toISOString(),
         });
       }
     }
-    if (out.length) writes[JOURNAL_STORE] = out;
+    if (out.length) writes[store] = out;
   }
+  await entries(JOURNAL_STORE, backup.entries, 'entries');
+  await entries(DREAMS_STORE, backup.dreams, 'dreams');
   await flat(LETTERS_STORE, backup.letters, 'letters');
   await flat(POSITIVES_STORE, backup.positives, 'positives');
   await flat(AFFIRMATIONS_STORE, backup.affirmations, 'affirmations');
@@ -227,6 +233,7 @@ export const totalAdded = (c: MergeCounts) => Object.values(c).reduce((a, b) => 
 
 const LABELS: [keyof MergeCounts, string, string][] = [
   ['entries', 'journal entry', 'journal entries'],
+  ['dreams', 'dream entry', 'dream entries'],
   ['letters', 'Time Capsule letter', 'Time Capsule letters'],
   ['goals', 'journey goal', 'journey goals'],
   ['habits', 'habit swap', 'habit swaps'],

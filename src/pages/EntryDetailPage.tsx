@@ -5,6 +5,7 @@ import EntryView from '../components/EntryView';
 import EntryForm from '../components/EntryForm';
 import TalkView from '../components/TalkView';
 import ConfirmDialog from '../components/ConfirmDialog';
+import { useBook } from '../lib/book';
 import { deleteEntry, formatDay, getEntry, saveQuickEntry, type JournalEntry, type QuickDraft } from '../lib/journal';
 
 type Status = 'loading' | 'ready' | 'not-found' | 'error';
@@ -12,6 +13,7 @@ type Status = 'loading' | 'ready' | 'not-found' | 'error';
 export default function EntryDetailPage() {
   const { id = '' } = useParams();
   const navigate = useNavigate();
+  const { book, base, page } = useBook();
 
   const [status, setStatus] = useState<Status>('loading');
   const [entry, setEntry] = useState<JournalEntry | undefined>();
@@ -24,7 +26,7 @@ export default function EntryDetailPage() {
   useEffect(() => {
     let active = true;
     setStatus('loading');
-    getEntry(id)
+    getEntry(id, book)
       .then((saved) => {
         if (!active) return;
         setEntry(saved);
@@ -34,7 +36,7 @@ export default function EntryDetailPage() {
     return () => {
       active = false;
     };
-  }, [id]);
+  }, [id, book]);
 
   const backTo = entry
     ? `/journal/look-back?month=${entry.date.slice(0, 7)}&day=${entry.date}`
@@ -44,7 +46,7 @@ export default function EntryDetailPage() {
     if (!entry) return;
     setJustSaved(false);
     if (entry.type === 'talk') {
-      navigate(`/journal/talk/${entry.id}`, { state: { from: `/journal/entry/${entry.id}` } });
+      navigate(`${base}/talk/${entry.id}`, { state: { from: `${base}/entry/${entry.id}` } });
     } else {
       setEditing(true);
     }
@@ -52,7 +54,7 @@ export default function EntryDetailPage() {
 
   async function handleQuickSave(draft: QuickDraft) {
     if (entry?.type !== 'quick') return;
-    const saved = await saveQuickEntry(entry.date, draft, entry);
+    const saved = await saveQuickEntry(entry.date, draft, entry, book);
     setEntry(saved);
     setEditing(false);
     setJustSaved(true);
@@ -64,7 +66,7 @@ export default function EntryDetailPage() {
     setDeleting(true);
     setDeleteError(null);
     try {
-      await deleteEntry(entry.id);
+      await deleteEntry(entry.id, book);
       navigate(backTo, { replace: true });
     } catch {
       setDeleting(false);
@@ -73,7 +75,7 @@ export default function EntryDetailPage() {
     }
   }
 
-  const title = entry?.type === 'talk' ? 'Journal page' : 'Quick entry';
+  const title = entry?.type === 'talk' ? page : 'Quick entry';
   const subtitle = entry ? formatDay(entry.date) : '';
 
   return (
@@ -116,7 +118,7 @@ export default function EntryDetailPage() {
             <ConfirmDialog
               title="Delete this entry?"
               message={`This permanently removes your ${
-                entry.type === 'quick' ? 'quick entry' : 'journal page'
+                entry.type === 'quick' ? 'quick entry' : page.toLowerCase()
               } from ${formatDay(entry.date)}. This can't be undone.`}
               confirmLabel="Delete"
               busy={deleting}

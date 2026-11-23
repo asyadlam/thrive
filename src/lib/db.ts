@@ -1,10 +1,14 @@
 // Minimal promise wrapper around IndexedDB (no extra dependencies).
 import { foldIntoJourneys } from './journeyParts';
+import { foldIntoLists } from './listParts';
+import { asLengthKind } from './measureParts';
 const DB_NAME = 'thrive';
-const DB_VERSION = 14; // 10: talk summaries became a list (see the migration below). 11: companion memory notes. 12: My Life profile. 13: bucket list. 14: goals + habit swaps move into journeys
+const DB_VERSION = 17; // 17: every measurement is a length (cm). 16: Wishlist + Bucket list move into My Life lists, with starter lists. 15: Dreams & Nightmares journal (its own store). 10: talk summaries became a list (see the migration below). 11: companion memory notes. 12: My Life profile. 13: bucket list. 14: goals + habit swaps move into journeys
 
 /** All journal entries (quick and talk) live in this one store, keyed by `id`. */
 export const JOURNAL_STORE = 'journal';
+/** Dreams & Nightmares entries (added in version 15): same shape and index as the journal, kept apart. */
+export const DREAMS_STORE = 'dreams';
 /** Index over [type, date] so we can ask for e.g. all "talk" entries on a given day. */
 export const TYPE_DATE_INDEX = 'type_date';
 /** Goals (added in version 3), keyed by `id`. */
@@ -49,6 +53,10 @@ function openDb(): Promise<IDBDatabase> {
         const tx = req.transaction!;
         if (!db.objectStoreNames.contains(JOURNAL_STORE)) {
           const store = db.createObjectStore(JOURNAL_STORE, { keyPath: 'id' });
+          store.createIndex(TYPE_DATE_INDEX, ['type', 'date']);
+        }
+        if (!db.objectStoreNames.contains(DREAMS_STORE)) {
+          const store = db.createObjectStore(DREAMS_STORE, { keyPath: 'id' });
           store.createIndex(TYPE_DATE_INDEX, ['type', 'date']);
         }
         if (!db.objectStoreNames.contains(GOALS_STORE)) {
@@ -124,6 +132,41 @@ function openDb(): Promise<IDBDatabase> {
               }),
             ),
           );
+        }
+        // Version 16: My Life has one Lists section. Everyone gets the starter lists (To do, Wishlist, Bucket list,
+        // Groceries); the old Wishlist and Bucket list items move into those lists with the same ids, keeping their
+        // "Got it" / "Did it" dates (see listParts.ts). Then the old wishlist and bucket list stores are emptied.
+        if (event.oldVersion < 16) {
+          const read = (name: string, done: (rows: never[]) => void) => {
+            if (!db.objectStoreNames.contains(name)) return done([]);
+            const r = tx.objectStore(name).getAll();
+            r.onsuccess = () => done(r.result as never[]);
+          };
+          read(LISTS_STORE, (lists) =>
+            read(WISHLIST_STORE, (wishes) =>
+              read(BUCKETLIST_STORE, (buckets) => {
+                const store = tx.objectStore(LISTS_STORE);
+                const before = new Map((lists as { id: string }[]).map((l) => [l.id, l]));
+                for (const l of foldIntoLists(lists, wishes, buckets, { addStarters: true, stamp: new Date().toISOString() })) {
+                  if (before.get(l.id) !== l) store.put(l); // only lists that are new or changed
+                }
+                tx.objectStore(WISHLIST_STORE).clear();
+                tx.objectStore(BUCKETLIST_STORE).clear();
+              }),
+            ),
+          );
+        }
+        // Version 17: Measurements no longer have a type: every kind is a length in cm. A weight or plain-number kind
+        // keeps all its numbers exactly as they were and notes its old type and unit (formerType / formerUnit).
+        if (event.oldVersion >= 1 && event.oldVersion < 17 && db.objectStoreNames.contains(MEASUREMENTS_STORE)) {
+          const store = tx.objectStore(MEASUREMENTS_STORE);
+          const r = store.getAll();
+          r.onsuccess = () => {
+            for (const k of r.result as Parameters<typeof asLengthKind>[0][]) {
+              const converted = asLengthKind(k);
+              if (JSON.stringify(converted) !== JSON.stringify(k)) store.put(converted);
+            }
+          };
         }
         // Move quick entries saved by version 1 into the new store, then drop the old one.
         if (event.oldVersion < 2 && db.objectStoreNames.contains(LEGACY_ENTRIES_STORE)) {

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
+import DreamsSection from '../components/DreamsSection';
 import { CalendarIcon, JournalIcon, LetterIcon, MyLifeIcon } from '../components/icons';
 import { formatTime, getQuickEntry, listTalkEntries, talkEntryLabel, todayKey, type TalkEntry } from '../lib/journal';
 
@@ -89,6 +90,8 @@ export default function Journal() {
           </ul>
         </>
       )}
+
+      <DreamsSection />
     </PageShell>
   );
 }

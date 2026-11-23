@@ -9,11 +9,13 @@ import {
   deleteItem,
   deleteList,
   getList,
+  kindOf,
   renameList,
   toggleItem,
   type UserList,
 } from '../lib/lists';
 import EmptyState from '../components/EmptyState';
+import RichListItems from '../components/RichListItems';
 
 type Status = 'loading' | 'ready' | 'missing' | 'error';
 
@@ -47,13 +49,15 @@ export default function ListPage() {
   }, [id]);
 
   // Every change saves immediately; show the saved version.
-  async function apply(change: (l: UserList) => Promise<UserList>) {
-    if (!list) return;
+  async function apply(change: (l: UserList) => Promise<UserList>): Promise<boolean> {
+    if (!list) return false;
     try {
       setList(await change(list));
       setFailed('');
+      return true;
     } catch {
       setFailed("Couldn't save that change. Please try again.");
+      return false;
     }
   }
 
@@ -92,7 +96,9 @@ export default function ListPage() {
     }
   }
 
-  const back = { to: '/my-life', label: 'My Life' };
+  const back = { to: '/my-life?section=lists', label: 'My Life' };
+  const kind = list ? kindOf(list) : 'custom';
+  const rich = kind === 'wishlist' || kind === 'bucket';
 
   if (status !== 'ready' || !list) {
     return (
@@ -158,6 +164,9 @@ export default function ListPage() {
         </div>
       )}
 
+      {rich && list && <RichListItems list={list} kind={kind as 'wishlist' | 'bucket'} apply={apply} />}
+
+      {!rich && (
       <form className="list-add" onSubmit={handleAdd} noValidate>
         <label htmlFor="new-item" className="sr-only">
           Add an item
@@ -179,6 +188,7 @@ export default function ListPage() {
           Add
         </button>
       </form>
+      )}
       {itemError && (
         <p className="form-error" role="alert">
           {itemError}
@@ -190,7 +200,7 @@ export default function ListPage() {
         </p>
       )}
 
-      {list.items.length === 0 ? (
+      {rich ? null : list.items.length === 0 ? (
         <EmptyState>Nothing here yet. Add the first item above.</EmptyState>
       ) : (
         <ul className="list-items">

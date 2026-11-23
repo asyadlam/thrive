@@ -1217,7 +1217,7 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 /* ---- Cards: white, 24px corners, soft shadow, no border ---- */
 .card,
 .dialog,
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) {
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .dreams, .wishlist, .bucketlist, .journey-part) {
   background: #fff;
   border: 0;
   border-radius: var(--card-radius);
@@ -1228,20 +1228,20 @@ a.letter-main:focus-visible { outline: 2px solid var(--green-500); outline-offse
 .dialog-backdrop { background: rgba(67, 82, 60, 0.4); }
 
 /* Every section on Growth / My Life (and their See-more pages) is its own card */
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) { padding: 16px; margin: 0; }
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) + :is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) {
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .dreams, .wishlist, .bucketlist, .journey-part) { padding: 16px; margin: 0; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .dreams, .wishlist, .bucketlist, .journey-part) + :is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .dreams, .wishlist, .bucketlist, .journey-part) {
   margin-top: 12px;
 }
 
 /* Inside a section card, rows and forms sit on a soft cream inset instead of being cards again */
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) :is(.card, .goal-item, .habit-card, .list-link, .positive-item, .affirmation-item) {
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .dreams, .wishlist, .bucketlist, .journey-part) :is(.card, .goal-item, .habit-card, .list-link, .positive-item, .affirmation-item) {
   background: var(--inset);
   border: 0;
   border-radius: var(--row-radius);
   box-shadow: none;
 }
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) :is(.goal-item, .habit-card, .list-link):hover { background: #F4EEE3; }
-:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .wishlist, .bucketlist, .journey-part) .input { background: #fff; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .dreams, .wishlist, .bucketlist, .journey-part) :is(.goal-item, .habit-card, .list-link):hover { background: #F4EEE3; }
+:is(.goals, .habits, .lists, .journeys, .affirmations, .positives, .about-me, .measurements, .dreams, .wishlist, .bucketlist, .journey-part) .input { background: #fff; }
 
 /* Rows that stand on their own on a page (Journal, Look back, Time Capsule, a list, a journey) */
 :is(.talk-list-item, .letter-row, .list-item, .ladder-step) {
@@ -1567,8 +1567,16 @@ textarea.input.memory-proposal-text { min-height: 0; resize: vertical; font-size
 .about-line { margin: 0; color: var(--ink-soft); overflow-wrap: anywhere; }
 .about-birthday { margin: 4px 0 0; display: flex; align-items: baseline; gap: 8px; }
 .birthday-row { display: flex; gap: 8px; }
-.birthday-row select:first-of-type { flex: 2; }
-.birthday-row select:last-of-type { flex: 1; }
+.blood-select { max-width: 200px; }
+.about-number-row { display: flex; align-items: center; gap: 12px; }
+.about-number { position: relative; flex: 0 0 auto; width: 140px; }
+.about-number .input { width: 100%; padding-right: 44px; }
+.about-unit { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); color: var(--ink-soft); font-weight: 700; pointer-events: none; }
+.about-convert { color: var(--ink-soft); font-size: 0.95rem; font-weight: 600; }
+.birthday-row select { min-width: 0; }
+.birthday-row #birthday-month { flex: 2; }
+.birthday-row #birthday-day { flex: 1; }
+.birthday-row #birthday-year { flex: 1.3; }
 select.input { appearance: auto; }
 .about-form { gap: 16px; }
 
@@ -1665,9 +1673,6 @@ select.input { appearance: auto; }
 
 /* ---------- My Life: Measurements (a calm record — values and dates only) ----------
    One rhythm throughout: 12px between blocks, 8px between rows, 10px inside forms, 12px 14px row padding. */
-.measure-switches { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; }
-.measure-switch { display: inline-flex; align-items: center; gap: 6px; }
-.measure-switch-label { font-size: 0.85rem; font-weight: 700; color: var(--ink-soft); }
 .measure-pill {
   min-height: 34px; min-width: 44px; padding: 0 12px; border: 1px solid var(--green-100); border-radius: 999px;
   background: #fff; font: inherit; font-size: 0.9rem; font-weight: 700; color: var(--ink-soft); cursor: pointer;
@@ -1677,19 +1682,6 @@ select.input { appearance: auto; }
 .measurements .placeholder { margin-bottom: 12px; }
 .measure-add { display: flex; flex-direction: column; gap: 12px; margin-bottom: 12px; }
 .measure-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
-.measure-types { display: flex; flex-direction: column; gap: 8px; }
-.measure-type { position: relative; display: block; cursor: pointer; }
-.measure-type input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.measure-type > span {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 48px; padding: 0 14px;
-  background: #fff; border: 1px solid #E9E2D3; border-radius: 14px;
-}
-.measure-type-label { font-weight: 700; }
-.measure-type-hint { font-size: 0.85rem; color: var(--ink-soft); }
-.measure-type input:checked + span { background: var(--green-50); border-color: var(--green-500); }
-.measure-type input:checked + span .measure-type-label { color: var(--green-700); }
-.measure-type input:focus-visible + span { outline: 2px solid var(--green-500); outline-offset: 2px; }
-.measure-label-input { max-width: 200px; }
 .measure-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .measure-item { background: var(--inset); border-radius: var(--row-radius); }
 .measure-row {
@@ -1719,3 +1711,34 @@ select.input { appearance: auto; }
 .measure-kind-actions .btn-danger-outline { flex: 1; min-height: 40px; }
 .measure-delete { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 0.8rem; color: var(--ink-soft); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; flex-shrink: 0; }
 .measure-delete:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+
+/* ---------- Journal tab: Dreams & Nightmares section, and the calendar's three marks ---------- */
+.dreams { margin-top: 28px; scroll-margin-top: 76px; }
+.dreams:first-child { margin-top: 0; }
+.day-marks { display: flex; align-items: center; justify-content: center; gap: 2px; height: 7px; }
+.day-mark { display: inline-block; flex-shrink: 0; width: 7px; height: 7px; border-radius: 50%; }
+.day-mark.page { background: var(--green-500); } /* journal entry: filled dot */
+.day-mark.quick { border: 1.5px solid var(--green-700); } /* quick entry: ring */
+.day-mark.dream { box-shadow: inset -2.5px -1px 0 0 var(--green-700); transform: rotate(-30deg); } /* dream: crescent moon */
+.day.selected .day-mark.page { background: #fff; }
+.day.selected .day-mark.quick { border-color: #fff; }
+.day.selected .day-mark.dream { box-shadow: inset -2.5px -1px 0 0 #fff; }
+.calendar-legend {
+  list-style: none; margin: 10px 0 0; padding: 10px 4px 0; border-top: 1px solid var(--sand);
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 16px; font-size: 0.8rem; color: var(--ink-soft);
+}
+.calendar-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.calendar-legend .day-mark { width: 9px; height: 9px; }
+.calendar-legend .day-mark.dream { box-shadow: inset -3px -1px 0 0 var(--green-700); }
+
+/* ---------- My Life lists: one Lists section (overview rows, new-list ideas, wishlist / bucket list pages) ---------- */
+.list-link-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.list-link-meta { font-size: 0.8rem; font-weight: 400; color: var(--ink-soft); }
+.list-ideas { display: flex; flex-direction: column; gap: 8px; }
+.list-idea-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.rich-list-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+.rich-list-top .save-status { margin: 0; }
+.rich-list-top .btn-secondary { margin-left: auto; padding: 0 5px; font-size: 0.9rem; white-space: nowrap; }
+.rich-list .rich-form { margin-bottom: 12px; }
+.rich-list .wish-item { background: #fff; border: 1px solid var(--sand); border-radius: 14px; }
+.rich-list .wish-got-area { border-top-color: var(--stone); }

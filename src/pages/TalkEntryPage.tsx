@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import { LIMITS, formatDay, formatTime, getTalkEntry, saveTalkEntry, talkSummariesOf, todayKey, type TalkEntry } from '../lib/journal';
+import { useBook } from '../lib/book';
 import DictationButton from '../components/DictationButton';
 import TalkSummaries from '../components/TalkSummaries';
 
@@ -11,7 +12,8 @@ export default function TalkEntryPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const from = (useLocation().state as { from?: string } | null)?.from;
-  const back = from ? { to: from, label: 'Back' } : { to: '/journal', label: 'Journal' };
+  const { book, base, home, page, writeTitle } = useBook();
+  const back = from ? { to: from, label: 'Back' } : home;
 
   const [status, setStatus] = useState<Status>(id ? 'loading' : 'ready');
   const [loadError, setLoadError] = useState('');
@@ -26,7 +28,7 @@ export default function TalkEntryPage() {
     if (!id || entry?.id === id) return; // new page, or the entry we just saved
     let active = true;
     setStatus('loading');
-    getTalkEntry(id)
+    getTalkEntry(id, book)
       .then((saved) => {
         if (!active) return;
         if (!saved) {
@@ -46,7 +48,7 @@ export default function TalkEntryPage() {
     return () => {
       active = false;
     };
-  }, [id, entry?.id]);
+  }, [id, entry?.id, book]);
 
   const dirty = title !== (entry?.title ?? '') || body !== (entry?.body ?? '');
 
@@ -59,11 +61,11 @@ export default function TalkEntryPage() {
     setSaving(true);
     setError(null);
     try {
-      const saved = await saveTalkEntry({ title, body }, entry);
+      const saved = await saveTalkEntry({ title, body }, entry, book);
       setEntry(saved);
       setTitle(saved.title);
       setJustSaved(true);
-      if (!id) navigate(`/journal/talk/${saved.id}`, { replace: true, state: from ? { from } : null });
+      if (!id) navigate(`${base}/talk/${saved.id}`, { replace: true, state: from ? { from } : null });
       return saved;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong while saving.');
@@ -82,20 +84,20 @@ export default function TalkEntryPage() {
   async function talk() {
     const chatState = from ? { from } : null;
     if (!body.trim()) {
-      navigate('/journal/chat', { state: chatState });
+      navigate(`${base}/chat`, { state: chatState });
       return;
     }
     const saved = entry && !dirty ? entry : await persist();
-    if (saved) navigate(`/journal/chat/${saved.id}`, { state: chatState });
+    if (saved) navigate(`${base}/chat/${saved.id}`, { state: chatState });
   }
 
   const subtitle = formatDay(entry?.date ?? todayKey());
 
   return (
-    <PageShell title="Need to talk about it" subtitle={subtitle} back={back}>
+    <PageShell title={writeTitle} subtitle={subtitle} back={back}>
       {status === 'loading' && <div className="card placeholder">Loading…</div>}
 
-      {status === 'not-found' && <div className="card placeholder">This journal page couldn't be found on this device.</div>}
+      {status === 'not-found' && <div className="card placeholder">This {page.toLowerCase()} couldn't be found on this device.</div>}
 
       {status === 'error' && (
         <div className="card form-error" role="alert">

@@ -4,7 +4,12 @@ import BottomNav from './BottomNav';
 import { GearIcon, HelpIcon } from './icons';
 
 /** Which page this is, for the fade. "/journal/talk/<id>" counts as "/journal/talk" (saving a new page adds the id). */
-const pageKey = (path: string) => (path.startsWith('/journal/talk') ? '/journal/talk' : path);
+const pageKey = (path: string) =>
+  path.startsWith('/journal/talk')
+    ? '/journal/talk'
+    : path.startsWith('/journal/dreams/talk')
+      ? '/journal/dreams/talk'
+      : path;
 
 export default function Layout() {
   const { pathname } = useLocation();

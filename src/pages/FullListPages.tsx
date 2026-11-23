@@ -6,6 +6,7 @@ import PageShell from '../components/PageShell';
 import ListsSection from '../components/ListsSection';
 import PositivesSection from '../components/PositivesSection';
 import JourneysSection from '../components/JourneysSection';
+import DreamsSection from '../components/DreamsSection';
 
 const MY_LIFE = (section: string) => ({ to: `/my-life?section=${section}`, label: 'My Life' });
 const GROWTH = (section: string) => ({ to: `/growth?section=${section}`, label: 'Growth' });
@@ -34,6 +35,14 @@ export function JourneysPage() {
       back={GROWTH('journeys')}
     >
       <JourneysSection full />
+    </PageShell>
+  );
+}
+
+export function AllDreamsPage() {
+  return (
+    <PageShell title="Dreams & Nightmares" subtitle="What your nights bring you." back={{ to: '/journal?section=dreams', label: 'Journal' }}>
+      <DreamsSection full />
     </PageShell>
   );
 }

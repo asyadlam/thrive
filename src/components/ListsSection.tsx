@@ -2,11 +2,16 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { LIST_TITLE_MAX, createList, listLists, type UserList } from '../lib/lists';
 import EmptyState from './EmptyState';
-import { SeeMore, newestFirst, previewOf, useSectionAnchor } from './ListPreview';
+import { SeeMore, previewOf, useSectionAnchor } from './ListPreview';
 
 type Status = 'loading' | 'ready' | 'error';
 
-/** The Lists area on My Life: my lists by title, and a way to start a new one. */
+/** Ideas offered when starting a new list (each is a plain list you can check off). */
+const IDEAS = ['Packing list', 'Gift ideas', 'Books to read', 'Movies to watch', 'Places to try'];
+
+const countLabel = (l: UserList) => (l.items.length === 0 ? 'Empty' : `${l.items.length} ${l.items.length === 1 ? 'item' : 'items'}`);
+
+/** The Lists area on My Life: every list (To do, Wishlist, Bucket list, Groceries and my own), and a way to start one. */
 export default function ListsSection({ full = false }: { full?: boolean }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<Status>('loading');
@@ -16,6 +21,7 @@ export default function ListsSection({ full = false }: { full?: boolean }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const titleInput = useRef<HTMLInputElement>(null);
   useSectionAnchor('lists', sectionRef);
 
   useEffect(() => {
@@ -23,7 +29,7 @@ export default function ListsSection({ full = false }: { full?: boolean }) {
     listLists()
       .then((all) => {
         if (!active) return;
-        setLists(newestFirst(all));
+        setLists(all); // most recently used first
         setStatus('ready');
       })
       .catch(() => active && setStatus('error'));
@@ -49,6 +55,12 @@ export default function ListsSection({ full = false }: { full?: boolean }) {
     }
   }
 
+  function pick(idea: string) {
+    setTitle(idea);
+    setError(null);
+    titleInput.current?.focus();
+  }
+
   return (
     <section className="lists" aria-labelledby="lists-heading" ref={sectionRef}>
       <div className="goals-header">
@@ -68,6 +80,7 @@ export default function ListsSection({ full = false }: { full?: boolean }) {
           <label htmlFor="new-list-title">List name</label>
           <input
             id="new-list-title"
+            ref={titleInput}
             type="text"
             className="input"
             value={title}
@@ -79,6 +92,19 @@ export default function ListsSection({ full = false }: { full?: boolean }) {
               if (error) setError(null);
             }}
           />
+          <div className="list-ideas">
+            <span className="hint">Start from an idea:</span>
+            <div className="list-idea-chips">
+              {IDEAS.map((idea) => (
+                <button key={idea} type="button" className={`measure-pill${title === idea ? ' active' : ''}`} onClick={() => pick(idea)}>
+                  {idea}
+                </button>
+              ))}
+              <button type="button" className={`measure-pill${title === '' ? ' active' : ''}`} onClick={() => pick('')}>
+                Blank list
+              </button>
+            </div>
+          </div>
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -118,7 +144,10 @@ export default function ListsSection({ full = false }: { full?: boolean }) {
           {previewOf(lists, full).map((l) => (
             <li key={l.id}>
               <Link to={`/my-life/lists/${l.id}`} className="list-link">
-                <span className="list-link-title">{l.title}</span>
+                <span className="list-link-main">
+                  <span className="list-link-title">{l.title}</span>
+                  <span className="list-link-meta">{countLabel(l)}</span>
+                </span>
                 <span className="quick-action-arrow" aria-hidden="true">›</span>
               </Link>
             </li>

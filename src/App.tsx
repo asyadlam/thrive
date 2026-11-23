@@ -13,7 +13,7 @@ import ListPage from './pages/ListPage';
 import LessonPage from './pages/LessonPage';
 import JourneyPage from './pages/JourneyPage';
 import Growth from './pages/Growth';
-import { AllListsPage, JourneysPage, PositivesPage } from './pages/FullListPages';
+import { AllDreamsPage, AllListsPage, JourneysPage, PositivesPage } from './pages/FullListPages';
 import AffirmationsPage from './pages/AffirmationsPage';
 import MyLife from './pages/MyLife';
 import Learn from './pages/Learn';
@@ -32,6 +32,11 @@ export default function App() {
         <Route path="journal/chat/:id?" element={<TalkChatPage />} />
         <Route path="journal/look-back" element={<LookBackPage />} />
         <Route path="journal/entry/:id" element={<EntryDetailPage />} />
+        <Route path="journal/dreams" element={<AllDreamsPage />} />
+        <Route path="journal/dreams/talk/:id?" element={<TalkEntryPage />} />
+        <Route path="journal/dreams/chat/:id?" element={<TalkChatPage />} />
+        <Route path="journal/dreams/look-back" element={<Navigate to="/journal/look-back" replace />} />
+        <Route path="journal/dreams/entry/:id" element={<EntryDetailPage />} />
         <Route path="journal/time-capsule" element={<TimeCapsulePage />} />
         <Route path="journal/time-capsule/:id" element={<LetterPage />} />
         <Route path="growth" element={<Growth />} />

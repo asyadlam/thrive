@@ -21,7 +21,7 @@ import { listHabits } from '../lib/habits';
 import { listLists } from '../lib/lists';
 import { listJourneys } from '../lib/journeys';
 import { listMemories } from '../lib/memory';
-import { listBucketList, listMeasurementKinds, listRoutine, listWishlist } from '../lib/profile';
+import { listMeasurementKinds, listRoutine } from '../lib/profile';
 import { applyMerge, describeCounts, planMerge, totalAdded, type MergePlan } from '../lib/merge';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -29,6 +29,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 type Message = { kind: 'ok' | 'error'; text: string } | null;
 type Current = {
   currentCount: number;
+  currentDreams: number;
   currentGoals: number;
   currentPositives: number;
   currentLetters: number;
@@ -39,8 +40,6 @@ type Current = {
   currentMemories: number;
   currentMeasurements: number;
   currentRoutine: number;
-  currentWishlist: number;
-  currentBucket: number;
 };
 
 export default function MyDataSection({ onRestored }: { onRestored: () => void }) {
@@ -92,9 +91,10 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     setBusy('reading');
     setMessage(null);
     try {
-      const [checked, current, goals, positives, letters, affirmations, habits, lists, journeys, memories, measurements, routine, wishlist, bucket] = await Promise.all([
+      const [checked, current, dreams, goals, positives, letters, affirmations, habits, lists, journeys, memories, measurements, routine] = await Promise.all([
         readBackupFile(file),
         listAllEntries(),
+        listAllEntries('dreams'),
         listAllGoals(),
         listStandalonePositives(),
         listAllLetterIds(),
@@ -105,12 +105,11 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         listMemories(),
         listMeasurementKinds(),
         listRoutine(),
-        listWishlist(),
-        listBucketList(),
       ]);
       setPending({
         ...checked,
         currentCount: current.length,
+        currentDreams: dreams.length,
         currentGoals: goals.length,
         currentPositives: positives.length,
         currentLetters: letters.length,
@@ -121,8 +120,6 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         currentMemories: memories.length,
         currentMeasurements: measurements.length,
         currentRoutine: routine.length,
-        currentWishlist: wishlist.wanted.length + wishlist.got.length,
-        currentBucket: bucket.todo.length + bucket.done.length,
       });
     } catch (err) {
       setMessage({
@@ -146,12 +143,13 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
       const positivesText = pending.positives
         ? `, ${pending.positives.length} saved ${pending.positives.length === 1 ? 'positive' : 'positives'}`
         : '';
+      const dreamsText = pending.dreams ? `, ${pending.dreams.length} dream ${pending.dreams.length === 1 ? 'entry' : 'entries'}` : '';
       const lettersText = pending.letters
         ? `, ${pending.letters.length} ${pending.letters.length === 1 ? 'letter' : 'letters'}`
         : '';
       setMessage({
         kind: 'ok',
-        text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${goalsText}${positivesText}${lettersText}${
+        text: `Restored ${total} ${total === 1 ? 'entry' : 'entries'}${dreamsText}${goalsText}${positivesText}${lettersText}${
           pending.affirmations
             ? `, ${pending.affirmations.length} ${pending.affirmations.length === 1 ? 'affirmation' : 'affirmations'} of your own`
             : ''
@@ -159,7 +157,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
           pending.lists ? `, ${pending.lists.length} ${pending.lists.length === 1 ? 'list' : 'lists'}` : ''
         }${pending.journeys ? `, ${pending.journeys.length} ${pending.journeys.length === 1 ? 'journey' : 'journeys'}` : ''}${
           pending.memories ? `, ${pending.memories.length} memory ${pending.memories.length === 1 ? 'note' : 'notes'}` : ''
-        }${pending.measurements || pending.routine || pending.wishlist || pending.bucketlist ? ', your My Life profile' : ''} and your settings.`,
+        }${pending.measurements || pending.routine ? ', your My Life profile' : ''} and your settings.`,
       });
       onRestored();
     } catch {
@@ -224,33 +222,30 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
 
   function restoreMessage(b: CheckedBackup & Current) {
     const has = [plural(b.quickCount, 'quick entry', 'quick entries'), plural(b.talkCount, 'journal page', 'journal pages')];
+    if (b.dreams) has.push(plural(b.dreams.length, 'dream entry', 'dream entries'));
     if (b.positives) has.push(plural(b.positives.length, 'saved positive', 'saved positives'));
     if (b.letters) has.push(plural(b.letters.length, 'Time Capsule letter', 'Time Capsule letters'));
     if (b.affirmations) has.push(plural(b.affirmations.length, 'affirmation of your own', 'affirmations of your own'));
     if (b.lists) has.push(plural(b.lists.length, 'list', 'lists'));
     if (b.journeys) has.push(plural(b.journeys.length, 'journey', 'journeys'));
     if (b.memories) has.push(plural(b.memories.length, 'companion memory note', 'companion memory notes'));
-    if (b.wishlist) has.push(plural(b.wishlist.length, 'wishlist item', 'wishlist items'));
-    if (b.bucketlist) has.push(plural(b.bucketlist.length, 'bucket list item', 'bucket list items'));
     const saved = b.exportedAt ? `, saved ${formatLongDay(todayKey(new Date(b.exportedAt)))}` : '';
     const replaced = [plural(b.currentCount, 'entry', 'entries')];
+    if (b.dreams) replaced.push(plural(b.currentDreams, 'dream entry', 'dream entries'));
     if (b.positives) replaced.push(plural(b.currentPositives, 'saved positive', 'saved positives'));
     if (b.letters) replaced.push(plural(b.currentLetters, 'letter', 'letters'));
     if (b.affirmations) replaced.push(plural(b.currentAffirmations, 'affirmation of your own', 'affirmations of your own'));
     if (b.lists) replaced.push(plural(b.currentLists, 'list', 'lists'));
     if (b.journeys && !b.keepCurrentJourneys) replaced.push(plural(b.currentJourneys, 'journey', 'journeys'));
     if (b.memories) replaced.push(plural(b.currentMemories, 'memory note', 'memory notes'));
-    if (b.wishlist) replaced.push(plural(b.currentWishlist, 'wishlist item', 'wishlist items'));
-    if (b.bucketlist) replaced.push(plural(b.currentBucket, 'bucket list item', 'bucket list items'));
     const missing = [
+      !b.dreams && 'dream entries',
       !b.positives && 'saved positives',
       !b.letters && 'Time Capsule letters',
       !b.affirmations && 'affirmations of your own',
       !b.lists && 'lists',
       !b.journeys && 'journeys',
       !b.memories && 'companion memory notes',
-      !b.wishlist && 'wishlist',
-      !b.bucketlist && 'bucket list',
     ]
       .filter(Boolean)
       .join(' or ');

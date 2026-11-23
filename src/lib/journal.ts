@@ -1,4 +1,4 @@
-import { JOURNAL_STORE, TYPE_DATE_INDEX, idbDelete, idbGet, idbGetAll, idbGetAllFromIndex, idbPut, idbReplaceAll } from './db';
+import { DREAMS_STORE, JOURNAL_STORE, TYPE_DATE_INDEX, idbDelete, idbGet, idbGetAll, idbGetAllFromIndex, idbPut, idbReplaceAll } from './db';
 
 export const MOODS = ['Rough', 'Low', 'Okay', 'Good', 'Great', 'Stressed', 'Tired', 'Excited'] as const;
 export type Mood = (typeof MOODS)[number];
@@ -86,6 +86,13 @@ export function withSummaryList<T extends TalkEntry>(entry: T): T {
 
 export type JournalEntry = QuickEntry | TalkEntry;
 
+/**
+ * Which journal an entry belongs to: the regular journal or Dreams & Nightmares. They work the same way but are
+ * stored in separate stores, so the two never mix. Every function below defaults to the regular journal.
+ */
+export type Book = 'journal' | 'dreams';
+const storeOf = (book: Book) => (book === 'dreams' ? DREAMS_STORE : JOURNAL_STORE);
+
 export type QuickDraft = Pick<QuickEntry, 'mood' | 'positives' | 'note' | 'intention'>;
 export type TalkDraft = Pick<TalkEntry, 'title' | 'body'>;
 
@@ -123,11 +130,11 @@ function keepStorage() {
 
 export const quickId = (date: string) => `quick-${date}`;
 
-export function getQuickEntry(date: string): Promise<QuickEntry | undefined> {
-  return idbGet<QuickEntry>(JOURNAL_STORE, quickId(date));
+export function getQuickEntry(date: string, book: Book = 'journal'): Promise<QuickEntry | undefined> {
+  return idbGet<QuickEntry>(storeOf(book), quickId(date));
 }
 
-export async function saveQuickEntry(date: string, draft: QuickDraft, existing?: QuickEntry): Promise<QuickEntry> {
+export async function saveQuickEntry(date: string, draft: QuickDraft, existing?: QuickEntry, book: Book = 'journal'): Promise<QuickEntry> {
   const now = new Date().toISOString();
   const entry: QuickEntry = {
     id: quickId(date),
@@ -140,19 +147,19 @@ export async function saveQuickEntry(date: string, draft: QuickDraft, existing?:
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
-  await idbPut(JOURNAL_STORE, entry);
+  await idbPut(storeOf(book), entry);
   keepStorage();
   return entry;
 }
 
 /* ---------- "Need to talk about it" entries ---------- */
 
-export async function getTalkEntry(id: string): Promise<TalkEntry | undefined> {
-  const entry = await idbGet<JournalEntry>(JOURNAL_STORE, id);
+export async function getTalkEntry(id: string, book: Book = 'journal'): Promise<TalkEntry | undefined> {
+  const entry = await idbGet<JournalEntry>(storeOf(book), id);
   return entry?.type === 'talk' ? entry : undefined;
 }
 
-export async function saveTalkEntry(draft: TalkDraft, existing?: TalkEntry): Promise<TalkEntry> {
+export async function saveTalkEntry(draft: TalkDraft, existing?: TalkEntry, book: Book = 'journal'): Promise<TalkEntry> {
   const now = new Date().toISOString();
   const entry: TalkEntry = {
     id: existing?.id ?? `talk-${newId()}`,
@@ -164,7 +171,7 @@ export async function saveTalkEntry(draft: TalkDraft, existing?: TalkEntry): Pro
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
-  await idbPut(JOURNAL_STORE, entry);
+  await idbPut(storeOf(book), entry);
   keepStorage();
   return entry;
 }
@@ -175,8 +182,8 @@ export const TALK_SUMMARY_MAX = 1000;
  * Adds a "From your talk" summary to a journal page, together with that chat's transcript.
  * This is the only moment a chat is ever stored. Earlier summaries are always kept.
  */
-export async function saveTalkSummary(entryId: string, summary: string, transcript: TranscriptLine[]): Promise<TalkEntry> {
-  const existing = await getTalkEntry(entryId);
+export async function saveTalkSummary(entryId: string, summary: string, transcript: TranscriptLine[], book: Book = 'journal'): Promise<TalkEntry> {
+  const existing = await getTalkEntry(entryId, book);
   if (!existing) throw new Error('This journal page couldn’t be found on this device.');
   const now = new Date().toISOString();
   const current = withSummaryList(existing);
@@ -192,13 +199,13 @@ export async function saveTalkSummary(entryId: string, summary: string, transcri
     talkSummaries: [...talkSummariesOf(current), added],
     updatedAt: now,
   };
-  await idbPut(JOURNAL_STORE, updated);
+  await idbPut(storeOf(book), updated);
   keepStorage();
   return updated;
 }
 
-export async function listTalkEntries(date: string): Promise<TalkEntry[]> {
-  const entries = await idbGetAllFromIndex<TalkEntry>(JOURNAL_STORE, TYPE_DATE_INDEX, ['talk', date]);
+export async function listTalkEntries(date: string, book: Book = 'journal'): Promise<TalkEntry[]> {
+  const entries = await idbGetAllFromIndex<TalkEntry>(storeOf(book), TYPE_DATE_INDEX, ['talk', date]);
   return entries.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
@@ -208,20 +215,20 @@ export function talkEntryLabel(entry: TalkEntry): string {
 
 /* ---------- Any entry type (used by Look back) ---------- */
 
-export function getEntry(id: string): Promise<JournalEntry | undefined> {
-  return idbGet<JournalEntry>(JOURNAL_STORE, id);
+export function getEntry(id: string, book: Book = 'journal'): Promise<JournalEntry | undefined> {
+  return idbGet<JournalEntry>(storeOf(book), id);
 }
 
-export function deleteEntry(id: string): Promise<undefined> {
-  return idbDelete(JOURNAL_STORE, id);
+export function deleteEntry(id: string, book: Book = 'journal'): Promise<undefined> {
+  return idbDelete(storeOf(book), id);
 }
 
 /** All entries (both types) whose date falls between two YYYY-MM-DD keys, inclusive. */
-export async function listEntriesBetween(start: string, end: string): Promise<JournalEntry[]> {
+export async function listEntriesBetween(start: string, end: string, book: Book = 'journal'): Promise<JournalEntry[]> {
   const range = (type: JournalEntry['type']) => IDBKeyRange.bound([type, start], [type, end]);
   const [quick, talk] = await Promise.all([
-    idbGetAllFromIndex<QuickEntry>(JOURNAL_STORE, TYPE_DATE_INDEX, range('quick')),
-    idbGetAllFromIndex<TalkEntry>(JOURNAL_STORE, TYPE_DATE_INDEX, range('talk')),
+    idbGetAllFromIndex<QuickEntry>(storeOf(book), TYPE_DATE_INDEX, range('quick')),
+    idbGetAllFromIndex<TalkEntry>(storeOf(book), TYPE_DATE_INDEX, range('talk')),
   ]);
   return [...quick, ...talk];
 }
@@ -246,8 +253,8 @@ export function formatLongDay(key: string): string {
 /* ---------- Whole journal (backup / restore) ---------- */
 
 /** Every entry of both types, oldest day first (then oldest written first). */
-export async function listAllEntries(): Promise<JournalEntry[]> {
-  const all = await idbGetAll<JournalEntry>(JOURNAL_STORE);
+export async function listAllEntries(book: Book = 'journal'): Promise<JournalEntry[]> {
+  const all = await idbGetAll<JournalEntry>(storeOf(book));
   return all.sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt ?? '').localeCompare(b.createdAt ?? ''));
 }
 
