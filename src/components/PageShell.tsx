@@ -6,14 +6,14 @@ type Props = {
   title: string;
   subtitle: string;
   back?: { to: string; label: string };
-  /** Show the small companion pet at the top-right, next to the title (main section pages only). */
+  /** The header companion pet at the top-right, next to the title. On by default: every page shows exactly one. */
   pet?: boolean;
   /** The header pet's pose (default when not given). */
   petPose?: PetPose;
   children?: ReactNode;
 };
 
-export default function PageShell({ title, subtitle, back, pet, petPose, children }: Props) {
+export default function PageShell({ title, subtitle, back, pet = true, petPose, children }: Props) {
   return (
     <section className="page">
       {back && (

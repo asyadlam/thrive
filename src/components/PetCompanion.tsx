@@ -4,28 +4,87 @@ import { loadSettings, type PetKind } from '../lib/settings';
 import { KIND_MESSAGES } from '../data/kindMessages';
 
 /*
-  The ONE place companion art is defined. `src` is each pet's default pose. A pet can also have other poses
-  (still images swapped by situation); any pose a pet doesn't have falls back to its default. Only Hippo has
-  poses for now.
+  The ONE place companion art is defined. `src` is each pet's default (normal) picture, `pickerImage` is the
+  picture shown in the Settings picker, and `poses` are the still images swapped in by situation. Any pose a pet
+  doesn't have falls back to its default picture.
 */
-export type PetPose = 'default' | 'thinking' | 'winking' | 'listening' | 'celebrating' | 'comforting';
+export type PetPose = 'default' | 'thinking' | 'winking' | 'listening' | 'celebrating' | 'comforting' | 'eating';
 
-export const PET_ART: Record<PetKind, { label: string; src: string; poses?: Partial<Record<Exclude<PetPose, 'default'>, string>> }> = {
+type PetArt = {
+  label: string;
+  src: string;
+  pickerImage: string;
+  poses?: Partial<Record<Exclude<PetPose, 'default'>, string>>;
+};
+
+const pet = (file: string) => `/pets/${file}-cutout.png`;
+
+export const PET_ART: Record<PetKind, PetArt> = {
   hippo: {
     label: 'Hippo',
-    src: '/pets/hippo.png',
+    src: pet('yoshi-default-heart'), // holding the heart is his normal picture
+    pickerImage: pet('yoshi-default-heart'),
     poses: {
-      thinking: '/pets/yoshi-thinking-cutout.png',
-      winking: '/pets/yoshi-winking-cutout.png',
-      listening: '/pets/yoshi-listening-cutout.png',
-      celebrating: '/pets/yoshi-celebrating-cutout.png',
-      comforting: '/pets/yoshi-comforting-cutout.png',
+      thinking: pet('yoshi-thinking'),
+      winking: pet('yoshi-winking'),
+      listening: pet('yoshi-listening'),
+      celebrating: pet('yoshi-celebrating'),
+      comforting: pet('yoshi-comforting-hug'), // eyes closed, hugging the heart (new name, so no phone shows an old cached copy)
+      eating: pet('yoshi-eating'),
     },
   },
-  cat: { label: 'Cat', src: '/pets/cat.png' },
-  platypus: { label: 'Platypus', src: '/pets/platypus.png' },
-  panda: { label: 'Panda', src: '/pets/panda.png' },
-  dog: { label: 'Dog', src: '/pets/dog.png' },
+  cat: {
+    label: 'Cat',
+    src: pet('cat-default-calm'),
+    pickerImage: pet('cat-winking'),
+    poses: {
+      thinking: pet('cat-thinking'),
+      winking: pet('cat-winking'),
+      listening: pet('cat-listening'),
+      celebrating: pet('cat-celebrating'),
+      comforting: pet('cat-comforting'),
+      eating: pet('cat-eating'),
+    },
+  },
+  platypus: {
+    label: 'Platypus',
+    src: pet('platypus-default-calm'),
+    pickerImage: pet('platypus-celebrating'),
+    poses: {
+      thinking: pet('platypus-thinking'),
+      winking: pet('platypus-winking'),
+      listening: pet('platypus-listening'),
+      celebrating: pet('platypus-celebrating'),
+      comforting: pet('platypus-comforting'),
+      eating: pet('platypus-eating'),
+    },
+  },
+  panda: {
+    label: 'Panda',
+    src: pet('panda-default-calm'),
+    pickerImage: pet('panda-thinking'),
+    poses: {
+      thinking: pet('panda-thinking'),
+      winking: pet('panda-winking'),
+      listening: pet('panda-listening'),
+      celebrating: pet('panda-celebrating'),
+      comforting: pet('panda-comforting'),
+      eating: pet('panda-eating'),
+    },
+  },
+  dog: {
+    label: 'Dog',
+    src: pet('dog-default-calm'),
+    pickerImage: pet('dog-listening'),
+    poses: {
+      thinking: pet('dog-thinking'),
+      winking: pet('dog-winking'),
+      listening: pet('dog-listening'),
+      celebrating: pet('dog-celebrating'),
+      comforting: pet('dog-comforting'),
+      eating: pet('dog-eating'),
+    },
+  },
 };
 
 /** The image for this pet in this pose, or the pet's default image when it has no such pose. */
@@ -63,13 +122,17 @@ export function useCelebration(base: PetPose = 'default'): [PetPose, () => void]
 }
 
 const CELEBRATE_MS = 3000;
+// Tap surprise: about 1 tap in 3 (never twice in a row) briefly shows a playful pose, only from the normal pose.
+const SURPRISE_POSES: PetPose[] = ['winking', 'celebrating', 'eating'];
+const SURPRISE_CHANCE = 1 / 3;
+const SURPRISE_MS = 2500;
 const POSE_FADE_MS = 220; // the crossfade itself is ~200ms (CSS); this clears the old image just after
 
-/** Small still preview, used only by the Settings picker. */
+/** Small still preview (the pet's picker picture), used only by the Settings picker. */
 export function PetThumb({ kind, size = 56 }: { kind: PetKind; size?: number }) {
   return (
     <img
-      src={PET_ART[kind].src}
+      src={PET_ART[kind].pickerImage}
       width={size}
       height={size}
       alt=""
@@ -158,8 +221,21 @@ type CompanionProps = {
 /** The companion pet. Renders nothing when the companion is set to "None". */
 export default function PetCompanion({ size = 'large', children, pose = 'default' }: CompanionProps = {}) {
   const [{ companion, petName }] = useState(loadSettings);
+  // A tap's playful pose surprise (null = none showing). Only ever starts while the page shows the normal pose.
+  const [surprise, setSurprise] = useState<PetPose | null>(null);
+  const lastTapSurprised = useRef(false);
+  const lastSurprise = useRef<PetPose | null>(null);
+  const surpriseTimer = useRef<number>();
+  useEffect(() => {
+    // a special pose (listening, thinking, a celebration, comforting…) always wins over a surprise
+    if (pose !== 'default') {
+      window.clearTimeout(surpriseTimer.current);
+      setSurprise(null);
+    }
+  }, [pose]);
+  useEffect(() => () => window.clearTimeout(surpriseTimer.current), []);
   // Pose crossfade: `shown` is the image on screen; `leaving` is the previous one, fading out underneath.
-  const target = companion === 'none' ? '' : petImage(companion, pose);
+  const target = companion === 'none' ? '' : petImage(companion, pose === 'default' && surprise ? surprise : pose);
   const [shown, setShown] = useState(target);
   const [leaving, setLeaving] = useState<string | null>(null);
   const leaveTimer = useRef<number>();
@@ -223,6 +299,18 @@ export default function PetCompanion({ size = 'large', children, pose = 'default
     setBubble((b) => ({ text, n: (b?.n ?? 0) + 1 }));
     window.clearTimeout(bubbleTimer.current);
     bubbleTimer.current = window.setTimeout(() => setBubble(null), BUBBLE_MS);
+
+    // Pose surprise: only from the normal pose, about 1 tap in 3, never on two taps in a row.
+    if (pose === 'default' && !surprise && !lastTapSurprised.current && Math.random() < SURPRISE_CHANCE) {
+      const next = pickNew(SURPRISE_POSES, lastSurprise.current);
+      lastSurprise.current = next;
+      lastTapSurprised.current = true;
+      setSurprise(next);
+      window.clearTimeout(surpriseTimer.current);
+      surpriseTimer.current = window.setTimeout(() => setSurprise(null), SURPRISE_MS);
+    } else if (!surprise) {
+      lastTapSurprised.current = false; // a plain tap: the next one may surprise again
+    }
 
     if (reducedMotion()) return; // no bounce, no floating effect
 

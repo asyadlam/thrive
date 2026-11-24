@@ -27,7 +27,7 @@ export default function Settings() {
   }
 
   return (
-    <PageShell title="Settings" subtitle="Make Thrive your own.">
+    <PageShell title="Settings" subtitle="Make Thrive your own." pet={false}>
       <section className="card settings-section" aria-labelledby="about-heading">
         <h2 id="about-heading" className="settings-heading">
           About you
