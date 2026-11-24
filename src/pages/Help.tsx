@@ -36,7 +36,7 @@ function TextIcon() {
 
 export default function Help() {
   return (
-    <PageShell title="Get help" subtitle="If things feel like too much right now, you do not have to carry this alone.">
+    <PageShell title="Get help" subtitle="If things feel like too much right now, you do not have to carry this alone." pet petPose="comforting">
       <div className="card help-card">
         <div className="help-action">
           <div className="help-action-text">

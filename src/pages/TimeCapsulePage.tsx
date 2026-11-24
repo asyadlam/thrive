@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { SAVE_FAILED } from '../lib/messages';
 import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
+import { useCelebration } from '../components/PetCompanion';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { LetterIcon } from '../components/icons';
 import MilestoneOpenButton from '../components/MilestoneOpenButton';
@@ -37,6 +38,7 @@ export default function TimeCapsulePage() {
   const [message, setMessage] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<LetterSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [petPose, celebrate] = useCelebration(); // a short celebration after sealing a letter
 
   const refresh = useCallback(async () => {
     try {
@@ -79,6 +81,7 @@ export default function TimeCapsulePage() {
         sealType === 'date' ? { title, body, sealType, unlockDate } : { title, body, sealType, milestone },
       );
       resetForm();
+      celebrate();
       setMessage(
         letter.sealType === 'milestone'
           ? `Sealed. It opens when: ${letter.milestone}`
@@ -108,7 +111,7 @@ export default function TimeCapsulePage() {
   }
 
   return (
-    <PageShell title="Time Capsule" subtitle="Letters to your future self." back={{ to: '/journal', label: 'Journal' }}>
+    <PageShell title="Time Capsule" subtitle="Letters to your future self." back={{ to: '/journal', label: 'Journal' }} pet petPose={petPose}>
       {writing ? (
         <form className="card letter-form" onSubmit={handleSeal} noValidate>
           <div className="field">

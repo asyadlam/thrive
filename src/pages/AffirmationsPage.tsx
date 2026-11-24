@@ -100,7 +100,7 @@ export default function AffirmationsPage() {
   }
 
   return (
-    <PageShell title="Affirmations" subtitle="Words to lean on." back={{ to: '/', label: 'Home' }}>
+    <PageShell title="Affirmations" subtitle="Words to lean on." back={{ to: '/', label: 'Home' }} pet petPose="winking">
       <div className="affirmations-page">
         <div className="card affirmation-card affirmation-card-large">
           <div className={`crossfade${fade.faded ? ' faded' : ''}`}>

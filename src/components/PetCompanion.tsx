@@ -4,16 +4,66 @@ import { loadSettings, type PetKind } from '../lib/settings';
 import { KIND_MESSAGES } from '../data/kindMessages';
 
 /*
-  The ONE place companion art is defined. To switch to animated versions later,
-  change only the `src` values here (animated GIF / APNG / WebP work as-is).
+  The ONE place companion art is defined. `src` is each pet's default pose. A pet can also have other poses
+  (still images swapped by situation); any pose a pet doesn't have falls back to its default. Only Hippo has
+  poses for now.
 */
-export const PET_ART: Record<PetKind, { label: string; src: string }> = {
-  hippo: { label: 'Hippo', src: '/pets/hippo.png' },
+export type PetPose = 'default' | 'thinking' | 'winking' | 'listening' | 'celebrating' | 'comforting';
+
+export const PET_ART: Record<PetKind, { label: string; src: string; poses?: Partial<Record<Exclude<PetPose, 'default'>, string>> }> = {
+  hippo: {
+    label: 'Hippo',
+    src: '/pets/hippo.png',
+    poses: {
+      thinking: '/pets/yoshi-thinking-cutout.png',
+      winking: '/pets/yoshi-winking-cutout.png',
+      listening: '/pets/yoshi-listening-cutout.png',
+      celebrating: '/pets/yoshi-celebrating-cutout.png',
+      comforting: '/pets/yoshi-comforting-cutout.png',
+    },
+  },
   cat: { label: 'Cat', src: '/pets/cat.png' },
   platypus: { label: 'Platypus', src: '/pets/platypus.png' },
   panda: { label: 'Panda', src: '/pets/panda.png' },
   dog: { label: 'Dog', src: '/pets/dog.png' },
 };
+
+/** The image for this pet in this pose, or the pet's default image when it has no such pose. */
+export function petImage(kind: PetKind, pose: PetPose = 'default'): string {
+  const art = PET_ART[kind];
+  return (pose !== 'default' && art.poses?.[pose]) || art.src;
+}
+
+/** Load a pet's pose images once in the background, so a pose change shows straight away. */
+const preloaded = new Set<PetKind>();
+function preloadPoses(kind: PetKind) {
+  if (preloaded.has(kind)) return;
+  preloaded.add(kind);
+  for (const src of Object.values(PET_ART[kind].poses ?? {})) {
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+  }
+}
+
+/**
+ * Shows a "celebrating" pose for about 3 seconds, then goes back to `base`.
+ * Returns the pose to show now and a function to start the celebration.
+ */
+export function useCelebration(base: PetPose = 'default'): [PetPose, () => void] {
+  const [celebrating, setCelebrating] = useState(false);
+  const timer = useRef<number>();
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+  const celebrate = () => {
+    setCelebrating(true);
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setCelebrating(false), CELEBRATE_MS);
+  };
+  return [celebrating ? 'celebrating' : base, celebrate];
+}
+
+const CELEBRATE_MS = 3000;
+const POSE_FADE_MS = 220; // the crossfade itself is ~200ms (CSS); this clears the old image just after
 
 /** Small still preview, used only by the Settings picker. */
 export function PetThumb({ kind, size = 56 }: { kind: PetKind; size?: number }) {
@@ -101,11 +151,34 @@ type CompanionProps = {
   size?: 'large' | 'small';
   /** Large only: shown between the pet and its greeting line (e.g. Home's time-of-day greeting). */
   children?: ReactNode;
+  /** Which pose to show (falls back to the pet's default image when it has no such pose). */
+  pose?: PetPose;
 };
 
 /** The companion pet. Renders nothing when the companion is set to "None". */
-export default function PetCompanion({ size = 'large', children }: CompanionProps = {}) {
+export default function PetCompanion({ size = 'large', children, pose = 'default' }: CompanionProps = {}) {
   const [{ companion, petName }] = useState(loadSettings);
+  // Pose crossfade: `shown` is the image on screen; `leaving` is the previous one, fading out underneath.
+  const target = companion === 'none' ? '' : petImage(companion, pose);
+  const [shown, setShown] = useState(target);
+  const [leaving, setLeaving] = useState<string | null>(null);
+  const leaveTimer = useRef<number>();
+  useEffect(() => {
+    if (companion !== 'none') preloadPoses(companion);
+  }, [companion]);
+  useEffect(() => {
+    if (target === shown) return;
+    window.clearTimeout(leaveTimer.current);
+    if (reducedMotion()) {
+      setLeaving(null); // no crossfade: just swap
+    } else {
+      setLeaving(shown);
+      leaveTimer.current = window.setTimeout(() => setLeaving(null), POSE_FADE_MS);
+    }
+    setShown(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target]);
+  useEffect(() => () => window.clearTimeout(leaveTimer.current), []);
   const [showedUpToday, setShowedUpToday] = useState<boolean | null>(null);
   const [bouncing, setBouncing] = useState(false);
   const [fx, setFx] = useState<{ kind: FxKind } | null>(null);
@@ -169,14 +242,25 @@ export default function PetCompanion({ size = 'large', children }: CompanionProp
   const tap = (
     <button type="button" className="pet-companion-tap" aria-label={`Say hi to ${name || art.label}`} onClick={handleTap}>
       <span className="pet-companion-bob">
-        <img
-          src={art.src}
-          alt=""
-          className={`pet-companion-img${bouncing ? ' bounce' : ''}`}
-          decoding="async"
-          draggable={false}
-          onAnimationEnd={() => setBouncing(false)}
-        />
+        {leaving && (
+          <span key={`out-${leaving}`} className="pet-pose pet-pose-out" aria-hidden="true">
+            <img src={leaving} alt="" className="pet-companion-img" decoding="async" draggable={false} />
+          </span>
+        )}
+        <span key={shown} className={`pet-pose${leaving ? ' pet-pose-in' : ''}`}>
+          <img
+            src={shown}
+            alt=""
+            className={`pet-companion-img${bouncing ? ' bounce' : ''}`}
+            decoding="async"
+            draggable={false}
+            onAnimationEnd={() => setBouncing(false)}
+            onError={(e) => {
+              // a missing pose image never shows as broken: use the pet's default instead
+              if (e.currentTarget.src !== new URL(art.src, window.location.href).href) setShown(art.src);
+            }}
+          />
+        </span>
       </span>
       {fx && (
         <span className={`pet-fx pet-fx-${fx.kind}`} aria-hidden="true">

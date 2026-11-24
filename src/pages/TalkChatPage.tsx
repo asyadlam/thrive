@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
-import { PET_ART } from '../components/PetCompanion';
+import { PET_ART, useCelebration } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
 import { useBook } from '../lib/book';
 import { loadSettings } from '../lib/settings';
@@ -67,6 +67,8 @@ export default function TalkChatPage() {
   const [waiting, setWaiting] = useState(false);
   const [problem, setProblem] = useState<{ text: string; retry: TalkMode | null; detail?: string } | null>(null);
   const [summary, setSummary] = useState<Summary>({ state: 'idle' });
+  // Header pet: listening while the chat is open, thinking while a reply is on its way, a short celebration after saving a summary.
+  const [restPose, celebrate] = useCelebration('listening');
 
   const request = useRef<AbortController | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
@@ -211,6 +213,7 @@ export default function TalkChatPage() {
       const approved = proposals.filter((p) => p.keep && p.text.trim());
       for (const p of approved) await addMemory(p.text);
       setSummary({ state: 'saved', notesSaved: approved.length });
+      celebrate();
     } catch {
       setSummary({ state: 'shown', text, proposals });
       setProblem({ text: 'Couldn’t save the summary on this device. Please try again.', retry: null });
@@ -228,7 +231,13 @@ export default function TalkChatPage() {
   const title = entry ? talkEntryLabel(entry) : 'A blank page';
 
   return (
-    <PageShell title="Talk about this" subtitle={title} back={{ to: backTo, label: 'Back to your entry' }}>
+    <PageShell
+      title="Talk about this"
+      subtitle={title}
+      back={{ to: backTo, label: 'Back to your entry' }}
+      pet
+      petPose={waiting || summary.state === 'writing' ? 'thinking' : restPose}
+    >
       {phase === 'loading' && <div className="card placeholder">Loading…</div>}
       {phase === 'missing' && <div className="card placeholder">This {page.toLowerCase()} couldn't be found on this device.</div>}
 

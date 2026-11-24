@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PetCompanion from '../components/PetCompanion';
+import { getQuickEntry, todayKey } from '../lib/journal';
 import { affirmationOfTheDay, positiveOfTheDay, timeGreeting } from '../lib/homeData';
 import type { AffirmationItem } from '../lib/affirmations';
 import type { PositiveItem } from '../lib/positives';
@@ -10,6 +11,8 @@ export default function Home() {
   const [{ userName, companion }] = useState(loadSettings);
   const [affirmation, setAffirmation] = useState<AffirmationItem | null>(null);
   const [positive, setPositive] = useState<PositiveItem | null>(null);
+  // Today's check-in said Rough or Low: the greeting pet is comforting for the rest of the day.
+  const [comforting, setComforting] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -17,6 +20,11 @@ export default function Home() {
     positiveOfTheDay()
       .then((p) => active && setPositive(p))
       .catch(() => active && setPositive(null));
+    if (companion !== 'none') {
+      getQuickEntry(todayKey())
+        .then((q) => active && setComforting(q?.mood === 'Rough' || q?.mood === 'Low'))
+        .catch(() => undefined);
+    }
     return () => {
       active = false;
     };
@@ -28,7 +36,7 @@ export default function Home() {
   return (
     <section className="page home">
       {/* 1. Centered greeting (with the pet above it, if one is chosen) */}
-      <div className="home-hero">{companion === 'none' ? greeting : <PetCompanion>{greeting}</PetCompanion>}</div>
+      <div className="home-hero">{companion === 'none' ? greeting : <PetCompanion pose={comforting ? 'comforting' : 'default'}>{greeting}</PetCompanion>}</div>
 
       {/* 2. Quick check-in */}
       <Link to="/journal/quick" className="home-checkin">

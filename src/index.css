@@ -2018,3 +2018,16 @@ select.input { appearance: auto; }
 .help-quiet p { margin: 0; color: var(--ink-soft); }
 .help-quiet a { color: var(--green-700); font-weight: 700; }
 .help-closing { margin: 20px 8px 8px; text-align: center; color: var(--ink-soft); font-size: 0.92rem; line-height: 1.5; }
+
+/* Companion poses: a gentle ~200ms crossfade when the pose changes (none with reduced motion) */
+.pet-companion-bob { position: relative; }
+.pet-pose { display: block; }
+.pet-pose-out { position: absolute; inset: 0; animation: pet-pose-out 0.2s ease forwards; pointer-events: none; }
+.pet-pose-out .pet-companion-img { margin: 0 auto; }
+.pet-pose-in { animation: pet-pose-in 0.2s ease; }
+@keyframes pet-pose-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pet-pose-out { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pet-pose-in, .pet-pose-out { animation: none; }
+  .pet-pose-out { display: none; }
+}

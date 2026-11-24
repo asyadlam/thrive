@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import PetCompanion from './PetCompanion';
+import PetCompanion, { type PetPose } from './PetCompanion';
 
 type Props = {
   title: string;
@@ -8,10 +8,12 @@ type Props = {
   back?: { to: string; label: string };
   /** Show the small companion pet at the top-right, next to the title (main section pages only). */
   pet?: boolean;
+  /** The header pet's pose (default when not given). */
+  petPose?: PetPose;
   children?: ReactNode;
 };
 
-export default function PageShell({ title, subtitle, back, pet, children }: Props) {
+export default function PageShell({ title, subtitle, back, pet, petPose, children }: Props) {
   return (
     <section className="page">
       {back && (
@@ -25,7 +27,7 @@ export default function PageShell({ title, subtitle, back, pet, children }: Prop
             <h1>{title}</h1>
             <p className="subtitle">{subtitle}</p>
           </div>
-          <PetCompanion size="small" />
+          <PetCompanion size="small" pose={petPose} />
         </div>
       ) : (
         <>

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
+import { useCelebration } from '../components/PetCompanion';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { formatLongDay, todayKey } from '../lib/journal';
 import GoalForm from '../components/GoalForm';
@@ -65,6 +66,7 @@ export default function JourneyPage() {
   const [confirm, setConfirm] = useState<Confirm>(null);
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState('');
+  const [petPose, celebrate] = useCelebration(); // a short celebration after a step is tried or the goal is reached
   const addInput = useRef<HTMLInputElement>(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [editingSwap, setEditingSwap] = useState<null | 'new' | string>(null);
@@ -120,6 +122,7 @@ export default function JourneyPage() {
 
   async function handleTried(step: JourneyStep) {
     if (await apply((j) => markTried(j, step.id))) {
+      celebrate();
       setReflection('');
       setReflecting(step.id); // optional "How did it go?"
     }
@@ -184,7 +187,13 @@ export default function JourneyPage() {
   const last = journey.steps.length - 1;
 
   return (
-    <PageShell title={journey.title} subtitle={journey.steps.length ? journeySummary(journey) : 'One thing you’re working on.'} back={back}>
+    <PageShell
+      title={journey.title}
+      subtitle={journey.steps.length ? journeySummary(journey) : 'One thing you’re working on.'}
+      back={back}
+      pet
+      petPose={petPose}
+    >
 
       {renaming ? (
         <form className="card positive-form list-rename" onSubmit={handleRename} noValidate>
@@ -292,7 +301,7 @@ export default function JourneyPage() {
                 </button>
               </div>
             ) : (
-              <button type="button" className="btn-primary journey-reached" onClick={() => apply((j) => setJourneyGoalReached(j, true))}>
+              <button type="button" className="btn-primary journey-reached" onClick={() => void apply((j) => setJourneyGoalReached(j, true)).then((ok) => ok && celebrate())}>
                 I reached it 🎉
               </button>
             )}

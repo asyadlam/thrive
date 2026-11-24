@@ -30,7 +30,7 @@ export default defineConfig({
           {
             urlPattern: ({ url }) => url.pathname.startsWith('/pets/'),
             handler: 'CacheFirst',
-            options: { cacheName: 'thrive-pets', expiration: { maxEntries: 10 } },
+            options: { cacheName: 'thrive-pets', expiration: { maxEntries: 20 } },
           },
           // The Nunito font (Google Fonts), so the app keeps its font offline.
           {
