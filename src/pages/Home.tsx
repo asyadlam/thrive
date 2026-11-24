@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import PetCompanion from '../components/PetCompanion';
+import { SYNC_NOTICE_TEXT, onSyncNotice, takeSyncNotice, type SyncNotice } from '../components/NewDevicePrompt';
 import { getQuickEntry, todayKey } from '../lib/journal';
 import { affirmationOfTheDay, positiveOfTheDay, timeGreeting } from '../lib/homeData';
 import type { AffirmationItem } from '../lib/affirmations';
@@ -13,6 +14,9 @@ export default function Home() {
   const [positive, setPositive] = useState<PositiveItem | null>(null);
   // Today's check-in said Rough or Low: the greeting pet is comforting for the rest of the day.
   const [comforting, setComforting] = useState(false);
+  // One small line after a login brought the cloud backup here (shown once, dismissible).
+  const [syncNotice, setSyncNotice] = useState<SyncNotice | null>(takeSyncNotice);
+  useEffect(() => onSyncNotice(() => setSyncNotice(takeSyncNotice())), []);
 
   useEffect(() => {
     let active = true;
@@ -37,6 +41,15 @@ export default function Home() {
     <section className="page home">
       {/* 1. Centered greeting (with the pet above it, if one is chosen) */}
       <div className="home-hero">{companion === 'none' ? greeting : <PetCompanion pose={comforting ? 'comforting' : 'default'}>{greeting}</PetCompanion>}</div>
+
+      {syncNotice && (
+        <p className="home-sync-note" role="status">
+          <span>{SYNC_NOTICE_TEXT[syncNotice]}</span>
+          <button type="button" className="home-sync-close" aria-label="Dismiss" onClick={() => setSyncNotice(null)}>
+            ×
+          </button>
+        </p>
+      )}
 
       {/* 2. Quick check-in */}
       <Link to="/journal/quick" className="home-checkin">
