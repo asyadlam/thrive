@@ -63,13 +63,14 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   const [lastBackupAt, setLastBackup] = useState(getLastBackupAt);
   const [busy, setBusy] = useState<'backup' | 'readable' | 'reading' | 'restoring' | 'merge-reading' | 'merging' | null>(null);
   const [mergePlan, setMergePlan] = useState<MergePlan | null>(null);
+  const [mergeFrom, setMergeFrom] = useState<'file' | 'cloud'>('file'); // where the plan came from (wording + where the result shows)
   const mergeInput = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<Message>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   // Cloud backup (only when logged in)
   const [signedIn, setSignedIn] = useState(false);
   const [lastCloud, setLastCloud] = useState<string | null>(getLastCloudBackupAt);
-  const [cloudBusy, setCloudBusy] = useState<null | 'backup' | 'reading'>(null);
+  const [cloudBusy, setCloudBusy] = useState<null | 'backup' | 'reading' | 'merge-reading'>(null);
   const [cloudMessage, setCloudMessage] = useState<Message>(null);
   const [confirmCloudReplace, setConfirmCloudReplace] = useState<string | null>(null);
   const [params, setParams] = useSearchParams();
@@ -244,6 +245,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
           )} already present).`,
         });
       } else {
+        setMergeFrom('file');
         setMergePlan(plan);
       }
     } catch (err) {
@@ -260,15 +262,16 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   async function handleMerge() {
     if (!mergePlan) return;
     setBusy('merging');
+    const show = mergeFrom === 'cloud' ? setCloudMessage : setMessage;
     try {
       await applyMerge(mergePlan);
-      setMessage({
+      show({
         kind: 'ok',
-        text: `Added ${describeCounts(mergePlan.added)}. Skipped ${plural(mergePlan.skipped, 'item', 'items')} already here.`,
+        text: `${mergeFrom === 'cloud' ? 'Merged from the cloud: added' : 'Added'} ${describeCounts(mergePlan.added)}. Skipped ${plural(mergePlan.skipped, 'item', 'items')} already here.`,
       });
       onRestored();
     } catch {
-      setMessage({ kind: 'error', text: "Adding didn't finish, so nothing was changed. Please try again." });
+      show({ kind: 'error', text: "Adding didn't finish, so nothing was changed. Please try again." });
     } finally {
       setMergePlan(null);
       setBusy(null);
@@ -368,6 +371,37 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     }
   }
 
+  /**
+   * Merge from cloud: download and check the cloud copy, then plan it with the very same merge as "Add a backup to my
+   * data" (planMerge / applyMerge). Nothing on this device is deleted; nothing changes until you tap Merge.
+   */
+  async function handleCloudMerge() {
+    setCloudBusy('merge-reading');
+    setCloudMessage(null);
+    setMessage(null);
+    try {
+      const copy = await fetchCloudBackup();
+      if (!copy) {
+        setCloudMessage({ kind: 'ok', text: 'There’s no cloud backup for this account yet.' });
+        return;
+      }
+      const plan = await planMerge(copy.backup);
+      if (totalAdded(plan.added) === 0) {
+        setCloudMessage({
+          kind: 'ok',
+          text: `Everything in your cloud backup is already here, so there's nothing to add (${plural(plan.skipped, 'item', 'items')} already present).`,
+        });
+        return;
+      }
+      setMergeFrom('cloud');
+      setMergePlan(plan);
+    } catch (err) {
+      setCloudMessage({ kind: 'error', text: err instanceof CloudError ? err.message : 'Couldn’t download your cloud backup. Please try again.' });
+    } finally {
+      setCloudBusy(null);
+    }
+  }
+
   return (
     <section className="card settings-section" aria-labelledby="my-data-heading">
       <h2 id="my-data-heading" className="settings-heading">
@@ -434,6 +468,9 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
             <button type="button" className="btn-secondary" onClick={() => void handleCloudRestore()} disabled={cloudBusy !== null || busy !== null}>
               {cloudBusy === 'reading' ? 'Checking…' : 'Restore from cloud'}
             </button>
+            <button type="button" className="btn-secondary" onClick={() => void handleCloudMerge()} disabled={cloudBusy !== null || busy !== null}>
+              {cloudBusy === 'merge-reading' ? 'Checking…' : 'Merge from cloud'}
+            </button>
           </div>
           <p className="hint cloud-last">
             Last cloud backup: <strong>{lastCloud ? cloudWhen(lastCloud) : 'Never'}</strong>
@@ -469,7 +506,20 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         />
       )}
 
-      {mergePlan && (
+      {mergePlan && mergeFrom === 'cloud' && (
+        <ConfirmDialog
+          title="Merge your cloud backup into this device?"
+          message="This adds what is in your cloud backup to what is already on this device. Nothing here is deleted, and duplicates are kept once."
+          confirmLabel="Merge"
+          busy={busy === 'merging'}
+          busyLabel="Merging…"
+          tone="gentle"
+          onConfirm={handleMerge}
+          onCancel={() => setMergePlan(null)}
+        />
+      )}
+
+      {mergePlan && mergeFrom === 'file' && (
         <ConfirmDialog
           title="Add this backup to your data?"
           message={`This will ADD anything from the backup that isn't already here. Nothing will be deleted or overwritten. It would add ${describeCounts(

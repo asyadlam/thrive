@@ -298,3 +298,68 @@ export async function deleteAccount(): Promise<void> {
   }
   welcomeAgain('deleted');
 }
+
+/* ---------------- Continue with Google ---------------- */
+
+/** Set just before leaving for Google; holds where to come back to ("/" or "/settings"). */
+const GOOGLE_PENDING_KEY = 'thrive.googlePending';
+/** Set when a Google sign-in didn't finish, so the form can say so once. */
+const GOOGLE_FAILED_KEY = 'thrive.googleFailed';
+export const GOOGLE_FAILED_MESSAGE = 'Google sign-in didn’t finish. You can try again, or use your email instead.';
+
+/** True while we're coming back from Google (the app waits a moment before showing anything). */
+export const hasGooglePending = () => !!recall(GOOGLE_PENDING_KEY);
+
+/** Leaves for Google's sign-in page; Supabase brings the person back to `back` in this app. */
+export async function signInWithGoogle(back: '/' | '/settings'): Promise<void> {
+  const sb = await supabase();
+  if (!sb) throw new CloudError('Accounts aren’t set up for this app yet.');
+  remember(GOOGLE_PENDING_KEY, back);
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: `${window.location.origin}${back}` },
+  });
+  if (error) {
+    forget(GOOGLE_PENDING_KEY);
+    throw new CloudError(GOOGLE_FAILED_MESSAGE);
+  }
+}
+
+function forget(key: string) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    /* nothing to forget */
+  }
+}
+
+/**
+ * Back from Google: let Supabase read the result from the address, then either the person is logged in (exactly
+ * like an email login) or the sign-in didn't finish (cancelled or failed) and the form will say so.
+ */
+export async function completeGoogleSignIn(): Promise<'signed-in' | 'failed'> {
+  forget(GOOGLE_PENDING_KEY);
+  let ok = false;
+  try {
+    ok = !!(await getSession());
+  } catch {
+    ok = false;
+  }
+  // Tidy the address: no tokens or error details left in it.
+  if (window.location.hash || window.location.href.endsWith('#') || /[?&](error|code)=/.test(window.location.search)) {
+    window.history.replaceState(null, '', window.location.pathname);
+  }
+  if (ok) {
+    rememberWelcomeChoice('account');
+    return 'signed-in';
+  }
+  remember(GOOGLE_FAILED_KEY, '1');
+  return 'failed';
+}
+
+/** The "didn't finish" message, shown once by the account form after a failed Google sign-in. */
+export function takeGoogleFailure(): string | null {
+  if (!recall(GOOGLE_FAILED_KEY)) return null;
+  forget(GOOGLE_FAILED_KEY);
+  return GOOGLE_FAILED_MESSAGE;
+}
