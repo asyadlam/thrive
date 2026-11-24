@@ -23,12 +23,15 @@ import {
   BUCKETLIST_STORE,
   LISTS_STORE,
   POSITIVES_STORE,
+  GOALS_STORE,
+  HABITS_STORE,
   idbGetAll,
   idbPutMany,
 } from './db';
 import { talkSummariesOf, withSummaryList, type JournalEntry } from './journal';
 import type { UserList } from './lists';
 import type { MeasurementKind } from './profile';
+import { STARTER_LISTS } from './listParts';
 import { listJourneys, type Journey } from './journeys';
 
 export type MergeCounts = {
@@ -236,6 +239,21 @@ export async function planMerge(backup: CheckedBackup): Promise<MergePlan> {
 
 /** Add everything in the plan, all in one step. */
 export const applyMerge = (plan: MergePlan) => idbPutMany(plan.writes);
+
+/**
+ * Does this device hold any Thrive data of its own (for the new-device prompt)? Every fresh device starts with the
+ * four empty starter lists, so those only count once they have items; any other record in any store counts.
+ */
+export async function deviceHasOwnData(): Promise<boolean> {
+  const stores = [
+    JOURNAL_STORE, DREAMS_STORE, GOALS_STORE, POSITIVES_STORE, LETTERS_STORE, AFFIRMATIONS_STORE, HABITS_STORE,
+    JOURNEYS_STORE, MEMORIES_STORE, MEASUREMENTS_STORE, ROUTINE_STORE, WISHLIST_STORE, BUCKETLIST_STORE,
+    HEALTH_STORE, MEDICATIONS_STORE,
+  ];
+  for (const store of stores) if ((await idbGetAll(store)).length > 0) return true;
+  const starters = new Set(STARTER_LISTS.map((s) => s.id));
+  return (await idbGetAll<UserList>(LISTS_STORE)).some((l) => !starters.has(l.id) || (l.items?.length ?? 0) > 0);
+}
 
 export const totalAdded = (c: MergeCounts) => Object.values(c).reduce((a, b) => a + b, 0);
 

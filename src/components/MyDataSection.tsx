@@ -63,7 +63,8 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   const [lastBackupAt, setLastBackup] = useState(getLastBackupAt);
   const [busy, setBusy] = useState<'backup' | 'readable' | 'reading' | 'restoring' | 'merge-reading' | 'merging' | null>(null);
   const [mergePlan, setMergePlan] = useState<MergePlan | null>(null);
-  const [mergeFrom, setMergeFrom] = useState<'file' | 'cloud'>('file'); // where the plan came from (wording + where the result shows)
+  const [mergeFrom, setMergeFrom] = useState<'file' | 'cloud'>('file');
+  const [cloudMergeAt, setCloudMergeAt] = useState<string | null>(null); // the cloud copy being merged // where the plan came from (wording + where the result shows)
   const mergeInput = useRef<HTMLInputElement>(null);
   const [message, setMessage] = useState<Message>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -265,6 +266,10 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
     const show = mergeFrom === 'cloud' ? setCloudMessage : setMessage;
     try {
       await applyMerge(mergePlan);
+      if (mergeFrom === 'cloud' && cloudMergeAt) {
+        await markRestoredFromCloud(cloudMergeAt); // this device has now taken data from this account
+        setLastCloud(cloudMergeAt);
+      }
       show({
         kind: 'ok',
         text: `${mergeFrom === 'cloud' ? 'Merged from the cloud: added' : 'Added'} ${describeCounts(mergePlan.added)}. Skipped ${plural(mergePlan.skipped, 'item', 'items')} already here.`,
@@ -394,6 +399,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
         return;
       }
       setMergeFrom('cloud');
+      setCloudMergeAt(copy.updatedAt);
       setMergePlan(plan);
     } catch (err) {
       setCloudMessage({ kind: 'error', text: err instanceof CloudError ? err.message : 'Couldn’t download your cloud backup. Please try again.' });
