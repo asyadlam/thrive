@@ -28,8 +28,6 @@ export default function Settings() {
 
   return (
     <PageShell title="Settings" subtitle="Make Thrive your own.">
-      <AccountSection />
-
       <section className="card settings-section" aria-labelledby="about-heading">
         <h2 id="about-heading" className="settings-heading">
           About you
@@ -181,6 +179,8 @@ export default function Settings() {
           setStatus('idle');
         }}
       />
+
+      <AccountSection />
 
       <footer className="quiet-footer">
         <Link to="/privacy">Privacy</Link>

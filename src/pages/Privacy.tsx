@@ -1,7 +1,7 @@
 import PageShell from '../components/PageShell';
 
 /** Where questions about privacy go. Replace the placeholder with your real contact address. */
-const CONTACT_EMAIL = '[CONTACT EMAIL]';
+const CONTACT_EMAIL = 'thrive.safespace@gmail.com';
 
 /**
  * /privacy — a short, plain-words privacy page. Reachable from the Welcome screen footer (shown on its own, before
