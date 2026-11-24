@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Welcome from './pages/Welcome';
 import { WELCOME_EVENT, completeGoogleSignIn, hasGooglePending, needsWelcome } from './lib/cloud';
 import Layout from './components/Layout';
@@ -24,6 +24,7 @@ import Learn from './pages/Learn';
 import Settings from './pages/Settings';
 import MemoryPage from './pages/MemoryPage';
 import Help from './pages/Help';
+import Privacy from './pages/Privacy';
 
 export default function App() {
   // One-time Welcome: only until the person logs in or chooses local-only use on this device.
@@ -31,6 +32,7 @@ export default function App() {
   // Coming back from "Continue with Google": wait for the result before showing anything (no flash of Welcome).
   const [returning, setReturning] = useState(hasGooglePending);
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   useEffect(() => {
     if (!returning) return;
     void completeGoogleSignIn().then((result) => {
@@ -49,6 +51,16 @@ export default function App() {
     return () => window.removeEventListener(WELCOME_EVENT, show);
   }, []);
   if (returning) return <div className="app-returning" aria-busy="true" />;
+  if (welcome && pathname === '/privacy') {
+    // Opened from the Welcome screen footer: shown on its own, before any choice is made.
+    return (
+      <main className="welcome">
+        <div className="welcome-inner">
+          <Privacy fromWelcome />
+        </div>
+      </main>
+    );
+  }
   if (welcome) {
     return (
       <Welcome
@@ -99,6 +111,7 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="settings/memory" element={<MemoryPage />} />
         <Route path="help" element={<Help />} />
+        <Route path="privacy" element={<Privacy />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

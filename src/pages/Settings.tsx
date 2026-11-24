@@ -181,6 +181,10 @@ export default function Settings() {
           setStatus('idle');
         }}
       />
+
+      <footer className="quiet-footer">
+        <Link to="/privacy">Privacy</Link>
+      </footer>
     </PageShell>
   );
 }

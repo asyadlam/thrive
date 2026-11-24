@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { AccountForm } from '../components/AccountSection';
 import { useState } from 'react';
 import { rememberWelcomeChoice, welcomeReason } from '../lib/cloud';
@@ -44,6 +45,10 @@ export default function Welcome({ onDone }: { onDone: () => void }) {
             restored. You can create an account anytime in Settings.
           </p>
         </div>
+
+        <footer className="quiet-footer">
+          <Link to="/privacy">Privacy</Link>
+        </footer>
       </div>
     </main>
   );

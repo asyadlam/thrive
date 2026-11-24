@@ -1988,3 +1988,12 @@ select.input { appearance: auto; }
   color: var(--ink-soft);
   cursor: pointer;
 }
+
+/* Privacy page + the quiet "Privacy" link (Welcome footer, bottom of Settings) */
+.quiet-footer { display: flex; justify-content: center; padding: 8px 0 4px; margin-top: 8px; }
+.quiet-footer a { color: var(--ink-soft); font-size: 0.9rem; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.privacy-card { display: flex; flex-direction: column; gap: 18px; }
+.privacy-card section h2 { margin: 0 0 4px; font-size: 1rem; font-weight: 700; color: var(--ink); }
+.privacy-card section p { margin: 0; color: var(--ink-soft); line-height: 1.5; }
+.privacy-card a { color: var(--green-700); font-weight: 600; }
+.welcome-inner .page { padding: 0; }
