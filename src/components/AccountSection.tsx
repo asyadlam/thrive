@@ -196,6 +196,17 @@ export default function AccountSection() {
       <h2 id="account-heading" className="settings-heading">
         Account
       </h2>
+      {(checked || !cloudAvailable()) && (
+        <p className="account-status" role="status">
+          {email ? (
+            <>
+              Signed in as <strong className="account-email">{email}</strong>
+            </>
+          ) : (
+            'Device only, no account.'
+          )}
+        </p>
+      )}
 
       {!cloudAvailable() ? (
         <p className="hint">Accounts aren't set up for this version of Thrive. Everything works on this device without one.</p>
@@ -203,9 +214,6 @@ export default function AccountSection() {
         <p className="hint">Loading…</p>
       ) : email ? (
         <>
-          <p className="hint">
-            Logged in as <strong className="account-email">{email}</strong>. You can back up to the cloud in My data below.
-          </p>
           <div className="data-actions">
             <button type="button" className="btn-secondary" onClick={() => void out()} disabled={busy}>
               {busy ? 'Logging out…' : 'Log out'}
@@ -224,11 +232,7 @@ export default function AccountSection() {
         </>
       ) : (
         <>
-          <p className="hint account-local">You are using Thrive on this device only.</p>
-          <p className="hint">
-            Optional. An account lets you keep a cloud backup of your Thrive. Without one, everything stays on this device, just as it
-            does now.
-          </p>
+          <p className="hint">Optional. An account keeps a cloud backup of your Thrive.</p>
           <AccountForm onSignedIn={() => setMessage('')} googleBack="/settings" />
         </>
       )}

@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ConfirmDialog from './ConfirmDialog';
 import {
   cloudAvailable,
   cloudBackupInfo,
@@ -10,7 +9,7 @@ import {
   markRestoredFromCloud,
   onSessionChange,
 } from '../lib/cloud';
-import { formatLongDay, formatTime, todayKey } from '../lib/journal';
+import { backupWhen } from './MyDataSection';
 import { applyMerge, describeCounts, deviceHasOwnData, planMerge, totalAdded } from '../lib/merge';
 
 /** Remembered on this device once the person makes a choice: the prompt never shows here again. */
@@ -37,9 +36,9 @@ type Result = { kind: 'ok' | 'error'; text: string };
 /**
  * "New device" prompt. Shown once per device, only when someone is logged in, their account has a cloud backup,
  * and this device hasn't taken data from that account yet (never restored, merged or backed up to it).
- *  - Empty device: "Restore my backup" (the usual Restore from cloud, with its confirm) or "Not now".
- *  - Device with its own data: "Merge the backup in" (the same merge as "Add a backup to my data"), "Replace with
- *    the backup" (the usual Restore from cloud, with its "cloud copy wins" confirm) or "Not now".
+ *  - Device with its own data: "Merge them" (the same merge as "Add a file to my data"), "Use backup only" (the
+ *    usual Restore from cloud, with its calm Replace confirm) or "Not now".
+ *  - Empty device (merge and restore are the same there): "Restore my backup" or "Not now".
  * Any choice is remembered on this device.
  */
 export default function NewDevicePrompt() {
@@ -72,7 +71,7 @@ export default function NewDevicePrompt() {
   }, []);
 
   useEffect(() => {
-    if (!offer?.hasData || merging) return;
+    if (!offer || merging) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && notNow();
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
@@ -108,11 +107,11 @@ export default function NewDevicePrompt() {
         kind: 'ok',
         text:
           totalAdded(plan.added) > 0
-            ? `Added ${describeCounts(plan.added)}. Skipped ${plan.skipped} ${plan.skipped === 1 ? 'item' : 'items'} already here. Everything that was on this device is still here.`
-            : 'Everything in your cloud backup is already on this device, so there was nothing to add.',
+            ? `Added ${describeCounts(plan.added)} from your backup. Everything that was here is still here.`
+            : 'Everything in your backup was already here.',
       });
     } catch {
-      setResult({ kind: 'error', text: 'The merge didn’t finish, so nothing on this device was changed. Please try again.' });
+      setResult({ kind: 'error', text: 'Merging didn’t finish, so nothing here was changed. Please try again.' });
     } finally {
       setMerging(false);
     }
@@ -122,7 +121,7 @@ export default function NewDevicePrompt() {
     return (
       <div className="dialog-backdrop">
         <div className="dialog" role="alertdialog" aria-modal="true" aria-labelledby="nd-result-title" aria-describedby="nd-result-message">
-          <h2 id="nd-result-title">{result.kind === 'ok' ? 'Merged from your cloud backup' : 'Not merged'}</h2>
+          <h2 id="nd-result-title">{result.kind === 'ok' ? 'All together now' : 'Not merged yet'}</h2>
           <p id="nd-result-message">{result.text}</p>
           <div className="dialog-actions">
             <button
@@ -140,21 +139,7 @@ export default function NewDevicePrompt() {
 
   if (!offer) return null;
 
-  const when = `${formatLongDay(todayKey(new Date(offer.backupAt)))} at ${formatTime(offer.backupAt)}`;
-
-  if (!offer.hasData) {
-    return (
-      <ConfirmDialog
-        title="Welcome back"
-        message={`This device doesn't have your Thrive on it yet. Your cloud backup from ${when} is ready.`}
-        confirmLabel="Restore my backup"
-        cancelLabel="Not now"
-        tone="gentle"
-        onConfirm={replace}
-        onCancel={notNow}
-      />
-    );
-  }
+  const when = backupWhen(offer.backupAt);
 
   return (
     <div className="dialog-backdrop" onClick={merging ? undefined : notNow}>
@@ -166,22 +151,34 @@ export default function NewDevicePrompt() {
         aria-describedby="nd-message"
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 id="nd-title">Welcome back</h2>
-        <p id="nd-message">This device has its own Thrive data, and your account also has a cloud backup from {when}. What would you like to do?</p>
+        <h2 id="nd-title">Your backup is here</h2>
+        <p id="nd-message">
+          {offer.hasData
+            ? `You are signed in on this device. Your cloud backup from ${when} can join what is on this device.`
+            : `You are signed in on this device. Your cloud backup from ${when} is ready.`}
+        </p>
         <div className="new-device-actions">
-          <button type="button" className="btn-primary" onClick={() => void merge()} disabled={merging}>
-            {merging ? 'Merging…' : 'Merge the backup in'}
-          </button>
-          <button type="button" className="btn-secondary" onClick={replace} disabled={merging}>
-            Replace with the backup
-          </button>
-          <button type="button" className="btn-secondary new-device-later" onClick={notNow} disabled={merging}>
+          {offer.hasData ? (
+            <>
+              <button type="button" className="choice-btn choice-btn-main" onClick={() => void merge()} disabled={merging}>
+                <strong>{merging ? 'Merging…' : 'Merge them'}</strong>
+                <span>Keeps everything here and adds your backup.</span>
+              </button>
+              <button type="button" className="choice-btn" onClick={replace} disabled={merging}>
+                <strong>Use backup only</strong>
+                <span>Replaces what is here with your backup.</span>
+              </button>
+            </>
+          ) : (
+            <button type="button" className="choice-btn choice-btn-main" onClick={replace}>
+              <strong>Restore my backup</strong>
+              <span>Brings your backup onto this device.</span>
+            </button>
+          )}
+          <button type="button" className="new-device-later" onClick={notNow} disabled={merging}>
             Not now
           </button>
         </div>
-        <p className="hint new-device-note">
-          Merge keeps everything on this device and adds the backup. Replace removes what's here and uses only the backup.
-        </p>
       </div>
     </div>
   );

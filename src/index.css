@@ -1939,5 +1939,52 @@ select.input { appearance: auto; }
 
 /* New-device prompt with three choices (device already has its own data) */
 .new-device-actions { display: flex; flex-direction: column; gap: 10px; }
-.new-device-actions button { width: 100%; }
-.dialog .new-device-note { margin: 14px 0 0; font-size: 0.88rem; }
+
+/* Backup redesign: two My data cards, calm status lines, device prompt choices */
+.data-status { margin: 0; color: var(--ink); font-size: 0.98rem; font-weight: 600; }
+.data-card > .hint { margin-top: 0; }
+.data-quiet-link {
+  align-self: center;
+  background: none;
+  border: 0;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.data-quiet-link:disabled { opacity: 0.6; cursor: default; }
+.account-status { margin: 0; color: var(--ink); font-weight: 600; }
+.account-status .account-email { word-break: break-all; }
+.choice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  text-align: left;
+  padding: 14px 18px;
+  border-radius: 18px;
+  border: 1.5px solid var(--stone);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+.choice-btn strong { font-size: 1.02rem; color: var(--green-700); }
+.choice-btn span { font-size: 0.88rem; color: var(--ink-soft); }
+.choice-btn-main { background: var(--tint-sage); border-color: var(--green-300); }
+.choice-btn:disabled { opacity: 0.7; cursor: default; }
+.new-device-later {
+  align-self: center;
+  background: none;
+  border: 0;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
