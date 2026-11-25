@@ -3,7 +3,7 @@
   shows). Both the Daily Sprout page and the voice assistant use these, so a change made either way is identical.
 */
 import { LISTS_STORE, idbDelete, idbGetAll } from './db';
-import { todayKey } from './journal';
+import { LIMITS, getQuickEntry, saveQuickEntry, todayKey, type Mood } from './journal';
 import { notifyDataChanged } from './dataEvents';
 import {
   FOOD_CALORIES_MAX,
@@ -142,4 +142,24 @@ export function dayName(key: string): string {
   if (key === shiftDay(today, 1)) return 'Tomorrow';
   if (key === shiftDay(today, -1)) return 'Yesterday';
   return new Date(`${key}T12:00:00`).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+}
+
+/* ---------- Quick entry mood (the same entry as Daily Sprout's Quick entry) ---------- */
+
+/**
+ * Sets a day's quick entry mood, keeping everything else in it. With a note: if the entry has no note yet it
+ * becomes the note; if it has one, the new sentence is added after it (nothing already written is replaced).
+ */
+export async function setQuickMood(date: string, mood: Mood, note?: string): Promise<'set' | 'set+note'> {
+  const existing = await getQuickEntry(date);
+  const add = note?.trim() ?? '';
+  const current = existing?.note?.trim() ?? '';
+  const nextNote = !add ? (existing?.note ?? '') : current && !current.includes(add) ? `${current}\n${add}` : current || add;
+  await saveQuickEntry(
+    date,
+    { mood, positives: existing?.positives ?? [], note: nextNote.slice(0, LIMITS.note), intention: existing?.intention ?? '' },
+    existing,
+  );
+  notifyDataChanged();
+  return add ? 'set+note' : 'set';
 }

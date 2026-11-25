@@ -2124,11 +2124,29 @@ select.input { appearance: auto; }
 
 /* ================= Floating voice assistant ================= */
 .app-main.has-fab { padding-bottom: calc(var(--nav-h) + var(--safe-b) + 88px); } /* room so the button never covers the last thing */
-.assistant-fab {
+
+/* Daily Sprout: a ticked box is filled sage so its white ✓ shows (stretch and to-dos, like medications) */
+.sprout-check input:checked + .list-check,
+.sprout-card .list-item.taken .list-check { background: var(--green-500); border-color: var(--green-500); }
+
+/* Daily Sprout: "Little sprout for the day:" at the top */
+.sprout-intention { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px; }
+.sprout-intention label { font-weight: 700; color: var(--green-700); }
+.sprout-intention .input { background: #fff; }
+
+/* ================= Ask Thrive: voice only, results as toasts ================= */
+.assistant-dock {
   position: fixed;
   z-index: 30;
   right: max(16px, calc(50vw - 280px + 16px)); /* inside the app column on wide screens */
   bottom: calc(var(--nav-h) + var(--safe-b) + 14px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.assistant-state { padding: 6px 12px; border-radius: 999px; background: #fff; color: var(--green-700); font-weight: 700; font-size: 0.9rem; box-shadow: var(--card-shadow); }
+.assistant-fab {
+  position: relative;
   width: 56px;
   height: 56px;
   border: 0;
@@ -2142,44 +2160,56 @@ select.input { appearance: auto; }
 }
 .assistant-fab svg { width: 26px; height: 26px; }
 .assistant-fab:focus-visible { outline: 3px solid var(--green-700); outline-offset: 3px; }
+.assistant-fab:disabled { cursor: default; }
+.assistant-fab.working { opacity: 0.75; }
+.assistant-fab.listening { background: var(--green-700); }
+.assistant-fab.listening::before,
+.assistant-fab.listening::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px solid var(--green-500);
+  animation: assistant-pulse 1.6s ease-out infinite;
+  pointer-events: none;
+}
+.assistant-fab.listening::after { animation-delay: 0.8s; }
+@keyframes assistant-pulse { from { transform: scale(1); opacity: 0.8; } to { transform: scale(1.7); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .assistant-fab.listening::before, .assistant-fab.listening::after { animation: none; transform: scale(1.18); opacity: 0.7; }
+}
 
-.assistant-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(67, 82, 60, 0.28); display: flex; align-items: flex-end; justify-content: center; }
-.assistant-panel {
-  width: 100%;
-  max-width: 560px;
-  max-height: min(72vh, 620px);
+.assistant-toasts {
+  position: fixed;
+  z-index: 35;
+  top: calc(var(--safe-t) + 68px); /* just under the header, top right */
+  right: max(12px, calc(50vw - 280px + 12px));
+  width: min(300px, calc(100vw - 24px));
+  margin: 0;
+  padding: 0;
+  list-style: none;
   display: flex;
   flex-direction: column;
-  background: var(--cream);
-  border-radius: 24px 24px 0 0;
-  box-shadow: 0 -8px 30px rgba(67, 82, 60, 0.18);
-  padding: 14px 16px calc(14px + var(--safe-b));
-  animation: assistant-up 0.22s ease-out;
+  gap: 8px;
+  pointer-events: none;
 }
-@keyframes assistant-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .assistant-panel { animation: none; } }
-.assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.assistant-head h2 { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--ink); }
-.assistant-close { width: 40px; height: 40px; border: 0; border-radius: 50%; background: #fff; color: var(--ink-soft); font-size: 1.4rem; line-height: 1; cursor: pointer; }
-.assistant-close:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
-.assistant-messages { flex: 1; min-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px 2px; }
-.assistant-intro { margin: 0; color: var(--ink-soft); font-size: 0.95rem; line-height: 1.45; }
-.assistant-bubble { margin: 0; max-width: 85%; padding: 10px 14px; border-radius: 18px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
-.assistant-bubble.from-me { align-self: flex-end; background: var(--green-700); color: #fff; border-bottom-right-radius: 6px; }
-.assistant-bubble.from-thrive { align-self: flex-start; background: #fff; color: var(--ink); border-bottom-left-radius: 6px; box-shadow: var(--card-shadow); }
-.assistant-typing { color: var(--ink-soft); letter-spacing: 2px; }
-.assistant-form { display: flex; flex-direction: column; gap: 6px; }
-.assistant-row { display: flex; align-items: flex-end; gap: 8px; }
-.assistant-input { flex: 1; min-width: 0; resize: none; max-height: 120px; }
-.assistant-form .dictation { justify-content: flex-end; min-height: 40px; }
-.assistant-form .dictation-status { flex: 1; margin: 0; text-align: left; }
-textarea.input.assistant-input { height: 48px; min-height: 48px; padding-top: 12px; padding-bottom: 12px; resize: none; }
-
-/* Daily Sprout: a ticked box is filled sage so its white ✓ shows (stretch and to-dos, like medications) */
-.sprout-check input:checked + .list-check,
-.sprout-card .list-item.taken .list-check { background: var(--green-500); border-color: var(--green-500); }
-
-/* Daily Sprout: "Little sprout for the day:" at the top */
-.sprout-intention { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px; }
-.sprout-intention label { font-weight: 700; color: var(--green-700); }
-.sprout-intention .input { background: #fff; }
+.assistant-toasts li { pointer-events: auto; animation: assistant-toast-in 0.2s ease-out; }
+@keyframes assistant-toast-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .assistant-toasts li { animation: none; } }
+.assistant-toast {
+  width: 100%;
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid var(--stone);
+  border-left: 4px solid var(--green-500);
+  border-radius: 14px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  box-shadow: 0 6px 18px rgba(67, 82, 60, 0.14);
+  cursor: pointer;
+}
+.assistant-toast.question { border-left-color: var(--green-700); background: var(--tint-sage); font-weight: 600; }
+.assistant-toast:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
