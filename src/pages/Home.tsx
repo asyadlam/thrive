@@ -51,10 +51,10 @@ export default function Home() {
         </p>
       )}
 
-      {/* 2. Quick check-in */}
+      {/* 2. My daily little sprout */}
       <Link to="/sprout" className="home-checkin">
-        <span className="home-checkin-title">Quick check-in</span>
-        <span className="home-checkin-sub">How are you, a short note, one small plan</span>
+        <span className="home-checkin-title">My daily little sprout</span>
+        <span className="home-checkin-sub">One small page for today</span>
       </Link>
 
       {/* 3. Today's affirmation — opens the Affirmations page */}
