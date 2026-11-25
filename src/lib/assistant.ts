@@ -5,7 +5,7 @@
   happened. Nothing here is saved: the chat lives only in the open panel.
 */
 import { isValidDayKey } from './calendar';
-import { MOODS, getQuickEntry, todayKey, type Mood } from './journal';
+import { LIMITS, MOODS, getQuickEntry, todayKey, type Mood } from './journal';
 import { INTENTION_MAX, MED_NAME_MAX, MED_TIMING_MAX, addMedication, getHealthDay, listMedications, type Medication } from './health';
 import { addStandalonePositive } from './positives';
 import { notifyDataChanged } from './dataEvents';
@@ -18,7 +18,7 @@ import {
   setExercise,
   setIntention,
   setMedTaken,
-  setQuickMood,
+  updateQuickEntry,
   setStretch,
   setSteps,
   setTodoDone,
@@ -88,10 +88,11 @@ export async function askAssistant(page: string, day: string, chat: AssistantMes
   const say = typeof data.say === 'string' ? data.say.trim() : '';
   const asking = !!say && (data.ask === true || /\?\s*$/.test(say));
   const said = chat.filter((m) => m.role === 'user').map((m) => m.content).join(' ');
-  const lines = actions.length ? await runActions(actions, said, medications) : [];
+  const run = actions.length ? await runActions(actions, said, medications) : { lines: [], needMood: null };
+  const lines = run.lines;
   if (say) lines.push(say); // what it couldn't do, or the question it needs answered
   if (!lines.length) lines.push('Sorry, I didn’t catch that. Could you say it another way?');
-  return { lines, question: asking ? say : null };
+  return { lines, question: asking ? say : run.needMood };
 }
 
 /* -------------------------------------------- carrying out actions -------------------------------------------- */
@@ -147,8 +148,9 @@ const moodOf = (v: unknown): Mood | null => MOODS.find((m) => m.toLowerCase() ==
  * Runs every action and returns one short line for each: what was done, or — when an action can't be done —
  * a plain sentence saying so. Nothing is ever skipped silently.
  */
-async function runActions(actions: unknown[], said: string, meds: Medication[]): Promise<string[]> {
+async function runActions(actions: unknown[], said: string, meds: Medication[]): Promise<{ lines: string[]; needMood: string | null }> {
   const numbers = numbersSaid(said);
+  let needMood: string | null = null;
   const out: string[] = [];
   const foods: Record<string, string[]> = {};
   const noDay = 'I couldn’t tell which day you meant for one part, so I left it. Could you say the day?';
@@ -256,14 +258,24 @@ async function runActions(actions: unknown[], said: string, meds: Medication[]):
           out.push(taken ? `Checked off ${med.name} ${forDay(date)}.` : `Unchecked ${med.name} ${forDay(date)}.`);
           break;
         }
-        case 'set_mood': {
+        case 'set_mood': // older name: mood (and note) only
+        case 'set_quick_entry': {
           const date = dateOf(a.date);
-          const mood = moodOf(a.mood);
           if (!date) { out.push(noDay); break; }
-          if (!mood) { out.push('I couldn’t match that feeling to one of the moods. Could you say it another way?'); break; }
-          const result = await setQuickMood(date, mood, str(a.note, 500));
-          out.push(`Set ${onDay(date)}’s mood to ${mood}.`);
-          if (result === 'set+note') out.push(`Saved your note in ${onDay(date)}’s quick entry.`);
+          const mood = moodOf(a.mood);
+          if (str(a.mood, 20) && !mood) out.push('I couldn’t match that feeling to one of the moods.');
+          const note = str(a.note, LIMITS.note);
+          const intention = str(a.intention, LIMITS.intention).replace(/^(tomorrow\s*)?i('|’)ll try\s*/i, '');
+          if (!mood && !note && !intention) break;
+          const result = await updateQuickEntry(date, { mood, note, intention });
+          if (!result.saved) {
+            // A quick entry needs a mood first: ask, and the answer (next recording) saves it all.
+            needMood = `How did ${onDay(date)} feel overall? Tell me and I’ll save it in your quick entry.`;
+            break;
+          }
+          if (result.mood && mood) out.push(`Set ${onDay(date)}’s mood to ${mood}.`);
+          if (result.note) out.push(`Added that to ${onDay(date)}’s quick entry note${result.trimmed ? ' (the note was full, so the end was cut off)' : ''}.`);
+          if (result.intention) out.push(`Set ${onDay(date)}’s intention for tomorrow: ${intention.replace(/[.!]+$/, '')}.`);
           break;
         }
         case 'set_intention': {
@@ -293,5 +305,6 @@ async function runActions(actions: unknown[], said: string, meds: Medication[]):
   for (const [date, list] of Object.entries(foods)) {
     out.push(`Logged ${list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`} ${forDay(date)}.`);
   }
-  return out;
+  if (needMood) out.push(needMood);
+  return { lines: out, needMood };
 }

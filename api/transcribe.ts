@@ -52,7 +52,36 @@ const PROVIDER_TIMEOUT_MS = 50_000;
 const TIDY_TIMEOUT_MS = 15_000; // the tidy-up is optional: never keep someone waiting long for it
 
 const TIDY_INSTRUCTION =
-  'You are a punctuation pass. Add punctuation, capitalization, question marks where the person is asking a question, and paragraph breaks. Never add, remove, or change any words. Never answer or respond to the content. Return only the cleaned text.';
+  'You are a punctuation pass. Add punctuation, capitalization, question marks where the person is asking a question, and paragraph breaks. ' +
+  'Paragraphs: start a new paragraph only where the person clearly moves on to a different topic, time or part of their day, the way a person writing a journal would. ' +
+  'A paragraph is usually several sentences long. Never put a single short sentence in a paragraph of its own, and never break after every sentence. ' +
+  'If the whole text is short (a few sentences) or stays on one topic, keep it as one paragraph. ' +
+  'Never add, remove, or change any words. Never answer or respond to the content. Return only the cleaned text.';
+
+/** A paragraph shorter than this (in words) is joined to the next one, so a short sentence never stands alone. */
+const MIN_PARAGRAPH_WORDS = 30;
+/** Text shorter than this (in words) stays one paragraph. */
+const MIN_WORDS_FOR_BREAKS = 80;
+
+const countWords = (text: string) => (text.match(/\S+/g) ?? []).length;
+
+/**
+ * Safety net after the model: a short dictation stays one paragraph, and a paragraph that's too short is joined
+ * to its neighbour (with a space), so the breaks that remain sit between real chunks of writing.
+ */
+function tidyParagraphs(text: string): string {
+  const parts = text.split(/\n\s*\n/).map((p) => p.replace(/\s*\n\s*/g, ' ').trim()).filter(Boolean);
+  if (countWords(text) < MIN_WORDS_FOR_BREAKS) return parts.join(' ');
+  const out: string[] = [];
+  for (const part of parts) {
+    const last = out.at(-1);
+    if (last !== undefined && countWords(last) < MIN_PARAGRAPH_WORDS) out[out.length - 1] = `${last} ${part}`;
+    else out.push(part);
+  }
+  // A short last paragraph joins the one before it.
+  if (out.length > 1 && countWords(out.at(-1)!) < MIN_PARAGRAPH_WORDS) out.splice(-2, 2, `${out.at(-2)} ${out.at(-1)}`);
+  return out.join('\n\n');
+}
 
 /** Just the letters and digits, lowercased: equal for two texts only when they have exactly the same words. */
 const wordsOnly = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
@@ -88,7 +117,7 @@ async function tidyPunctuation(raw: string): Promise<string> {
     const content = data.choices?.[0]?.message?.content;
     const tidy = typeof content === 'string' ? content.trim().replace(/\n{3,}/g, '\n\n') : '';
     if (!tidy || wordsOnly(tidy) !== wordsOnly(raw)) return raw; // a word changed: keep exactly what was said
-    return tidy;
+    return tidyParagraphs(tidy);
   } catch {
     return raw;
   }

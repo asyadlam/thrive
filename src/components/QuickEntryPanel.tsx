@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import EntryForm from './EntryForm';
 import EntryView from './EntryView';
 import ConfirmDialog from './ConfirmDialog';
@@ -18,6 +18,8 @@ export default function QuickEntryPanel({ date }: { date: string }) {
   const [justSaved, setJustSaved] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  // True only while I've chosen to edit (tapped Edit); the empty-day form isn't counted.
+  const userEditing = useRef(false);
 
   async function handleDelete() {
     if (!entry) return;
@@ -38,7 +40,9 @@ export default function QuickEntryPanel({ date }: { date: string }) {
       .then((saved) => {
         if (!active) return;
         setEntry(saved);
-        if (!saved) setEditing(true); // nothing yet: show the form (an open edit is left alone on a refresh)
+        // Nothing yet: show the form. An entry arrived (e.g. from Ask Thrive): show it, unless I'm editing it myself.
+        if (!saved) setEditing(true);
+        else if (!userEditing.current) setEditing(false);
         setStatus('ready');
       })
       .catch(() => active && setStatus('error'));
@@ -50,12 +54,14 @@ export default function QuickEntryPanel({ date }: { date: string }) {
   useEffect(() => {
     setJustSaved(false);
     setEditing(false);
+    userEditing.current = false;
   }, [date]);
 
   async function handleSave(draft: QuickDraft) {
     const saved = await saveQuickEntry(date, draft, entry);
     setEntry(saved);
     setEditing(false);
+    userEditing.current = false;
     setJustSaved(true);
   }
 
@@ -72,10 +78,10 @@ export default function QuickEntryPanel({ date }: { date: string }) {
       )}
       {status === 'ready' &&
         (editing || !entry ? (
-          <EntryForm key={`${date}-${entry?.updatedAt ?? 'new'}`} initial={entry} onSave={handleSave} onCancel={entry ? () => setEditing(false) : undefined} dictation={false} />
+          <EntryForm key={`${date}-${entry?.updatedAt ?? 'new'}`} initial={entry} onSave={handleSave} onCancel={entry ? () => ((userEditing.current = false), setEditing(false)) : undefined} dictation={false} />
         ) : (
           <>
-            <EntryView entry={entry} onEdit={() => (setJustSaved(false), setEditing(true))} onDelete={() => setConfirming(true)} />
+            <EntryView entry={entry} onEdit={() => ((userEditing.current = true), setJustSaved(false), setEditing(true))} onDelete={() => setConfirming(true)} />
             {justSaved && (
               <p className="save-status" role="status">
                 Saved on this device.

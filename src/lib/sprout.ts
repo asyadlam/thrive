@@ -147,19 +147,34 @@ export function dayName(key: string): string {
 /* ---------- Quick entry mood (the same entry as Daily Sprout's Quick entry) ---------- */
 
 /**
- * Sets a day's quick entry mood, keeping everything else in it. With a note: if the entry has no note yet it
- * becomes the note; if it has one, the new sentence is added after it (nothing already written is replaced).
+ * Updates a day's quick entry (the same entry Daily Sprout and the Journal show), changing only what's given:
+ * - mood: replaces the mood;
+ * - note: a bit about the day — becomes the note, or is added after the note already there (nothing is replaced);
+ * - intention: "Tomorrow's intention" in that day's entry — replaces it.
+ * A quick entry always has a mood, so if the day has no entry yet and no mood is given, nothing is saved and
+ * 'need_mood' comes back (the assistant then asks how the day felt).
  */
-export async function setQuickMood(date: string, mood: Mood, note?: string): Promise<'set' | 'set+note'> {
+export async function updateQuickEntry(
+  date: string,
+  parts: { mood?: Mood | null; note?: string; intention?: string },
+): Promise<{ saved: false; reason: 'need_mood' } | { saved: true; mood: boolean; note: boolean; intention: boolean; trimmed: boolean }> {
   const existing = await getQuickEntry(date);
-  const add = note?.trim() ?? '';
+  const mood = parts.mood ?? existing?.mood ?? null;
+  if (!mood) return { saved: false, reason: 'need_mood' };
+  const add = parts.note?.trim() ?? '';
   const current = existing?.note?.trim() ?? '';
-  const nextNote = !add ? (existing?.note ?? '') : current && !current.includes(add) ? `${current}\n${add}` : current || add;
+  const joined = !add ? (existing?.note ?? '') : current && !current.includes(add) ? `${current}\n${add}` : current || add;
+  const intention = parts.intention?.trim();
   await saveQuickEntry(
     date,
-    { mood, positives: existing?.positives ?? [], note: nextNote.slice(0, LIMITS.note), intention: existing?.intention ?? '' },
+    {
+      mood,
+      positives: existing?.positives ?? [],
+      note: joined.slice(0, LIMITS.note),
+      intention: (intention || existing?.intention || '').slice(0, LIMITS.intention),
+    },
     existing,
   );
   notifyDataChanged();
-  return add ? 'set+note' : 'set';
+  return { saved: true, mood: !!parts.mood, note: !!add, intention: !!intention, trimmed: joined.length > LIMITS.note };
 }
