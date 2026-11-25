@@ -7,6 +7,7 @@ import { formatShortDay, todayKey } from '../lib/journal';
 import { useCrossFade } from './useCrossFade';
 import { SeeMore, previewOf, scrollToSection } from './ListPreview';
 import { downloadFile } from '../lib/backup';
+import { useDataVersion } from '../lib/dataEvents';
 
 /** How many positives the Positives page shows. Older ones stay saved and are in the downloadable file. */
 export const LIVE_POSITIVES = 20;
@@ -67,6 +68,12 @@ export default function PositivesSection({ full = false }: { full?: boolean }) {
       setStatus('error');
     }
   }, []);
+
+  // The voice assistant added a positive while this page is open: show it.
+  const version = useDataVersion();
+  useEffect(() => {
+    if (version) void refresh();
+  }, [version, refresh]);
 
   useEffect(() => {
     void refresh();

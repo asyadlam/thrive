@@ -83,7 +83,12 @@ import { listStandalonePositives, positiveFromBackup, type StandalonePositive } 
                wishlist and bucket list items live inside the Wishlist and Bucket list lists (with note, price and
                doneAt), so the separate wishlist and bucketlist arrays are no longer written. Older files' wishlist and
                bucketlist items are moved into those lists on restore and merge (see listParts.ts).
-   version 16: same, plus Health Journey: health: [...] (one record per logged day) and medications: [...] */
+   version 16: same, plus Health Journey: health: [...] (one record per logged day) and medications: [...]
+               Each health day is also the Daily Sprout day: it may carry stretch: true, todos: [...] and intention
+               ("Little sprout for the day"), and a food's
+               calories may be null (logged without numbers). The version stays 16: these fields are additive.
+               The old built-in To do list (id "list-todo") in older files is moved onto that day's to-dos after
+               restore or merge (see moveOldTodoList in sprout.ts). */
 const FORMAT = { app: 'thrive', kind: 'backup', version: 16 } as const;
 const MAX_FILE_BYTES = 50 * 1024 * 1024;
 

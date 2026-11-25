@@ -100,13 +100,11 @@ export default function EntryDetailPage() {
           )}
 
           {entry.type === 'quick' ? (
-            editing ? (
-              <EntryForm
-                key={entry.updatedAt}
-                initial={entry}
-                onSave={handleQuickSave}
-                onCancel={() => setEditing(false)}
-              />
+            book === 'journal' ? (
+              // Quick entries are created and edited on Daily Sprout; here they're read-only.
+              <EntryView entry={entry} openInSprout />
+            ) : editing ? (
+              <EntryForm key={entry.updatedAt} initial={entry} onSave={handleQuickSave} onCancel={() => setEditing(false)} />
             ) : (
               <EntryView entry={entry} onEdit={handleEdit} onDelete={() => setConfirming(true)} />
             )

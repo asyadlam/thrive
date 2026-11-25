@@ -52,7 +52,7 @@ export default function Home() {
       )}
 
       {/* 2. Quick check-in */}
-      <Link to="/journal/quick" className="home-checkin">
+      <Link to="/sprout" className="home-checkin">
         <span className="home-checkin-title">Quick check-in</span>
         <span className="home-checkin-sub">How are you, a short note, one small plan</span>
       </Link>

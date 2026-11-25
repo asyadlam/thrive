@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { loadSettings } from '../lib/settings';
 import { SAVE_FAILED } from '../lib/messages';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
@@ -17,7 +18,6 @@ import {
   type FoodLog,
   MED_NAME_MAX,
   MED_TIMING_MAX,
-  WATER_GLASSES,
   addMedication,
   deleteMedication,
   emptyDraft,
@@ -155,7 +155,7 @@ function CalorieField({ foods, typed, onTyped, onFoods }: CalorieFieldProps) {
                 <span className="food-name">{f.name || 'Something to eat'}</span>
                 {nutrientLine(f) && <span className="hint">{nutrientLine(f)}</span>}
               </span>
-              <span className="food-kcal">{f.calories.toLocaleString()} kcal</span>
+              <span className="food-kcal">{f.calories === null ? '— kcal' : `${f.calories.toLocaleString()} kcal`}</span>
               <button type="button" className="positive-delete" aria-label={`Delete ${f.name || 'this log'}`} onClick={() => onFoods(foods.filter((x) => x.id !== f.id))}>
                 ×
               </button>
@@ -295,6 +295,7 @@ export function HealthDayPage() {
   // Medications checked off this day that are no longer on my list still show (so a past day reads right).
   const formerMeds = draft.meds.filter((x) => !meds.some((m) => m.id === x.id));
   const chip = EXERCISE_CHIPS.find((c) => c.toLowerCase() === draft.exercise.trim().toLowerCase());
+  const waterTarget = loadSettings().waterTarget;
 
   return (
     <PageShell title="Health Journey" subtitle={formatLongDay(date)} back={BACK_HEALTH}>
@@ -389,10 +390,10 @@ export function HealthDayPage() {
 
             <fieldset className="field">
               <legend>
-                Water <span className="optional">({draft.water} of {WATER_GLASSES} glasses)</span>
+                Water <span className="optional">({draft.water} of {waterTarget} glasses)</span>
               </legend>
               <div className="water-row">
-                {Array.from({ length: WATER_GLASSES }, (_, i) => i + 1).map((n) => (
+                {Array.from({ length: Math.max(waterTarget, draft.water) }, (_, i) => i + 1).map((n) => (
                   <button
                     key={n}
                     type="button"

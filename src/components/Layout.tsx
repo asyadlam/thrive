@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
 import NewDeviceSync from './NewDevicePrompt';
+import VoiceAssistant, { mainPageName } from './VoiceAssistant';
 import { GearIcon, HelpIcon } from './icons';
 
 /** Which page this is, for the fade. "/journal/talk/<id>" counts as "/journal/talk" (saving a new page adds the id). */
@@ -36,7 +37,7 @@ export default function Layout() {
           </NavLink>
         </div>
       </header>
-      <main className="app-main">
+      <main className={`app-main${mainPageName(pathname) ? ' has-fab' : ''}`}>
         {/* keyed by page so the soft fade-in plays each time you switch pages. Saving a
             new "Need to talk" page moves /journal/talk → /journal/talk/<id>, which is treated as the
             same page (it keeps its state and doesn't fade again). */}
@@ -45,6 +46,7 @@ export default function Layout() {
         </div>
       </main>
       <NewDeviceSync />
+      <VoiceAssistant />
       <BottomNav />
     </div>
   );

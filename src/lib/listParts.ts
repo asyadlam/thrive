@@ -44,9 +44,8 @@ export type UserList = {
 
 export const kindOf = (list: Pick<UserList, 'kind'>): ListKind => list.kind ?? 'custom';
 
-/** The four lists everyone starts with. Fixed ids, so the same list lines up across devices and backups. */
+/** The lists everyone starts with (To do moved to Daily Sprout). Fixed ids, so the same list lines up across devices and backups. */
 export const STARTER_LISTS: { id: string; title: string; kind: ListKind }[] = [
-  { id: 'list-todo', title: 'To do', kind: 'todo' },
   { id: 'list-wishlist', title: 'Wishlist', kind: 'wishlist' },
   { id: 'list-bucket', title: 'Bucket list', kind: 'bucket' },
   { id: 'list-groceries', title: 'Groceries', kind: 'groceries' },

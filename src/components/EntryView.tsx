@@ -1,8 +1,13 @@
+import { Link } from 'react-router-dom';
 import { formatTime, type QuickEntry } from '../lib/journal';
 
-type Props = { entry: QuickEntry; onEdit: () => void; onDelete?: () => void };
+/**
+ * A saved quick entry. On Daily Sprout it has Edit (and Delete); elsewhere it's read-only with "Open in Daily
+ * Sprout" (`openInSprout`), since quick entries are created and edited only there.
+ */
+type Props = { entry: QuickEntry; onEdit?: () => void; onDelete?: () => void; openInSprout?: boolean };
 
-export default function EntryView({ entry, onEdit, onDelete }: Props) {
+export default function EntryView({ entry, onEdit, onDelete, openInSprout }: Props) {
   return (
     <article className="card saved-entry" aria-label="Quick entry">
       <div className="saved-row">
@@ -43,9 +48,16 @@ export default function EntryView({ entry, onEdit, onDelete }: Props) {
               Delete
             </button>
           )}
-          <button type="button" className="btn-secondary" onClick={onEdit}>
-            Edit
-          </button>
+          {onEdit && (
+            <button type="button" className="btn-secondary" onClick={onEdit}>
+              Edit
+            </button>
+          )}
+          {openInSprout && (
+            <Link to={`/sprout/${entry.date}`} className="btn-secondary">
+              Open in Daily Sprout
+            </Link>
+          )}
         </div>
       </div>
     </article>

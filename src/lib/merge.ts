@@ -251,7 +251,7 @@ export async function deviceHasOwnData(): Promise<boolean> {
     HEALTH_STORE, MEDICATIONS_STORE,
   ];
   for (const store of stores) if ((await idbGetAll(store)).length > 0) return true;
-  const starters = new Set(STARTER_LISTS.map((s) => s.id));
+  const starters = new Set([...STARTER_LISTS.map((s) => s.id), 'list-todo']); // list-todo: the old empty To do list
   return (await idbGetAll<UserList>(LISTS_STORE)).some((l) => !starters.has(l.id) || (l.items?.length ?? 0) > 0);
 }
 

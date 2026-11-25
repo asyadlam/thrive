@@ -29,6 +29,24 @@ export type AppSettings = {
   heightCm: number | null;
   /** My Life "About me": weight in kg, or null if not set. A single current value, not a history. */
   weightKg: number | null;
+  /** Daily Sprout targets: calories, protein (g), added sugar (g) and glasses of water a day. */
+  calorieTarget: number;
+  proteinTarget: number;
+  addedSugarTarget: number;
+  waterTarget: number;
+};
+
+/** Daily Sprout targets: starting values and sensible bounds (whole numbers). */
+export const TARGETS = {
+  calorieTarget: { start: 1600, min: 500, max: 10000, label: 'Calories', unit: 'kcal' },
+  proteinTarget: { start: 80, min: 1, max: 500, label: 'Protein', unit: 'g' },
+  addedSugarTarget: { start: 25, min: 0, max: 500, label: 'Added sugar', unit: 'g' },
+  waterTarget: { start: 8, min: 1, max: 20, label: 'Water', unit: 'glasses' },
+} as const;
+export type TargetKey = keyof typeof TARGETS;
+const target = (v: unknown, key: TargetKey) => {
+  const t = TARGETS[key];
+  return typeof v === 'number' && Number.isInteger(v) && v >= t.min && v <= t.max ? v : t.start;
 };
 
 /** Sensible bounds for the About me height (cm) and weight (kg) fields. */
@@ -98,6 +116,10 @@ const DEFAULTS: AppSettings = {
   bloodType: '',
   heightCm: null,
   weightKg: null,
+  calorieTarget: TARGETS.calorieTarget.start,
+  proteinTarget: TARGETS.proteinTarget.start,
+  addedSugarTarget: TARGETS.addedSugarTarget.start,
+  waterTarget: TARGETS.waterTarget.start,
   showHealth: false,
   showDreams: false,
 };
@@ -130,6 +152,10 @@ export function normalizeSettings(value: unknown): AppSettings {
     showDreams: parsed.showDreams === true,
     heightCm: inRange(parsed.heightCm, HEIGHT_CM) ? roundOne(parsed.heightCm) : null,
     weightKg: inRange(parsed.weightKg, WEIGHT_KG) ? roundOne(parsed.weightKg) : null,
+    calorieTarget: target(parsed.calorieTarget, 'calorieTarget'),
+    proteinTarget: target(parsed.proteinTarget, 'proteinTarget'),
+    addedSugarTarget: target(parsed.addedSugarTarget, 'addedSugarTarget'),
+    waterTarget: target(parsed.waterTarget, 'waterTarget'),
   };
 }
 

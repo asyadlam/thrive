@@ -4,21 +4,19 @@ import PageShell from '../components/PageShell';
 import DreamsSection from '../components/DreamsSection';
 import HealthSection from '../components/HealthSection';
 import { loadSettings } from '../lib/settings';
-import { CalendarIcon, JournalIcon, LetterIcon, MyLifeIcon } from '../components/icons';
-import { formatTime, getQuickEntry, listTalkEntries, talkEntryLabel, todayKey, type TalkEntry } from '../lib/journal';
+import { CalendarIcon, LetterIcon, MyLifeIcon } from '../components/icons';
+import { formatTime, listTalkEntries, talkEntryLabel, todayKey, type TalkEntry } from '../lib/journal';
 
 export default function Journal() {
   const date = useMemo(() => todayKey(), []);
-  const [quickDone, setQuickDone] = useState(false);
   const [talkEntries, setTalkEntries] = useState<TalkEntry[]>([]);
   const [{ showHealth, showDreams }] = useState(loadSettings);
 
   useEffect(() => {
     let active = true;
-    Promise.all([getQuickEntry(date), listTalkEntries(date)])
-      .then(([quick, talks]) => {
+    listTalkEntries(date)
+      .then((talks) => {
         if (!active) return;
-        setQuickDone(Boolean(quick));
         setTalkEntries(talks);
       })
       .catch(() => undefined); // the entry pages themselves explain storage problems
@@ -32,18 +30,6 @@ export default function Journal() {
       <h2 className="section-title">What would help right now?</h2>
 
       <div className="choice-list">
-        <Link to="/journal/quick" className="card choice-card">
-          <span className="quick-action-icon">
-            <JournalIcon />
-          </span>
-          <span className="quick-action-text">
-            <strong>Quick entry</strong>
-            <span>Mood, a short note and tomorrow's intention.</span>
-            {quickDone && <span className="done-badge">Done for today · tap to view</span>}
-          </span>
-          <span className="quick-action-arrow" aria-hidden="true">›</span>
-        </Link>
-
         <Link to="/journal/talk" className="card choice-card">
           <span className="quick-action-icon talk-icon">
             <MyLifeIcon />

@@ -1,5 +1,6 @@
 import { LISTS_STORE, idbDelete, idbGet, idbGetAll, idbPut } from './db';
 import { isIsoTime, newId } from './journal';
+import { moveOldTodoList } from './sprout';
 import { LIST_KINDS, isBuiltInList, type ListItem, type ListKind, type UserList } from './listParts';
 
 export { isBuiltInList, kindOf, STARTER_LISTS, type ListItem, type ListKind, type UserList } from './listParts';
@@ -11,8 +12,9 @@ export const LIST_PRICE_MAX = 20;
 
 const now = () => new Date().toISOString();
 
-/** All lists, the most recently used first. */
+/** All lists, the most recently used first. (The old To do list is moved onto Daily Sprout first.) */
 export async function listLists(): Promise<UserList[]> {
+  await moveOldTodoList();
   const all = await idbGetAll<UserList>(LISTS_STORE);
   return all.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || b.createdAt.localeCompare(a.createdAt));
 }

@@ -5,6 +5,7 @@ import { GrowthIcon } from './icons';
 import { formatDay, formatShortDay, todayKey } from '../lib/journal';
 import { WEEKDAYS, addMonths, compareMonths, dayKey, fromDayKey, monthCells, monthLabel, type YearMonth } from '../lib/calendar';
 import { listHealthDays, type HealthDay } from '../lib/health';
+import { useDataVersion } from '../lib/dataEvents';
 
 /** A short summary of what a day holds ("1,800 kcal · Gym · 6 glasses of water"). */
 export function daySummary(d: HealthDay): string {
@@ -118,6 +119,7 @@ export default function HealthSection() {
   useSectionAnchor('health', ref);
   const today = useMemo(() => todayKey(), []);
   const [todayLog, setTodayLog] = useState<HealthDay | null | undefined>(undefined);
+  const version = useDataVersion(); // Daily Sprout or the assistant changed the day: show it
 
   useEffect(() => {
     let active = true;
@@ -127,7 +129,7 @@ export default function HealthSection() {
     return () => {
       active = false;
     };
-  }, [today]);
+  }, [today, version]);
 
   return (
     <div className="card health-card" ref={ref}>

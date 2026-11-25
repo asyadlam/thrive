@@ -2067,3 +2067,119 @@ select.input { appearance: auto; }
   cursor: pointer;
 }
 .home-sync-close:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+
+/* ================= Tab bar: five tabs, "Daily Sprout" fits on small phones ================= */
+.nav-item span { text-align: center; line-height: 1.15; white-space: nowrap; }
+@media (max-width: 360px) { .nav-item { font-size: 0.64rem; } }
+
+/* ================= Growth → Learn heading with its lightbulb ================= */
+.learn-entry { margin-top: 16px; }
+
+/* ================= Daily Sprout ================= */
+.sprout-daynav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 8px; padding: 8px; border-radius: var(--card-radius); background: #fff; box-shadow: var(--card-shadow); }
+.sprout-day { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
+.sprout-day strong { font-size: 1.1rem; color: var(--ink); }
+.sprout-day span { font-size: 0.85rem; color: var(--ink-soft); }
+.sprout-today { display: block; margin: 0 auto 8px; }
+.sprout-quick { margin: 24px 0 4px; }
+.sprout-quick .section-title { margin-top: 0; }
+.sprout-card { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.sprout-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.sprout-card-title { margin: 0; font-size: 1.1rem; font-weight: 700; color: var(--ink); }
+.sprout-card-title .optional { font-size: 0.9rem; font-weight: 600; color: var(--ink-soft); margin-left: 6px; }
+.sprout-link { color: var(--green-700); font-weight: 600; font-size: 0.9rem; }
+.sprout-label { display: block; font-weight: 600; margin-bottom: 6px; }
+.sprout-add { align-self: flex-start; }
+
+.sprout-ring-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.sprout-ring { width: clamp(130px, 40vw, 160px); height: auto; }
+.sprout-ring-track { fill: none; stroke: var(--green-50); stroke-width: 12; }
+.sprout-ring-fill { fill: none; stroke: var(--green-500); stroke-width: 12; stroke-linecap: round; transition: stroke-dashoffset 0.4s ease; }
+@media (prefers-reduced-motion: reduce) { .sprout-ring-fill { transition: none; } }
+.sprout-ring-number { font-size: 24px; font-weight: 800; fill: var(--ink); font-family: inherit; }
+.sprout-ring-of { font-size: 11px; fill: var(--ink-soft); font-family: inherit; }
+.sprout-ring-totals { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin: 0; color: var(--ink-soft); font-size: 0.92rem; text-align: center; }
+.sprout-ring-totals strong { color: var(--ink); }
+
+.sprout-foods { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.sprout-food { display: flex; align-items: center; gap: 10px; padding: 10px 6px 10px 14px; border-radius: var(--row-radius); background: var(--inset); }
+.sprout-food-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.sprout-food-name { font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.sprout-food-nutrients { font-size: 0.82rem; color: var(--ink-soft); }
+.sprout-food-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.sprout-food-grid .field { margin: 0; display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 0.92rem; }
+.sprout-food-grid .input { min-width: 0; width: 100%; }
+
+.sprout-check { display: flex; align-items: center; gap: 10px; font-weight: 600; cursor: pointer; min-height: 44px; }
+.sprout-check input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.sprout-check input:focus-visible + .list-check { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.sprout-inline-form { display: flex; flex-direction: column; gap: 8px; }
+.sprout-todo-form { display: flex; gap: 8px; }
+.sprout-todo-form .input { flex: 1; min-width: 0; }
+
+/* ================= Settings → Daily Sprout targets ================= */
+.targets-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 12px; }
+.targets-grid .field { margin: 0; display: flex; flex-direction: column; gap: 4px; font-weight: 600; font-size: 0.92rem; }
+.targets-grid .input { min-width: 0; width: 100%; }
+
+/* ================= Floating voice assistant ================= */
+.app-main.has-fab { padding-bottom: calc(var(--nav-h) + var(--safe-b) + 88px); } /* room so the button never covers the last thing */
+.assistant-fab {
+  position: fixed;
+  z-index: 30;
+  right: max(16px, calc(50vw - 280px + 16px)); /* inside the app column on wide screens */
+  bottom: calc(var(--nav-h) + var(--safe-b) + 14px);
+  width: 56px;
+  height: 56px;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--green-500);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(74, 115, 86, 0.32);
+  cursor: pointer;
+}
+.assistant-fab svg { width: 26px; height: 26px; }
+.assistant-fab:focus-visible { outline: 3px solid var(--green-700); outline-offset: 3px; }
+
+.assistant-backdrop { position: fixed; inset: 0; z-index: 40; background: rgba(67, 82, 60, 0.28); display: flex; align-items: flex-end; justify-content: center; }
+.assistant-panel {
+  width: 100%;
+  max-width: 560px;
+  max-height: min(72vh, 620px);
+  display: flex;
+  flex-direction: column;
+  background: var(--cream);
+  border-radius: 24px 24px 0 0;
+  box-shadow: 0 -8px 30px rgba(67, 82, 60, 0.18);
+  padding: 14px 16px calc(14px + var(--safe-b));
+  animation: assistant-up 0.22s ease-out;
+}
+@keyframes assistant-up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .assistant-panel { animation: none; } }
+.assistant-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.assistant-head h2 { margin: 0; font-size: 1.1rem; font-weight: 800; color: var(--ink); }
+.assistant-close { width: 40px; height: 40px; border: 0; border-radius: 50%; background: #fff; color: var(--ink-soft); font-size: 1.4rem; line-height: 1; cursor: pointer; }
+.assistant-close:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.assistant-messages { flex: 1; min-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 12px 2px; }
+.assistant-intro { margin: 0; color: var(--ink-soft); font-size: 0.95rem; line-height: 1.45; }
+.assistant-bubble { margin: 0; max-width: 85%; padding: 10px 14px; border-radius: 18px; line-height: 1.4; white-space: pre-wrap; overflow-wrap: anywhere; }
+.assistant-bubble.from-me { align-self: flex-end; background: var(--green-700); color: #fff; border-bottom-right-radius: 6px; }
+.assistant-bubble.from-thrive { align-self: flex-start; background: #fff; color: var(--ink); border-bottom-left-radius: 6px; box-shadow: var(--card-shadow); }
+.assistant-typing { color: var(--ink-soft); letter-spacing: 2px; }
+.assistant-form { display: flex; flex-direction: column; gap: 6px; }
+.assistant-row { display: flex; align-items: flex-end; gap: 8px; }
+.assistant-input { flex: 1; min-width: 0; resize: none; max-height: 120px; }
+.assistant-form .dictation { justify-content: flex-end; min-height: 40px; }
+.assistant-form .dictation-status { flex: 1; margin: 0; text-align: left; }
+textarea.input.assistant-input { height: 48px; min-height: 48px; padding-top: 12px; padding-bottom: 12px; resize: none; }
+
+/* Daily Sprout: a ticked box is filled sage so its white ✓ shows (stretch and to-dos, like medications) */
+.sprout-check input:checked + .list-check,
+.sprout-card .list-item.taken .list-check { background: var(--green-500); border-color: var(--green-500); }
+
+/* Daily Sprout: "Little sprout for the day:" at the top */
+.sprout-intention { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px; }
+.sprout-intention label { font-weight: 700; color: var(--green-700); }
+.sprout-intention .input { background: #fff; }

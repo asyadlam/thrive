@@ -5,12 +5,16 @@ import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { ensureEntryMetadata } from './lib/journal';
 import { autoCloudBackup, cloudAvailable } from './lib/cloud';
+import { moveOldTodoList } from './lib/sprout';
 import './index.css';
 
 registerSW({ immediate: true });
 
 // Give any older entry a createdAt/updatedAt if it's missing one (changes nothing else).
 ensureEntryMetadata().catch(() => undefined);
+
+// To-dos live on Daily Sprout now: the old My Life "To do" list's items move onto today (nothing is lost).
+moveOldTodoList().catch(() => undefined);
 
 // Logged in? Quietly back up to the cloud once a day when the app opens (never a popup; see lib/cloud.ts).
 if (cloudAvailable()) window.setTimeout(() => void autoCloudBackup(), 4000);

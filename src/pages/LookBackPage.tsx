@@ -24,6 +24,7 @@ import {
   type JournalEntry,
 } from '../lib/journal';
 import EmptyState from '../components/EmptyState';
+import EntryView from '../components/EntryView';
 import { loadSettings } from '../lib/settings';
 
 type Status = 'loading' | 'ready' | 'error';
@@ -182,7 +183,13 @@ export default function LookBackPage() {
               <EmptyState>No entries on this day.</EmptyState>
             ) : (
               <ul className="talk-list">
-                {selectedEntries.map((e) => (
+                {selectedEntries.map((e) =>
+                  e.type === 'quick' && e.book !== 'dreams' ? (
+                    // The day's quick entry, read-only here: it's edited on Daily Sprout.
+                    <li key={e.id} className="lookback-quick">
+                      <EntryView entry={e} openInSprout />
+                    </li>
+                  ) : (
                   <li key={e.id}>
                     <Link to={`${e.book === 'dreams' ? '/journal/dreams' : '/journal'}/entry/${e.id}`} className="talk-list-item">
                       {e.type === 'quick' ? (
@@ -205,7 +212,8 @@ export default function LookBackPage() {
                       <span className="quick-action-arrow" aria-hidden="true">›</span>
                     </Link>
                   </li>
-                ))}
+                  ),
+                )}
               </ul>
             )}
           </>

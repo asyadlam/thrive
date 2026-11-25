@@ -7,9 +7,11 @@ type Props = {
   initial?: QuickEntry;
   onSave: (draft: QuickDraft) => Promise<void>;
   onCancel?: () => void;
+  /** Show the small mic on the note (off on Daily Sprout, which has the main assistant mic). */
+  dictation?: boolean;
 };
 
-export default function EntryForm({ initial, onSave, onCancel }: Props) {
+export default function EntryForm({ initial, onSave, onCancel, dictation = true }: Props) {
   const [mood, setMood] = useState<Mood | null>(initial?.mood ?? null);
   // Quick entries no longer ask for a positive (that lives in Growth → Positives). Positives saved on older
   // entries are kept exactly as they were when the entry is edited.
@@ -61,9 +63,13 @@ export default function EntryForm({ initial, onSave, onCancel }: Props) {
 
 
       <div className="field">
-        <DictationButton value={note} onChange={setNote} maxLength={LIMITS.note} label="your note">
+        {dictation ? (
+          <DictationButton value={note} onChange={setNote} maxLength={LIMITS.note} label="your note">
+            <label htmlFor="entry-note">Short note</label>
+          </DictationButton>
+        ) : (
           <label htmlFor="entry-note">Short note</label>
-        </DictationButton>
+        )}
         <textarea
           id="entry-note"
           className="input"

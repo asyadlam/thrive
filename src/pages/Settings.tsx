@@ -3,6 +3,7 @@ import AccountSection from '../components/AccountSection';
 import { Link } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import MyDataSection from '../components/MyDataSection';
+import TargetsSection from '../components/TargetsSection';
 import { PET_ART, PetThumb } from '../components/PetCompanion';
 import {
   PET_KINDS,
@@ -159,7 +160,7 @@ export default function Settings() {
         <h2 id="health-heading" className="settings-heading">
           Health Journey
         </h2>
-        <p className="hint">A small daily log in your Journal — calories, exercise, steps, water and medications/vitamins, all typed in by you.</p>
+        <p className="hint">A small daily log in your Journal — calories, exercise, steps, water and medications/vitamins. It's the same day as Daily Sprout, which works either way.</p>
         <label className="switch-row">
           <span>Show Health Journey</span>
           <input
@@ -172,6 +173,8 @@ export default function Settings() {
         </label>
         {!settings.showHealth && <p className="hint">Off: it doesn't appear anywhere. Anything you logged earlier stays saved.</p>}
       </section>
+
+      <TargetsSection settings={settings} update={update} />
 
       <MyDataSection
         onRestored={() => {

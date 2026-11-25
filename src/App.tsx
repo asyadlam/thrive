@@ -5,7 +5,6 @@ import { WELCOME_EVENT, completeGoogleSignIn, hasGooglePending, needsWelcome } f
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Journal from './pages/Journal';
-import QuickEntryPage from './pages/QuickEntryPage';
 import TalkEntryPage from './pages/TalkEntryPage';
 import TalkChatPage from './pages/TalkChatPage';
 import LookBackPage from './pages/LookBackPage';
@@ -20,6 +19,7 @@ import { HealthDayPage, HealthDaysPage, MedicationsPage } from './pages/HealthPa
 import { AllDreamsPage, AllListsPage, JourneysPage, PositivesPage } from './pages/FullListPages';
 import AffirmationsPage from './pages/AffirmationsPage';
 import MyLife from './pages/MyLife';
+import DailySprout from './pages/DailySprout';
 import Learn from './pages/Learn';
 import Settings from './pages/Settings';
 import MemoryPage from './pages/MemoryPage';
@@ -76,7 +76,8 @@ export default function App() {
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="journal" element={<Journal />} />
-        <Route path="journal/quick" element={<QuickEntryPage />} />
+        {/* quick entries are made on Daily Sprout now */}
+        <Route path="journal/quick" element={<Navigate to="/sprout" replace />} />
         <Route path="journal/talk/:id?" element={<TalkEntryPage />} />
         <Route path="journal/chat/:id?" element={<TalkChatPage />} />
         <Route path="journal/look-back" element={<LookBackPage />} />
@@ -106,6 +107,8 @@ export default function App() {
         <Route path="my-life/habits" element={<Navigate to="/growth" replace />} />
         <Route path="my-life/lists" element={<AllListsPage />} />
         <Route path="my-life/lists/:id" element={<ListPage />} />
+        <Route path="sprout" element={<DailySprout />} />
+        <Route path="sprout/:date" element={<DailySprout />} />
         <Route path="learn" element={<Learn />} />
         <Route path="learn/:id" element={<LessonPage />} />
         <Route path="settings" element={<Settings />} />

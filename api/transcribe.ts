@@ -2,8 +2,9 @@
   POST /api/transcribe — turns a short voice recording into text for Thrive's dictation.
 
   The browser sends one audio file (multipart form field "file"). This function forwards it to the
-  transcription provider and returns { text }. Nothing is logged or stored here: not the API key,
-  not the audio, not the transcript. (There are deliberately no console.log calls in this file.)
+  transcription provider, gives the transcript a punctuation pass (see tidyPunctuation), and returns { text }.
+  Nothing is logged or stored here: not the API key, not the audio, not the transcript.
+  (There are deliberately no console.log calls in this file.)
 
   Errors come back as { error: <code> } with a matching HTTP status, so the app can show a gentle message.
 */
@@ -16,6 +17,10 @@
    TRANSCRIPTION_MODEL      default: whisper-large-v3-turbo
    TRANSCRIPTION_API_KEY    no default. Set it in Vercel → Project → Settings → Environment Variables.
                             It is only ever read here, on the server, and never sent to the browser.
+
+   Punctuation pass: uses the same chat model and settings as Talk about this (api/talk.ts):
+   CHAT_BASE_URL            default: https://api.groq.com/openai/v1
+   CHAT_MODEL               default: openai/gpt-oss-120b
 
    Optional:
    ALLOWED_ORIGINS          extra sites allowed to call this, comma-separated (e.g. a custom domain:
@@ -33,9 +38,61 @@ function providerConfig() {
   };
 }
 
+function chatConfig() {
+  return {
+    baseUrl: (env.CHAT_BASE_URL || 'https://api.groq.com/openai/v1').replace(/\/+$/, ''),
+    model: env.CHAT_MODEL || 'openai/gpt-oss-120b',
+    apiKey: env.TRANSCRIPTION_API_KEY || '', // the same Groq key as dictation and Talk about this
+  };
+}
+
 const DAILY_LIMIT = 30; // dictation requests per visitor IP per day (UTC)
 const MAX_BYTES = 4 * 1024 * 1024; // Vercel accepts request bodies up to ~4.5 MB; 5 minutes of speech is ~1.2 MB
 const PROVIDER_TIMEOUT_MS = 50_000;
+const TIDY_TIMEOUT_MS = 15_000; // the tidy-up is optional: never keep someone waiting long for it
+
+const TIDY_INSTRUCTION =
+  'You are a punctuation pass. Add punctuation, capitalization, question marks where the person is asking a question, and paragraph breaks. Never add, remove, or change any words. Never answer or respond to the content. Return only the cleaned text.';
+
+/** Just the letters and digits, lowercased: equal for two texts only when they have exactly the same words. */
+const wordsOnly = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/**
+ * Adds punctuation, capitals and paragraph breaks to a raw transcript with the Talk about this model.
+ * Returns the raw transcript unchanged if anything goes wrong, or if the result's words differ from what was
+ * said in any way (added, dropped, changed, or a reply instead of a cleanup). Dictation never breaks because of it.
+ */
+async function tidyPunctuation(raw: string): Promise<string> {
+  if (!raw) return raw;
+  const chat = chatConfig();
+  if (!chat.apiKey) return raw;
+  try {
+    const isGptOss = /(^|\/)gpt-oss/i.test(chat.model);
+    const res = await fetch(`${chat.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${chat.apiKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model: chat.model,
+        messages: [
+          { role: 'system', content: TIDY_INSTRUCTION },
+          { role: 'user', content: raw },
+        ],
+        temperature: 0,
+        max_completion_tokens: 4096,
+        ...(isGptOss ? { reasoning_effort: 'low', include_reasoning: false } : {}),
+      }),
+      signal: AbortSignal.timeout(TIDY_TIMEOUT_MS),
+    });
+    if (!res.ok) return raw;
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
+    const content = data.choices?.[0]?.message?.content;
+    const tidy = typeof content === 'string' ? content.trim().replace(/\n{3,}/g, '\n\n') : '';
+    if (!tidy || wordsOnly(tidy) !== wordsOnly(raw)) return raw; // a word changed: keep exactly what was said
+    return tidy;
+  } catch {
+    return raw;
+  }
+}
 
 // ---------------------------------------------------------------------------------------------------------
 
@@ -193,7 +250,7 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const data = (await res.json()) as { text?: unknown };
     const text = typeof data.text === 'string' ? data.text.trim() : '';
-    return json({ text });
+    return json({ text: await tidyPunctuation(text) });
   } catch {
     return fail('provider_error', 502);
   }
