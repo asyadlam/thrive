@@ -8,8 +8,6 @@ Thrive is a calm place to write about your day, keep the good moments, and work 
 
 ![Thrive logo](public/logo-wordmark.png)
 
-<!-- Home Screen and Journal Screen -->
-
 ## Why I made it
 
 A programme called "The Thrive Program" helped me a lot emotionally, more than therapy ever did, and writing has always been the thing that helps me most. So I named the app after it, and built the journal I wished I had back then.
@@ -34,6 +32,10 @@ It's also my portfolio project for learning how to direct AI coding agents well.
 The content shared in the Learn section is based on personal experiences and practices that have helped me. It is intended for personal growth purposes only and should not be considered medical or professional advice. Mostly because they were made for me.
 
 You can also pick a companion pet: Hippo, Cat, Platypus, Panda, Dog, or none at all. The pet sits in the page headers, and tapping it gives you little hearts, sparkles and kind messages. Each pet has different poses now, so it can listen while you talk, celebrate a good moment, or hold a heart on a rough day. A Get Help button is always in the header, just in case. It has the crisis lines on it, and a note that Thrive is a journal, not a crisis service.
+
+<img width="499" height="691" alt="Screenshot 2026-11-25 at 8 59 01 PM" src="https://github.com/user-attachments/assets/0fa555d0-17ff-4be1-932d-d82e64772925" />
+
+<img width="499" height="690" alt="Screenshot 2026-11-25 at 9 00 03 PM" src="https://github.com/user-attachments/assets/fc61e894-4c00-4e70-a63f-f6547332c76d" />
 
 ## Privacy, because it matters
 
