@@ -163,7 +163,9 @@ export async function updateQuickEntry(
   if (!mood) return { saved: false, reason: 'need_mood' };
   const add = parts.note?.trim() ?? '';
   const current = existing?.note?.trim() ?? '';
-  const joined = !add ? (existing?.note ?? '') : current && !current.includes(add) ? `${current}\n${add}` : current || add;
+  // Added to the end with a space; whatever is already there is kept (and the same words aren't added twice).
+  const fresh = !!add && !current.includes(add);
+  const joined = !add ? (existing?.note ?? '') : current && fresh ? `${current} ${add}` : current || add;
   const intention = parts.intention?.trim();
   await saveQuickEntry(
     date,
@@ -176,5 +178,5 @@ export async function updateQuickEntry(
     existing,
   );
   notifyDataChanged();
-  return { saved: true, mood: !!parts.mood, note: !!add, intention: !!intention, trimmed: joined.length > LIMITS.note };
+  return { saved: true, mood: !!parts.mood, note: fresh, intention: !!intention, trimmed: joined.length > LIMITS.note };
 }

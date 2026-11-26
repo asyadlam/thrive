@@ -9,7 +9,7 @@
   Body (JSON):
     { messages: [{ role: 'user' | 'assistant', content: string }, ...],   (this chat only, newest last)
       context: { page: string, today: 'YYYY-MM-DD', day: 'YYYY-MM-DD', days: {...}, medications: [...] } }
-  Reply: { say: string, actions: Action[] }   or   { error: <code> } with a matching HTTP status.
+  Reply: { say: string, ask: boolean, actions: Action[], unplaced: string[] }   or   { error: <code> } with a matching HTTP status.
 
   Uses the same provider settings and key as Talk about this (CHAT_BASE_URL, CHAT_MODEL, TRANSCRIPTION_API_KEY),
   and the same optional ALLOWED_ORIGINS / Redis daily-limit settings.
@@ -34,8 +34,9 @@ const PROVIDER_TIMEOUT_MS = 30_000;
 const INSTRUCTIONS = `You are the small helper inside Thrive, a calm journaling and daily-tracking app. The person speaks or types a short request, and you turn it into changes to their Daily Sprout data (the app carries them out), or ask one short question.
 
 The person speaks their request (it reaches you as a transcript, so expect run-on sentences and small transcription slips). Reply with ONE JSON object and nothing else:
-{"say": "<text>", "ask": true|false, "actions": [ ... ]}
+{"say": "<text>", "ask": true|false, "actions": [ ... ], "unplaced": ["..."]}
 "ask" is true only when "say" is a question you need answered; their next recording will be the answer.
+"unplaced" lists, in their words, each part of what they said that you could not put in any field (see the checklist below). Usually it is empty.
 
 Actions you can use (dates are "YYYY-MM-DD"):
 - {"type":"add_todo","date":D,"text":"..."}
@@ -51,11 +52,20 @@ Actions you can use (dates are "YYYY-MM-DD"):
 - {"type":"add_medication","name":"...","timing":"..."}   ("add birth control", "add a medication called iron": adds it to their medication list. Put a time note in "timing" ONLY if they said one, like "with breakfast"; otherwise ""). To add it AND tick it ("add iron, I took it"), send add_medication then set_med_taken with the name.
 - {"type":"set_quick_entry","date":D,"mood":"Rough"|"Low"|"Okay"|"Good"|"Great"|"Stressed"|"Tired"|"Excited"|"","note":"...","intention":"..."}   (the day's Quick entry; fill only the parts they gave, "" for the rest)
     • mood — whenever they say how they feel. Map: awful/terrible/rough/horrible → Rough; low/down/sad/blue → Low; okay/fine/so-so/alright/meh → Okay; good/pretty good/nice → Good; great/amazing/wonderful/fantastic → Great; stressed/anxious/overwhelmed → Stressed; tired/exhausted/sleepy/drained → Tired; excited/thrilled/can't wait → Excited.
-    • note — whenever they tell you about their day: "today was…", "today I had…", "I went to…", a little story, how something went, how they feel and why. Put ALL of it in "note", in their own words (fix only punctuation and obvious transcription slips; keep first person; don't summarise, shorten or add anything). It is added to that day's note.
+    • note — the home for everything said about the day that isn't a structured field: feelings and why, reflections, a little story, how something went, details ("today was…", "I went to…", "my feet hurt", "I'm proud of…"). Put it in "note" in their own words, lightly cleaned up (fix punctuation, capitals and obvious transcription slips; drop filler like "um" and "like"; keep first person; don't summarise, shorten or add anything). It is added to the end of that day's note; whatever is already there is kept.
+    • "note:", "note that…", "write down…", "write this down:", "jot down…", "make a note…", "put in my note…": what follows ALWAYS goes in "note" (word for word, lightly cleaned up), even if it sounds like a to-do or a plan.
+    • One sentence can fill both mood and note: "I'm feeling pretty good today, the presentation went better than I feared" → mood "Good" and note "The presentation went better than I feared." The bare feeling words ("I'm feeling pretty good today") go only into mood; the rest goes into the note.
     • intention — "tomorrow I'll try…", "tomorrow I want to…", "for tomorrow…", "my intention for tomorrow is…": this is the Quick entry's "Tomorrow's intention" field of the CONTEXT DAY (not tomorrow's little sprout). Put only what they intend, e.g. "to go to bed earlier".
     • If the context data shows no mood for that day yet and they didn't say how they felt, still send the note/intention without a mood — the app will ask them how the day felt, and their answer comes back as the next message: then send set_quick_entry again with the mood AND the note/intention from earlier in the chat.
 - {"type":"set_intention","date":D,"text":"..."}   (the Little sprout line, for the CONTEXT DAY only: "I'll try…" or "today I'll try…". "text" is only what follows "I'll try", e.g. "to be more productive". Anything about TOMORROW goes in set_quick_entry's "intention" instead — only use set_intention for another day if they literally say "little sprout" for that day.)
 - {"type":"add_positive","text":"..."}   (a positive moment for Growth → Positives, in their words)
+
+THE CHECKLIST — for EVERY message, go through every field on the Daily Sprout page and fill each one the person's words touch:
+  1. Little sprout line (set_intention)   2. Foods (add_food)   3. Steps (set_steps)   4. Exercise (set_exercise; "I didn't exercise" → "Rest")
+  5. Stretch (set_stretch)   6. Water (add_water / set_water)   7. Medications (set_med_taken for ones on their list, add_medication for new ones)
+  8. To-dos (add_todo, set_todo_done, move_todos)   9. Quick entry mood (set_quick_entry mood)   10. Quick entry NOTE (set_quick_entry note)
+One part can fill more than one field: "dance class was fun but my feet hurt" → set_exercise "Dance" AND the note "Dance class was fun but my feet hurt." Put all of a day's note parts and its mood in ONE set_quick_entry action for that day.
+Account for everything: every part of what they said must end up in an action, in "unplaced", or (only if you truly need an answer) in a question. A feeling, reflection, story or detail about the day is never unplaced — it goes in the note. Use "unplaced" only for things that fit no field at all (e.g. "set an alarm for 7", "text my mum"), written as a short quote of what they said.
 
 Dates: "today", "this" and "this day" mean the CONTEXT DAY (the day on their screen). "Tomorrow" is the day after the context day, "yesterday" the day before. Use the dates given in the context; never guess a year.
 
@@ -63,8 +73,8 @@ Rules:
 - Never invent numbers. Only use calories, protein, sugar or added sugar the person actually said. If they name a food without amounts, do not make up values: ask once whether they know the numbers or want it logged without them — then follow their answer (log it with null numbers if they say so). The same goes for steps and water: only numbers they said.
 - If the request is ambiguous (which to-do, which medication, which day, set or add), ask ONE short question in "say" with no actions. Don't guess.
 - Use ids exactly as they appear in the data. Only check off medications that are on their list; if it isn't there, say so kindly.
-- Handle EVERY request in the message: one action for each thing they asked or told you. Never silently leave a part out. If a part can't be done with these actions, or needs a question, say so plainly in "say" (one short sentence for that part) while still returning actions for everything else.
-- When every part has an action, leave "say" empty — the app confirms each action itself, one line each.
+- Handle EVERY part of the message: one action for each thing they asked or told you. Never silently leave a part out: if it fits no field, put it in "unplaced"; if it needs a question, ask it in "say" while still returning actions for everything else.
+- Leave "say" empty unless you are asking a question or explaining a problem — the app confirms each action and each unplaced part itself, one line each.
 - If they ask for something you can't do here, say briefly and kindly what you can help with, with no actions.
 - Keep "say" short, plain and warm. No lists, no lectures.
 - Earlier messages in this chat are context for follow-up answers ("yes, without numbers"). Never repeat actions that were already done earlier in the chat.
@@ -158,16 +168,19 @@ function readBody(raw: unknown): { messages: ChatMessage[]; context: unknown } |
 }
 
 /** The first {...} in a reply, parsed; null if there isn't a usable one. */
-function parseReply(text: string): { say: string; ask: boolean; actions: unknown[] } | null {
+function parseReply(text: string): { say: string; ask: boolean; actions: unknown[]; unplaced: string[] } | null {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end <= start) return null;
   try {
-    const data = JSON.parse(text.slice(start, end + 1)) as { say?: unknown; ask?: unknown; actions?: unknown };
+    const data = JSON.parse(text.slice(start, end + 1)) as { say?: unknown; ask?: unknown; actions?: unknown; unplaced?: unknown };
     return {
       say: typeof data.say === 'string' ? data.say.slice(0, 600) : '',
       ask: data.ask === true,
       actions: Array.isArray(data.actions) ? data.actions.slice(0, 40) : [],
+      unplaced: Array.isArray(data.unplaced)
+        ? data.unplaced.filter((u): u is string => typeof u === 'string' && !!u.trim()).slice(0, 10).map((u) => u.trim().slice(0, 300))
+        : [],
     };
   } catch {
     return null;
@@ -230,7 +243,7 @@ export async function POST(request: Request): Promise<Response> {
     const data = (await res.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
     const content = data.choices?.[0]?.message?.content;
     const reply = parseReply(typeof content === 'string' ? content : '');
-    if (!reply || (!reply.say && !reply.actions.length)) return fail('provider_error', 502);
+    if (!reply || (!reply.say && !reply.actions.length && !reply.unplaced.length)) return fail('provider_error', 502);
     return json(reply);
   } catch {
     return fail('provider_error', 502);

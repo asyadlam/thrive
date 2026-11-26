@@ -61,11 +61,54 @@ async function buildContext(page: string, day: string) {
 }
 
 /** One turn: returns the assistant's question/answer, or what was done. */
-/** What one spoken request produced: one line per toast, and whether the last line is a question to answer. */
-export type AssistantResult = { lines: string[]; question: string | null };
+/** Quick-entry words waiting for a mood (a quick entry can't be saved without one); kept in memory only. */
+export type HeldEntry = { date: string; note: string; intention: string };
+
+/** What one spoken request produced: one line per toast, whether the last line is a question to answer, and any note waiting for a mood. */
+export type AssistantResult = { lines: string[]; question: string | null; held: HeldEntry | null };
+
+/** Letters and digits only, for "is this already in the note?" checks. */
+const wordsOnly = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/**
+ * What follows "note:", "write down…", "jot down…", "make a note…" in what they said — to the end of that sentence.
+ * The assistant is told to put these in the note; this makes sure it happens even if it didn't.
+ */
+export function explicitNotes(said: string): string[] {
+  const out: string[] = [];
+  const re = /(?:^|[.!?]\s+|,\s*(?:and|also)\s+|\band\s+)(?:please\s+)?(?:note(?:\s+that)?|write\s+(?:this\s+)?down(?:\s+that)?|jot\s+(?:this\s+)?down(?:\s+that)?|make\s+a\s+note(?:\s+that)?|add\s+(?:a\s+note|to\s+my\s+note)(?:\s+that)?|put\s+in\s+my\s+note(?:\s+that)?)\s*[:,\-–—]?\s+([^.!?]+[.!?]?)/gi;
+  for (const m of said.matchAll(re)) {
+    const text = m[1].trim().replace(/^["“']|["”']$/g, '');
+    if (wordsOnly(text).length >= 3) out.push(text.charAt(0).toUpperCase() + text.slice(1));
+  }
+  return out;
+}
+
+/** "Added to today's note." (and a word if the note was full). */
+const noteLine = (date: string, trimmed: boolean) => `Added to ${onDay(date)}’s note${trimmed ? ' (the note was full, so the end was cut off)' : ''}.`;
+const needMoodLine = (date: string) => `I’ve kept your note ready. How did ${onDay(date)} feel overall? Tell me and I’ll save it.`;
+
+/** Adds to a day's quick entry; returns the lines to show, or the words to hold if the day has no mood yet. */
+async function addToEntry(date: string, note: string, intention: string): Promise<{ lines: string[]; held: HeldEntry | null }> {
+  const result = await updateQuickEntry(date, { note, intention });
+  if (!result.saved) return { lines: [], held: { date, note, intention } };
+  const lines: string[] = [];
+  if (result.note) lines.push(noteLine(date, result.trimmed));
+  if (result.intention) lines.push(`Set ${onDay(date)}’s intention for tomorrow: ${intention.replace(/[.!]+$/, '')}.`);
+  return { lines, held: null };
+}
+
+const joinHeld = (a: HeldEntry | null, b: HeldEntry | null): HeldEntry | null =>
+  !a ? b : !b ? a : a.date !== b.date ? b : { date: a.date, note: [a.note, b.note].filter(Boolean).join(' '), intention: b.intention || a.intention };
 
 /** One turn: carries out what was asked and returns a line for each thing done or not done. */
-export async function askAssistant(page: string, day: string, chat: AssistantMessage[], signal?: AbortSignal): Promise<AssistantResult> {
+export async function askAssistant(
+  page: string,
+  day: string,
+  chat: AssistantMessage[],
+  signal?: AbortSignal,
+  heldBefore: HeldEntry | null = null,
+): Promise<AssistantResult> {
   const { context, medications } = await buildContext(page, day);
   let res: Response;
   try {
@@ -78,7 +121,7 @@ export async function askAssistant(page: string, day: string, chat: AssistantMes
   } catch {
     throw new AssistantError('I couldn’t connect just now. Please try again in a moment.');
   }
-  const data = (await res.json().catch(() => null)) as { say?: unknown; actions?: unknown; ask?: unknown; error?: unknown } | null;
+  const data = (await res.json().catch(() => null)) as { say?: unknown; actions?: unknown; ask?: unknown; unplaced?: unknown; error?: unknown } | null;
   if (!res.ok || !data) {
     throw new AssistantError(
       data?.error === 'daily_limit' ? 'That’s all the help I can give today. Everything still works by hand.' : 'Something went wrong on my side. Please try again.',
@@ -88,11 +131,41 @@ export async function askAssistant(page: string, day: string, chat: AssistantMes
   const say = typeof data.say === 'string' ? data.say.trim() : '';
   const asking = !!say && (data.ask === true || /\?\s*$/.test(say));
   const said = chat.filter((m) => m.role === 'user').map((m) => m.content).join(' ');
-  const run = actions.length ? await runActions(actions, said, medications) : { lines: [], needMood: null };
+  const latest = chat.at(-1)?.content ?? '';
+  const run = actions.length ? await runActions(actions, said, medications) : { lines: [], held: null };
   const lines = run.lines;
-  if (say) lines.push(say); // what it couldn't do, or the question it needs answered
-  if (!lines.length) lines.push('Sorry, I didn’t catch that. Could you say it another way?');
-  return { lines, question: asking ? say : run.needMood };
+  let held = run.held;
+
+  // "note: …" / "write down …" always reach the note, even if the assistant missed one.
+  const noteNow = (await getQuickEntry(day))?.note ?? '';
+  const inNote = (t: string) => wordsOnly(noteNow).includes(wordsOnly(t)) || (!!held && wordsOnly(held.note).includes(wordsOnly(t)));
+  const missed = explicitNotes(latest).filter((t) => !inNote(t));
+  if (missed.length) {
+    const r = await addToEntry(day, missed.join(' '), '');
+    if (r.lines.length && !lines.some((l) => l.startsWith(`Added to ${onDay(day)}’s note`))) lines.push(...r.lines);
+    held = joinHeld(held, r.held);
+  }
+
+  // Words held from an earlier question about the mood: saved as soon as that day has a mood.
+  if (heldBefore) {
+    if ((await getQuickEntry(heldBefore.date))?.mood) {
+      const r = await addToEntry(heldBefore.date, heldBefore.note, heldBefore.intention);
+      for (const l of r.lines) if (!lines.includes(l)) lines.push(l);
+    } else held = joinHeld(heldBefore, held);
+  }
+
+  // Anything heard that fits no field is shown, so nothing is dropped without a word.
+  const unplaced = Array.isArray(data.unplaced) ? data.unplaced.filter((u): u is string => typeof u === 'string' && !!u.trim()) : [];
+  for (const u of unplaced.slice(0, 10)) lines.push(`Couldn’t place: “${str(u, 200).replace(/^["“]|["”]$/g, '')}”`);
+  if (say) lines.push(say); // the question it needs answered, or a problem to explain
+  if (!lines.length && !held) lines.push(latest.trim() ? `Couldn’t place: “${str(latest, 200)}”` : 'Sorry, I didn’t catch that. Could you say it another way?');
+
+  let question = asking ? say : null;
+  if (held && !question) {
+    question = needMoodLine(held.date);
+    lines.push(question);
+  }
+  return { lines, question, held };
 }
 
 /* -------------------------------------------- carrying out actions -------------------------------------------- */
@@ -148,9 +221,9 @@ const moodOf = (v: unknown): Mood | null => MOODS.find((m) => m.toLowerCase() ==
  * Runs every action and returns one short line for each: what was done, or — when an action can't be done —
  * a plain sentence saying so. Nothing is ever skipped silently.
  */
-async function runActions(actions: unknown[], said: string, meds: Medication[]): Promise<{ lines: string[]; needMood: string | null }> {
+async function runActions(actions: unknown[], said: string, meds: Medication[]): Promise<{ lines: string[]; held: HeldEntry | null }> {
   const numbers = numbersSaid(said);
-  let needMood: string | null = null;
+  let held: HeldEntry | null = null;
   const out: string[] = [];
   const foods: Record<string, string[]> = {};
   const noDay = 'I couldn’t tell which day you meant for one part, so I left it. Could you say the day?';
@@ -269,12 +342,12 @@ async function runActions(actions: unknown[], said: string, meds: Medication[]):
           if (!mood && !note && !intention) break;
           const result = await updateQuickEntry(date, { mood, note, intention });
           if (!result.saved) {
-            // A quick entry needs a mood first: ask, and the answer (next recording) saves it all.
-            needMood = `How did ${onDay(date)} feel overall? Tell me and I’ll save it in your quick entry.`;
+            // A quick entry needs a mood first: the words are held (in memory) and saved once they say how the day felt.
+            held = joinHeld(held, { date, note, intention });
             break;
           }
           if (result.mood && mood) out.push(`Set ${onDay(date)}’s mood to ${mood}.`);
-          if (result.note) out.push(`Added that to ${onDay(date)}’s quick entry note${result.trimmed ? ' (the note was full, so the end was cut off)' : ''}.`);
+          if (result.note) out.push(noteLine(date, result.trimmed));
           if (result.intention) out.push(`Set ${onDay(date)}’s intention for tomorrow: ${intention.replace(/[.!]+$/, '')}.`);
           break;
         }
@@ -305,6 +378,5 @@ async function runActions(actions: unknown[], said: string, meds: Medication[]):
   for (const [date, list] of Object.entries(foods)) {
     out.push(`Logged ${list.length === 1 ? list[0] : `${list.slice(0, -1).join(', ')} and ${list.at(-1)}`} ${forDay(date)}.`);
   }
-  if (needMood) out.push(needMood);
-  return { lines: out, needMood };
+  return { lines: out, held };
 }

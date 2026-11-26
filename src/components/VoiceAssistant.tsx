@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { MicIcon } from './icons';
-import { AssistantError, askAssistant, type AssistantMessage } from '../lib/assistant';
+import { AssistantError, askAssistant, type AssistantMessage, type HeldEntry } from '../lib/assistant';
 import { getAssistantDay } from '../lib/assistantContext';
 import { MAX_RECORDING_MS, canDictate, pickFormat, transcribe } from '../lib/dictation';
 import { todayKey } from '../lib/journal';
@@ -35,7 +35,8 @@ export default function VoiceAssistant() {
   const nextId = useRef(1);
   const timers = useRef(new Map<number, number>());
   // The question just asked (and the request it was about), so the next recording can answer it.
-  const pending = useRef<{ chat: AssistantMessage[]; at: number } | null>(null);
+  // A note waiting for the day's mood travels with it, so the answer saves it.
+  const pending = useRef<{ chat: AssistantMessage[]; at: number; held: HeldEntry | null } | null>(null);
 
   const recorder = useRef<MediaRecorder | null>(null);
   const stream = useRef<MediaStream | null>(null);
@@ -147,10 +148,12 @@ export default function VoiceAssistant() {
         return;
       }
       // An open question? Then this recording is the answer to it.
-      const open = pending.current && Date.now() - pending.current.at < QUESTION_OPEN_MS ? pending.current.chat : [];
-      const chat: AssistantMessage[] = [...open, { role: 'user', content: words.slice(0, 1000) }];
-      const result = await askAssistant(page ?? 'Daily Sprout', getAssistantDay() ?? todayKey(), chat, controller.signal);
-      pending.current = result.question ? { chat: [...chat, { role: 'assistant', content: result.question }], at: Date.now() } : null;
+      const fresh = pending.current && Date.now() - pending.current.at < QUESTION_OPEN_MS ? pending.current : null;
+      const chat: AssistantMessage[] = [...(fresh?.chat ?? []), { role: 'user', content: words.slice(0, 1000) }];
+      const result = await askAssistant(page ?? 'Daily Sprout', getAssistantDay() ?? todayKey(), chat, controller.signal, fresh?.held ?? null);
+      pending.current = result.question
+        ? { chat: [...chat, { role: 'assistant', content: result.question }], at: Date.now(), held: result.held }
+        : null;
       if (alive.current) show(result.lines, result.question);
     } catch (e) {
       if (controller.signal.aborted || !alive.current) return;
