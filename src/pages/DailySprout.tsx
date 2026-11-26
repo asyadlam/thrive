@@ -81,6 +81,7 @@ function CalorieRing({ foods }: { foods: FoodLog[] }) {
           Added sugar <strong>{(totals.addedSugar ?? 0).toLocaleString()} g</strong> of {addedSugarTarget} g
         </span>
       </p>
+      <p className="hint sprout-targets-note">These targets are yours, you can change them anytime in Settings.</p>
     </div>
   );
 }

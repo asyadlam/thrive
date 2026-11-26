@@ -34,16 +34,26 @@ export type AppSettings = {
   proteinTarget: number;
   addedSugarTarget: number;
   waterTarget: number;
+  /** Which set of default targets these settings were made with (see TARGETS_VERSION). */
+  targetsVersion: number;
 };
 
 /** Daily Sprout targets: starting values and sensible bounds (whole numbers). */
 export const TARGETS = {
-  calorieTarget: { start: 1600, min: 500, max: 10000, label: 'Calories', unit: 'kcal' },
+  calorieTarget: { start: 2000, min: 500, max: 10000, label: 'Calories', unit: 'kcal' },
   proteinTarget: { start: 80, min: 1, max: 500, label: 'Protein', unit: 'g' },
   addedSugarTarget: { start: 25, min: 0, max: 500, label: 'Added sugar', unit: 'g' },
   waterTarget: { start: 8, min: 1, max: 20, label: 'Water', unit: 'glasses' },
 } as const;
 export type TargetKey = keyof typeof TARGETS;
+
+/**
+ * Version 2: the default calorie target went from 1,600 to 2,000. Settings saved before that (no version, and
+ * still exactly the old 1,600 default) move to 2,000; any other calorie target is the person's own and stays.
+ * From version 2 on, a 1,600 someone types in themselves is kept like any other number.
+ */
+export const TARGETS_VERSION = 2;
+const OLD_CALORIE_DEFAULT = 1600;
 const target = (v: unknown, key: TargetKey) => {
   const t = TARGETS[key];
   return typeof v === 'number' && Number.isInteger(v) && v >= t.min && v <= t.max ? v : t.start;
@@ -120,6 +130,7 @@ const DEFAULTS: AppSettings = {
   proteinTarget: TARGETS.proteinTarget.start,
   addedSugarTarget: TARGETS.addedSugarTarget.start,
   waterTarget: TARGETS.waterTarget.start,
+  targetsVersion: TARGETS_VERSION,
   showHealth: false,
   showDreams: false,
 };
@@ -152,10 +163,14 @@ export function normalizeSettings(value: unknown): AppSettings {
     showDreams: parsed.showDreams === true,
     heightCm: inRange(parsed.heightCm, HEIGHT_CM) ? roundOne(parsed.heightCm) : null,
     weightKg: inRange(parsed.weightKg, WEIGHT_KG) ? roundOne(parsed.weightKg) : null,
-    calorieTarget: target(parsed.calorieTarget, 'calorieTarget'),
+    calorieTarget:
+      parsed.targetsVersion !== TARGETS_VERSION && parsed.calorieTarget === OLD_CALORIE_DEFAULT
+        ? TARGETS.calorieTarget.start // still on the old default: the new default
+        : target(parsed.calorieTarget, 'calorieTarget'),
     proteinTarget: target(parsed.proteinTarget, 'proteinTarget'),
     addedSugarTarget: target(parsed.addedSugarTarget, 'addedSugarTarget'),
     waterTarget: target(parsed.waterTarget, 'waterTarget'),
+    targetsVersion: TARGETS_VERSION,
   };
 }
 

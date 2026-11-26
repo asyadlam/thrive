@@ -299,6 +299,99 @@ export async function deleteAccount(): Promise<void> {
   welcomeAgain('deleted');
 }
 
+/* ---------------- Forgot password ---------------- */
+
+/*
+  Supabase's built-in reset: we ask it to email a link; the link brings the person back to /reset-password with a
+  short-lived login in the address ("type=recovery"), or with an error if the link is too old or already used.
+  The address is read once, as Thrive starts, before the account code can tidy it away.
+*/
+
+/** The reset link's way back into Thrive (it must be on Supabase's list of allowed redirect URLs). */
+export const RESET_PATH = '/reset-password';
+/** Set when a reset is requested on this device (holds the email), so a too-old link can offer a fresh one. */
+const RESET_ASKED_KEY = 'thrive.resetAsked';
+export const RESET_SENT_MESSAGE = 'If an account matches that email, a reset link is on its way. It can take a few minutes.';
+
+export type RecoveryState = 'recovery' | 'expired' | null;
+
+function readLaunchRecovery(): RecoveryState {
+  if (typeof window === 'undefined') return null;
+  const { hash, search, pathname } = window.location;
+  const params = new URLSearchParams(`${search.slice(1)}&${hash.replace(/^#/, '')}`);
+  if (params.get('type') === 'recovery' && params.get('access_token')) return 'recovery';
+  const code = params.get('error_code') ?? '';
+  const error = params.get('error') ?? '';
+  const onResetPath = pathname === RESET_PATH;
+  if (onResetPath && (error || code)) return 'expired';
+  if (code === 'otp_expired' && recall(RESET_ASKED_KEY) !== null) return 'expired'; // came back to the home address instead
+  return null;
+}
+
+/** What the reset link brought, read once at start: a recovery login, a too-old link, or nothing. */
+let launchRecovery: RecoveryState = readLaunchRecovery();
+export const recoveryAtLaunch = (): RecoveryState => launchRecovery;
+/** While the "Set a new password" screen is open: other account work (like the new-device sync) waits. */
+export const isRecovering = () => launchRecovery === 'recovery';
+
+/** The email a reset was last asked for on this device ('' if none), to fill in the "send a new one" field. */
+export const lastResetEmail = () => recall(RESET_ASKED_KEY) ?? '';
+
+/** Leaves the reset screens: tidies the address so the link's details aren't left in it. */
+export function finishRecovery(): void {
+  launchRecovery = null;
+  if (window.location.hash || window.location.search || window.location.pathname === RESET_PATH) {
+    window.history.replaceState(null, '', '/');
+  }
+}
+
+/**
+ * Asks Supabase to email a reset link. Says the same thing whether or not an account (or a Google-only account)
+ * matches the email; only a connection problem or too many tries gets its own plain message.
+ */
+export async function requestPasswordReset(email: string): Promise<string> {
+  const sb = await supabase();
+  if (!sb) throw new CloudError('Accounts aren’t set up for this app yet.');
+  const { error } = await sb.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}${RESET_PATH}` });
+  if (error) {
+    const msg = String(error.message ?? '').toLowerCase();
+    const status = (error as { status?: number }).status;
+    if (status === 429 || msg.includes('rate limit') || msg.includes('security purposes') || msg.includes('too many')) {
+      throw new CloudError('A link was just sent. Please wait a minute before asking for another.');
+    }
+    if (msg.includes('fetch') || msg.includes('network')) throw new CloudError('Couldn’t reach the cloud. Check your connection and try again.');
+  }
+  remember(RESET_ASKED_KEY, email.trim());
+  return RESET_SENT_MESSAGE;
+}
+
+/**
+ * From the reset link: is there a usable recovery login? Supabase reads it from the address when the account code
+ * starts. Null means the link didn't work (too old or already used).
+ */
+export async function recoverySession(): Promise<Session | null> {
+  try {
+    return await getSession();
+  } catch {
+    return null;
+  }
+}
+
+/** Saves the new password for the person the reset link logged in. */
+export async function saveNewPassword(password: string): Promise<void> {
+  const sb = await supabase();
+  if (!sb) throw new CloudError('Accounts aren’t set up for this app yet.');
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) {
+    const msg = String(error.message ?? '').toLowerCase();
+    if (msg.includes('different from the old') || msg.includes('same password')) throw new CloudError('That’s your current password. Please choose a new one.');
+    if (msg.includes('session') || msg.includes('jwt') || msg.includes('expired') || msg.includes('not authenticated')) throw new CloudError('expired');
+    throw friendly(error, 'Your new password didn’t save just now. Please try again.');
+  }
+  forget(RESET_ASKED_KEY);
+  rememberWelcomeChoice('account');
+}
+
 /* ---------------- Continue with Google ---------------- */
 
 /** Set just before leaving for Google; holds where to come back to ("/" or "/settings"). */

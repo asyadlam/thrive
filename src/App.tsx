@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Welcome from './pages/Welcome';
-import { WELCOME_EVENT, completeGoogleSignIn, hasGooglePending, needsWelcome } from './lib/cloud';
+import ResetPassword from './pages/ResetPassword';
+import { WELCOME_EVENT, completeGoogleSignIn, finishRecovery, hasGooglePending, needsWelcome, recoveryAtLaunch } from './lib/cloud';
 import Layout from './components/Layout';
 import Home from './pages/Home';
 import Journal from './pages/Journal';
@@ -30,7 +31,9 @@ export default function App() {
   // One-time Welcome: only until the person logs in or chooses local-only use on this device.
   const [welcome, setWelcome] = useState(needsWelcome);
   // Coming back from "Continue with Google": wait for the result before showing anything (no flash of Welcome).
-  const [returning, setReturning] = useState(hasGooglePending);
+  const [returning, setReturning] = useState(() => !recoveryAtLaunch() && hasGooglePending());
+  // Opened from a "Forgot password?" email: the reset screen comes first, before Welcome or Home.
+  const [recovery, setRecovery] = useState(recoveryAtLaunch);
   const navigate = useNavigate();
   const { pathname } = useLocation();
   useEffect(() => {
@@ -50,6 +53,20 @@ export default function App() {
     window.addEventListener(WELCOME_EVENT, show);
     return () => window.removeEventListener(WELCOME_EVENT, show);
   }, []);
+  if (recovery) {
+    return (
+      <ResetPassword
+        initial={recovery}
+        onDone={(signedIn) => {
+          finishRecovery();
+          setRecovery(null);
+          setWelcome(signedIn ? false : needsWelcome());
+          window.scrollTo(0, 0);
+          navigate('/', { replace: true });
+        }}
+      />
+    );
+  }
   if (returning) return <div className="app-returning" aria-busy="true" />;
   if (welcome && pathname === '/privacy') {
     // Opened from the Welcome screen footer: shown on its own, before any choice is made.

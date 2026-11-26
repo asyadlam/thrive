@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { applyBackup } from '../lib/backup';
-import { cloudAvailable, cloudBackupInfo, fetchCloudBackup, getSession, isLinkedDevice, markRestoredFromCloud, onSessionChange } from '../lib/cloud';
+import { cloudAvailable, cloudBackupInfo, fetchCloudBackup, getSession, isLinkedDevice, isRecovering, markRestoredFromCloud, onSessionChange } from '../lib/cloud';
 import { applyMerge, deviceHasOwnData, planMerge, totalAdded } from '../lib/merge';
 
 /*
@@ -50,7 +50,7 @@ function leaveNotice(kind: SyncNotice) {
 let syncing = false;
 
 async function syncIfNeeded(): Promise<void> {
-  if (syncing) return;
+  if (syncing || isRecovering()) return; // a password reset is open: wait until the new password is saved
   syncing = true;
   try {
     if (!(await getSession()) || (await isLinkedDevice())) return;

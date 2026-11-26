@@ -9,6 +9,7 @@ import {
   logIn,
   logOut,
   onSessionChange,
+  requestPasswordReset,
   signInWithGoogle,
   signUp,
   takeGoogleFailure,
@@ -39,6 +40,24 @@ export function AccountForm({ onSignedIn, googleBack = '/' }: { onSignedIn?: () 
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
+  // "Forgot password?": a soft line under the password field (never a pop-up).
+  const [resetNote, setResetNote] = useState('');
+  const [resetting, setResetting] = useState(false);
+
+  async function forgotPassword() {
+    const email = formEmail.trim();
+    setError(null);
+    setMessage('');
+    if (!/^\S+@\S+\.\S+$/.test(email)) return setResetNote('Enter your email above, then tap Forgot password again.');
+    setResetting(true);
+    try {
+      setResetNote(await requestPasswordReset(email));
+    } catch (err) {
+      setResetNote(err instanceof CloudError ? err.message : 'That didn’t go through just now. Please try again.');
+    } finally {
+      setResetting(false);
+    }
+  }
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -93,7 +112,7 @@ export function AccountForm({ onSignedIn, googleBack = '/' }: { onSignedIn?: () 
           type="email"
           autoComplete="email"
           value={formEmail}
-          onChange={(e) => (setFormEmail(e.target.value), setError(null))}
+          onChange={(e) => (setFormEmail(e.target.value), setError(null), setResetNote(''))}
         />
       </div>
       <div className="field">
@@ -107,6 +126,18 @@ export function AccountForm({ onSignedIn, googleBack = '/' }: { onSignedIn?: () 
           onChange={(e) => (setPassword(e.target.value), setError(null))}
         />
         {mode === 'signup' && <p className="hint">At least 8 characters.</p>}
+        {mode === 'login' && (
+          <>
+            <button type="button" className="saving-toggle account-forgot" onClick={() => void forgotPassword()} disabled={resetting || busy}>
+              {resetting ? 'One moment…' : 'Forgot password?'}
+            </button>
+            {resetNote && (
+              <p className="hint account-reset-note" role="status">
+                {resetNote}
+              </p>
+            )}
+          </>
+        )}
       </div>
       {error && (
         <p className="form-error" role="alert">
@@ -124,6 +155,7 @@ export function AccountForm({ onSignedIn, googleBack = '/' }: { onSignedIn?: () 
         onClick={() => {
           setMode((m) => (m === 'login' ? 'signup' : 'login'));
           setError(null);
+          setResetNote('');
           setMessage('');
         }}
       >
