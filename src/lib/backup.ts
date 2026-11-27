@@ -17,7 +17,8 @@ import {
   type Mood,
   type TalkSummary,
 } from './journal';
-import { loadSettings, normalizeSettings, saveSettings, type AppSettings } from './settings';
+import { getSettingsUpdatedAt, loadSettings, normalizeSettings, saveSettings, type AppSettings } from './settings';
+import { backupMeta, readBackupMeta, type BackupMeta } from './device';
 import { goalFromBackup, listAllGoals, type Goal } from './goals';
 import {
   AFFIRMATIONS_STORE,
@@ -94,7 +95,11 @@ const MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 export type Backup = typeof FORMAT & {
   exportedAt: string;
+  /** Where and when this backup was made (device id and a platform label only). */
+  meta: BackupMeta;
   settings: AppSettings;
+  /** When the settings were last changed on the device that made this backup ("last changed wins"). */
+  settingsUpdatedAt: string | null;
   entries: JournalEntry[];
   dreams: JournalEntry[];
   health: HealthDay[];
@@ -115,7 +120,9 @@ export async function buildBackup(): Promise<Backup> {
   return {
     ...FORMAT,
     exportedAt: new Date().toISOString(),
+    meta: backupMeta(),
     settings: loadSettings(),
+    settingsUpdatedAt: getSettingsUpdatedAt(),
     entries: (await listAllEntries()).map((e) => (e.type === 'talk' ? withSummaryList(e) : e)), // summaries as a list
     health: await listHealthDays(),
     medications: await listMedications(),
@@ -206,7 +213,9 @@ function checkEntry(raw: unknown, i: number): JournalEntry {
 
 export type CheckedBackup = {
   exportedAt: string | null;
+  meta: BackupMeta | null;
   settings: AppSettings;
+  settingsUpdatedAt: string | null;
   entries: JournalEntry[];
   quickCount: number;
   talkCount: number;
@@ -437,7 +446,9 @@ export function checkBackup(data: unknown): CheckedBackup {
   return {
     keepCurrentJourneys,
     exportedAt: isIsoTime(d.exportedAt) ? d.exportedAt : null,
+    meta: readBackupMeta(d.meta),
     settings: normalizeSettings(d.settings),
+    settingsUpdatedAt: isIsoTime(d.settingsUpdatedAt) ? d.settingsUpdatedAt : null,
     entries,
     quickCount: entries.filter((e) => e.type === 'quick').length,
     talkCount: entries.filter((e) => e.type === 'talk').length,
@@ -495,7 +506,7 @@ export async function applyBackup(backup: CheckedBackup): Promise<void> {
   if (backup.measurements) stores[MEASUREMENTS_STORE] = backup.measurements;
   if (backup.routine) stores[ROUTINE_STORE] = backup.routine;
   await idbReplaceStores(stores);
-  saveSettings(backup.settings);
+  saveSettings(backup.settings, backup.settingsUpdatedAt ?? new Date().toISOString());
 }
 
 /* ---------- Readable copy ---------- */
@@ -522,6 +533,37 @@ export async function buildReadableText(): Promise<string> {
       }
     }
     lines.push('');
+  }
+  // Daily Sprout days (they're in every backup file; here they're written out to read).
+  const days = await listHealthDays();
+  if (days.length) {
+    lines.push('════════════════════════════════', 'Daily Sprout', '');
+    const meds = new Map((await listMedications()).map((m) => [m.id, m.name]));
+    for (const d of days) {
+      lines.push('────────────────────────────────', formatLongDay(d.date));
+      if (d.intention) lines.push(`Little sprout: I'll try ${d.intention}`);
+      const foods = d.foods ?? [];
+      if (foods.length) {
+        const total = foods.reduce((t, f) => t + (f.calories ?? 0), 0);
+        lines.push(`Food (${total.toLocaleString()} cal):`);
+        for (const f of foods) {
+          const nums = [
+            f.calories === null ? null : `${f.estimate ? 'about ' : ''}${f.calories.toLocaleString()} cal`,
+            f.protein === null ? null : `protein ${f.protein} g`,
+            f.sugar === null ? null : `sugar ${f.sugar} g`,
+            f.addedSugar === null ? null : `added sugar ${f.addedSugar} g`,
+          ].filter(Boolean);
+          lines.push(`  • ${f.name || 'Something to eat'}${f.count && f.count > 1 ? ` × ${f.count}` : ''}${nums.length ? ` (${nums.join(', ')})` : ''}${f.estimate ? ' [estimate]' : ''}`);
+        }
+      } else if (d.calories !== null) lines.push(`Calories: ${d.calories.toLocaleString()}`);
+      if (d.steps !== null) lines.push(`Steps: ${d.steps.toLocaleString()}`);
+      if (d.exercise) lines.push(`Exercise: ${d.exercise}`);
+      if (d.stretch) lines.push('Stretched: yes');
+      if (d.water) lines.push(`Water: ${d.water} ${d.water === 1 ? 'glass' : 'glasses'}`);
+      if (d.meds.length) lines.push(`Medications/vitamins: ${d.meds.map((m) => meds.get(m.id) ?? m.name).join(', ')}`);
+      if (d.todos?.length) lines.push('To-dos:', ...d.todos.map((t) => `  ${t.done ? '[x]' : '[ ]'} ${t.text}`));
+      lines.push('');
+    }
   }
   return lines.join('\n');
 }

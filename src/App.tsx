@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Welcome from './pages/Welcome';
 import ResetPassword from './pages/ResetPassword';
+import { SETTINGS_SYNCED } from './lib/settings';
 import { WELCOME_EVENT, completeGoogleSignIn, finishRecovery, hasGooglePending, needsWelcome, recoveryAtLaunch } from './lib/cloud';
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -44,6 +45,13 @@ export default function App() {
       setReturning(false);
     });
   }, [returning]);
+  // Settings that arrived from another device (name, pet, targets…): pages re-read them quietly.
+  const [settingsVersion, setSettingsVersion] = useState(0);
+  useEffect(() => {
+    const bump = () => setSettingsVersion((v) => v + 1);
+    window.addEventListener(SETTINGS_SYNCED, bump);
+    return () => window.removeEventListener(SETTINGS_SYNCED, bump);
+  }, []);
   // Log out / Delete account bring the Welcome screen back straight away (local data untouched).
   useEffect(() => {
     const show = () => {
@@ -89,7 +97,7 @@ export default function App() {
     );
   }
   return (
-    <Routes>
+    <Routes key={settingsVersion}>
       <Route element={<Layout />}>
         <Route index element={<Home />} />
         <Route path="journal" element={<Journal />} />

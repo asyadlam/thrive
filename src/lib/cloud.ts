@@ -10,6 +10,7 @@
 */
 import type { Session, SupabaseClient } from '@supabase/supabase-js';
 import { buildBackup, checkBackup, type CheckedBackup } from './backup';
+import { deviceId, deviceLabel, readBackupMeta } from './device';
 
 const URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -205,9 +206,13 @@ async function requireUser(): Promise<{ sb: SupabaseClient; userId: string }> {
 /** When this account's cloud copy was last saved (null if there isn't one yet). */
 export async function cloudBackupInfo(): Promise<{ updatedAt: string } | null> {
   const { sb, userId } = await requireUser();
-  const { data, error } = await sb.from(TABLE).select('updated_at').eq('user_id', userId).maybeSingle();
+  const { data, error } = await sb.from(TABLE).select('updated_at, meta:data->meta').eq('user_id', userId).maybeSingle();
   if (error) throw friendly(error, 'Couldn’t check your cloud backup. Please try again.');
-  if (data?.updated_at) remember(LAST_CLOUD_KEY, data.updated_at);
+  if (data?.updated_at) {
+    remember(LAST_CLOUD_KEY, data.updated_at);
+    const meta = readBackupMeta((data as { meta?: unknown }).meta);
+    noteCloudCopy({ at: data.updated_at as string, deviceId: meta?.deviceId ?? null, deviceLabel: meta?.deviceLabel ?? '' });
+  }
   return data ? { updatedAt: data.updated_at as string } : null;
 }
 
@@ -220,7 +225,7 @@ export async function backUpToCloud(): Promise<string> {
   if (error) throw friendly(error, 'Couldn’t back up to the cloud. Your data is safe on this device — please try again.');
   remember(LAST_CLOUD_KEY, updatedAt);
   remember(LINKED_KEY, userId);
-  recordSync(true);
+  recordSync(true, { copy: madeHere(updatedAt) });
   return updatedAt;
 }
 
@@ -251,30 +256,84 @@ export async function markRestoredFromCloud(updatedAt: string): Promise<void> {
 
 const SYNC_KEY = 'thrive.cloudSync';
 const SYNC_EVENT = 'thrive:cloud-sync-status';
-/** The last sync: when, whether it worked, and how many things a merge on open added (shown for a day). */
-export type SyncStatus = { at: string; ok: boolean; added: number; addedAt?: string };
+/**
+ * The last sync: when it was tried and whether it worked, how many things a merge on open added (mentioned for a
+ * day), and the newest cloud backup this device knows of: when it was made and on which device.
+ */
+export type SyncStatus = {
+  at: string;
+  ok: boolean;
+  added: number;
+  addedAt?: string;
+  backupAt?: string;
+  backupDeviceId?: string;
+  backupDeviceLabel?: string;
+};
+/** The newest cloud backup: when, and on which device (id and platform label). */
+export type CloudCopyInfo = { at: string; deviceId: string | null; deviceLabel: string };
 
 export function readSyncStatus(): SyncStatus | null {
   try {
     const v = JSON.parse(recall(SYNC_KEY) ?? 'null') as Partial<SyncStatus> | null;
     if (!v || typeof v.at !== 'string' || typeof v.ok !== 'boolean') return null;
     const fresh = typeof v.addedAt === 'string' && Date.now() - Date.parse(v.addedAt) < 24 * 60 * 60 * 1000;
-    return { at: v.at, ok: v.ok, added: fresh ? Number(v.added) || 0 : 0, ...(fresh ? { addedAt: v.addedAt } : {}) };
+    return {
+      at: v.at,
+      ok: v.ok,
+      added: fresh ? Number(v.added) || 0 : 0,
+      ...(fresh ? { addedAt: v.addedAt } : {}),
+      ...(typeof v.backupAt === 'string' ? { backupAt: v.backupAt } : {}),
+      ...(typeof v.backupDeviceId === 'string' ? { backupDeviceId: v.backupDeviceId } : {}),
+      ...(typeof v.backupDeviceLabel === 'string' ? { backupDeviceLabel: v.backupDeviceLabel } : {}),
+    };
   } catch {
     return null;
   }
 }
 
-/** Records a sync result. `added` is only given by a merge on open; otherwise the last merge's count is kept. */
-export function recordSync(ok: boolean, added?: number): void {
-  const before = readSyncStatus();
-  const now = new Date().toISOString();
-  // A merge that added things is mentioned for a day (later opens that add nothing don't hide it).
-  const kept = added && added > 0 ? { added, addedAt: now } : { added: before?.added ?? 0, ...(before?.addedAt ? { addedAt: before.addedAt } : {}) };
-  const next: SyncStatus = ok ? { at: now, ok: true, ...kept } : { at: before?.at ?? now, ok: false, ...kept }; // keep when it last worked
+function writeSyncStatus(next: SyncStatus) {
   remember(SYNC_KEY, JSON.stringify(next));
   window.dispatchEvent(new Event(SYNC_EVENT));
 }
+
+/**
+ * Records a sync result. `added` is only given by a merge on open; `copy` is the newest cloud backup it saw or
+ * made. Anything not given is kept from before.
+ */
+export function recordSync(ok: boolean, info: { added?: number; copy?: CloudCopyInfo } = {}): void {
+  const before = readSyncStatus();
+  const now = new Date().toISOString();
+  // A merge that added things is mentioned for a day (later opens that add nothing don't hide it).
+  const added =
+    info.added && info.added > 0
+      ? { added: info.added, addedAt: now }
+      : { added: before?.added ?? 0, ...(before?.addedAt ? { addedAt: before.addedAt } : {}) };
+  const copy = info.copy
+    ? { backupAt: info.copy.at, ...(info.copy.deviceId ? { backupDeviceId: info.copy.deviceId } : {}), backupDeviceLabel: info.copy.deviceLabel }
+    : {
+        ...(before?.backupAt ? { backupAt: before.backupAt } : {}),
+        ...(before?.backupDeviceId ? { backupDeviceId: before.backupDeviceId } : {}),
+        ...(before?.backupDeviceLabel ? { backupDeviceLabel: before.backupDeviceLabel } : {}),
+      };
+  writeSyncStatus({ at: ok ? now : (before?.at ?? now), ok, ...added, ...copy });
+}
+
+/** Just updates which cloud backup is newest (when Settings checks), without counting it as a sync. */
+function noteCloudCopy(copy: CloudCopyInfo) {
+  const before = readSyncStatus();
+  writeSyncStatus({
+    at: before?.at ?? copy.at,
+    ok: before?.ok ?? true,
+    added: before?.added ?? 0,
+    ...(before?.addedAt ? { addedAt: before.addedAt } : {}),
+    backupAt: copy.at,
+    ...(copy.deviceId ? { backupDeviceId: copy.deviceId } : {}),
+    backupDeviceLabel: copy.deviceLabel,
+  });
+}
+
+/** The cloud copy info for a backup this device just made. */
+const madeHere = (at: string): CloudCopyInfo => ({ at, deviceId: deviceId(), deviceLabel: deviceLabel() });
 
 export function onSyncStatus(cb: () => void): () => void {
   window.addEventListener(SYNC_EVENT, cb);
@@ -315,7 +374,7 @@ export async function backUpToCloudOnClose(): Promise<string> {
   if (!res.ok) throw new CloudError('Couldn’t back up to the cloud.');
   remember(LAST_CLOUD_KEY, updatedAt);
   remember(LINKED_KEY, session.user.id);
-  recordSync(true);
+  recordSync(true, { copy: madeHere(updatedAt) });
   return updatedAt;
 }
 

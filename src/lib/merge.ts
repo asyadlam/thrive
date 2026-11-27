@@ -29,6 +29,7 @@ import {
   idbPutMany,
 } from './db';
 import { talkSummariesOf, withSummaryList, type JournalEntry } from './journal';
+import { SETTINGS_SYNCED, getSettingsUpdatedAt, loadSettings, normalizeSettings, saveSettings, settingsAreDefault } from './settings';
 import type { UserList } from './lists';
 import type { MeasurementKind } from './profile';
 import { STARTER_LISTS } from './listParts';
@@ -253,6 +254,24 @@ export async function deviceHasOwnData(): Promise<boolean> {
   for (const store of stores) if ((await idbGetAll(store)).length > 0) return true;
   const starters = new Set([...STARTER_LISTS.map((s) => s.id), 'list-todo']); // list-todo: the old empty To do list
   return (await idbGetAll<UserList>(LISTS_STORE)).some((l) => !starters.has(l.id) || (l.items?.length ?? 0) > 0);
+}
+
+/**
+ * Settings travel as one set, and the set changed most recently wins (each backup carries when its settings
+ * were last changed). A device whose settings were never touched takes the backup's even from an older backup
+ * without that time. Returns true when this device's settings were replaced.
+ */
+export function takeNewerSettings(backup: CheckedBackup): boolean {
+  const mine = getSettingsUpdatedAt();
+  const theirs = backup.settingsUpdatedAt;
+  const newer = theirs ? !mine || Date.parse(theirs) > Date.parse(mine) : !mine && settingsAreDefault() && !settingsAreDefault(backup.settings);
+  if (!newer) return false;
+  const incoming = normalizeSettings(backup.settings);
+  const same = JSON.stringify(incoming) === JSON.stringify(loadSettings());
+  saveSettings(incoming, theirs ?? null);
+  if (same) return false;
+  window.dispatchEvent(new Event(SETTINGS_SYNCED)); // open pages pick up the new name, pet, targets…
+  return true;
 }
 
 export const totalAdded = (c: MergeCounts) => Object.values(c).reduce((a, b) => a + b, 0);

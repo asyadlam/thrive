@@ -13,6 +13,7 @@ import {
   type CheckedBackup,
 } from '../lib/backup';
 import { formatTime } from '../lib/journal';
+import { deviceId } from '../lib/device';
 import { setLastBackupAt } from '../lib/settings';
 import { applyMerge, describeCounts, planMerge, totalAdded, type MergePlan } from '../lib/merge';
 import {
@@ -31,6 +32,23 @@ import {
 } from '../lib/cloud';
 
 /** A short backup date, "Nov 23, 2026 at 4:05 PM", so backup lines stay short on a phone. */
+/**
+ * The one quiet line: "Last backup: today at 9:41 PM · from this device", "… · from another device (Chrome on
+ * Mac) · 3 entries added here", or, after a failed try, "Couldn't sync last time, will try again".
+ */
+function syncLine(sync: SyncStatus | null, lastCloud: string | null): string {
+  if (sync && !sync.ok) return 'Couldn’t sync last time, will try again.';
+  const at = sync?.backupAt ?? lastCloud;
+  if (!at) return 'No cloud backup yet.';
+  const from = !sync?.backupDeviceId
+    ? ''
+    : sync.backupDeviceId === deviceId()
+      ? ' · from this device'
+      : ` · from another device${sync.backupDeviceLabel ? ` (${sync.backupDeviceLabel})` : ''}`;
+  const added = sync && sync.added > 0 ? ` · ${sync.added} ${sync.added === 1 ? 'entry' : 'entries'} added here` : '';
+  return `Last backup: ${syncWhen(at)}${from}${added}`;
+}
+
 /** "today at 9:41 PM", "yesterday at 8:02 AM", or "Nov 3, 2026 at 9:41 PM". */
 function syncWhen(iso: string): string {
   const d = new Date(iso);
@@ -289,13 +307,7 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
             Cloud backup
           </h2>
           <p className="data-status" role="status">
-            {sync && !sync.ok
-              ? 'Couldn’t sync last time, will try again.'
-              : sync
-                ? `Last synced: ${syncWhen(sync.at)}${sync.added > 0 ? ` · ${sync.added} ${sync.added === 1 ? 'entry' : 'entries'} added from your backup` : ''}`
-                : lastCloud
-                  ? `Last synced: ${syncWhen(lastCloud)}`
-                  : 'No cloud backup yet.'}
+            {syncLine(sync, lastCloud)}
           </p>
           <div className="data-actions">
             <button type="button" className="btn-primary" onClick={() => void handleCloudBackup()} disabled={cloudBusy !== null || busy !== null}>

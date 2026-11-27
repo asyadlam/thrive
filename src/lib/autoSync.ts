@@ -21,12 +21,13 @@ import {
   cloudAvailable,
   fetchCloudBackup,
   getSession,
+  isLinkedDevice,
   isRecovering,
   markRestoredFromCloud,
   onSessionChange,
   recordSync,
 } from './cloud';
-import { applyMerge, planMerge, totalAdded } from './merge';
+import { applyMerge, deviceHasOwnData, planMerge, takeNewerSettings, totalAdded } from './merge';
 
 /** A burst of edits makes one backup, this long after the last one. */
 const QUIET_MS = 4000;
@@ -57,6 +58,8 @@ const writePending = (on: boolean) => {
   }
 };
 let dirty = false;
+/** True while a merge on open is writing what came from the cloud. */
+let applying = false;
 let timer: number | undefined;
 let backingUp: Promise<void> | null = null;
 let again = false;
@@ -69,21 +72,35 @@ async function mergeOnOpen(): Promise<void> {
   try {
     const copy = await fetchCloudBackup();
     let added = 0;
+    // The first sync of a device that already had its own things: those need to go up to the cloud too.
+    const firstWithOwnData = !(await isLinkedDevice()) && (await deviceHasOwnData());
     if (copy) {
       const plan = await planMerge(copy.backup);
       added = totalAdded(plan.added);
       if (added > 0) {
-        await applyMerge(plan);
+        applying = true; // what the merge writes came from the cloud: not a change to send back
+        try {
+          await applyMerge(plan);
+        } finally {
+          applying = false;
+        }
         notifyDataChanged(); // open pages show what arrived
       }
+      // Settings: the set changed most recently wins, as a whole (never field by field).
+      takeNewerSettings(copy.backup);
       await markRestoredFromCloud(copy.updatedAt);
     }
     if (userId !== who) return; // logged out (or switched) meanwhile
     mergedFor = who;
     if (readPending()) dirty = true; // changes from last time that never reached the cloud
-    recordSync(true, added);
-    // No cloud copy yet, something arrived, or edits were waiting: back up so the cloud has the full picture.
-    if (!copy || added > 0 || dirty) {
+    const meta = copy?.backup.meta ?? null;
+    recordSync(true, {
+      added,
+      ...(copy ? { copy: { at: copy.updatedAt, deviceId: meta?.deviceId ?? null, deviceLabel: meta?.deviceLabel ?? '' } } : {}),
+    });
+    // No cloud copy yet, this device's own things aren't up there yet, or edits were waiting: back up. (What a
+    // merge brought in is already in the cloud, so it alone never causes a backup — no ping-pong.)
+    if (!copy || firstWithOwnData || dirty) {
       dirty = true;
       schedule();
     }
@@ -129,7 +146,7 @@ async function backUp(closing: boolean): Promise<void> {
 
 /** Something was saved on this device. */
 function changed() {
-  if (!userId) return; // guest mode: nothing to do
+  if (!userId || applying) return; // guest mode, or the merge's own writes: nothing to send
   dirty = true;
   writePending(true);
   if (mergedFor === userId) schedule();

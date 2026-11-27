@@ -185,12 +185,42 @@ export function loadSettings(): AppSettings {
 
 /** Fired after settings are saved (the automatic cloud backup listens). */
 export const SETTINGS_SAVED = 'thrive:settings-saved';
+/** Fired when settings arrive from another device (open pages re-read them). */
+export const SETTINGS_SYNCED = 'thrive:settings-synced';
 
-/** Returns false if the browser refused to save (e.g. storage blocked). */
-export function saveSettings(settings: AppSettings): boolean {
+/** When settings were last changed on this device (ISO), for "last changed wins" between devices. */
+const SETTINGS_TIME_KEY = 'thrive.settingsUpdatedAt';
+export function getSettingsUpdatedAt(): string | null {
   try {
-    localStorage.setItem(KEY, JSON.stringify(settings));
-    window.dispatchEvent(new Event(SETTINGS_SAVED)); // the automatic cloud backup follows changes here too
+    const v = localStorage.getItem(SETTINGS_TIME_KEY);
+    return v && !Number.isNaN(Date.parse(v)) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when this device's settings are still the untouched defaults (nothing chosen here yet). */
+export function settingsAreDefault(s: AppSettings = loadSettings()): boolean {
+  return JSON.stringify(normalizeSettings({})) === JSON.stringify(normalizeSettings(s));
+}
+
+/**
+ * Returns false if the browser refused to save (e.g. storage blocked). A real change stamps this device's
+ * "settings last changed" time; settings that came from a backup keep that backup's time (`changedAt`).
+ */
+export function saveSettings(settings: AppSettings, changedAt?: string | null): boolean {
+  try {
+    const before = localStorage.getItem(KEY);
+    const next = JSON.stringify(settings);
+    localStorage.setItem(KEY, next);
+    if (changedAt !== undefined) {
+      if (changedAt) localStorage.setItem(SETTINGS_TIME_KEY, changedAt);
+    } else if (before !== next) {
+      localStorage.setItem(SETTINGS_TIME_KEY, new Date().toISOString());
+    }
+    // A change made here: the automatic cloud backup follows it. (Settings that just came from a backup aren't
+    // a new change, so they don't trigger one.)
+    if (changedAt === undefined) window.dispatchEvent(new Event(SETTINGS_SAVED));
     return true;
   } catch {
     return false;
