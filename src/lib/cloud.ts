@@ -343,39 +343,57 @@ export function onSyncStatus(cb: () => void): () => void {
 /** Keepalive requests (they can finish after the page closes) are limited to about 64 KB by browsers. */
 const KEEPALIVE_MAX = 60 * 1024;
 
-/**
- * The backup for when the app is closing: the same full copy as Back up to cloud, sent as a keepalive request
- * when it's small enough to be allowed one (so it can still arrive after the page is gone); otherwise sent the
- * usual way, as best effort.
- */
-export async function backUpToCloudOnClose(): Promise<string> {
+/** A backup ready to send at once (built ahead, so leaving the app doesn't have to wait for it). */
+export type PreparedBackup = { userId: string; token: string; data: string; at: string };
+
+/** Builds a backup ready to send, for the signed-in account (null when not signed in). */
+export async function prepareBackup(): Promise<PreparedBackup | null> {
   const session = await getSession();
-  if (!session || !URL || !ANON_KEY) throw new CloudError('Please log in first.');
-  const backup = await buildBackup();
-  const updatedAt = new Date().toISOString();
-  const body = JSON.stringify({ user_id: session.user.id, data: backup, updated_at: updatedAt });
-  if (body.length > KEEPALIVE_MAX) return backUpToCloud();
-  let res: Response;
-  try {
-    res = await fetch(`${URL.replace(/\/+$/, '')}/rest/v1/${TABLE}?on_conflict=user_id`, {
-      method: 'POST',
-      keepalive: true,
+  if (!session) return null;
+  const at = new Date().toISOString();
+  return { userId: session.user.id, token: session.access_token, data: JSON.stringify(await buildBackup()), at };
+}
+
+export type UploadResult = 'saved' | 'conflict';
+
+/**
+ * Sends a prepared backup — but only over the cloud copy this device has already seen (`seenAt`), so it can
+ * never replace changes from another device that haven't been merged here yet: if the cloud copy changed in the
+ * meantime, nothing is written and this says 'conflict'. With no cloud copy yet (`seenAt` null) it creates one.
+ * `keepalive` lets the request finish after the app closes (when it's small enough for browsers to allow it).
+ * The request is started straight away, before anything else is awaited.
+ */
+export async function uploadBackup(prep: PreparedBackup, seenAt: string | null, keepalive = false): Promise<UploadResult> {
+  if (!URL || !ANON_KEY) throw new CloudError('Accounts aren’t set up for this app yet.');
+  const base = `${URL.replace(/\/+$/, '')}/rest/v1/${TABLE}`;
+  const body = seenAt
+    ? `{"data":${prep.data},"updated_at":${JSON.stringify(prep.at)}}`
+    : `{"user_id":${JSON.stringify(prep.userId)},"data":${prep.data},"updated_at":${JSON.stringify(prep.at)}}`;
+  const res = await fetch(
+    seenAt
+      ? `${base}?user_id=eq.${encodeURIComponent(prep.userId)}&updated_at=eq.${encodeURIComponent(seenAt)}&select=user_id`
+      : `${base}?on_conflict=user_id&select=user_id`,
+    {
+      method: seenAt ? 'PATCH' : 'POST',
+      keepalive: keepalive && body.length <= KEEPALIVE_MAX,
       headers: {
         apikey: ANON_KEY,
-        authorization: `Bearer ${session.access_token}`,
+        authorization: `Bearer ${prep.token}`,
         'content-type': 'application/json',
-        prefer: 'resolution=merge-duplicates,return=minimal',
+        prefer: seenAt ? 'return=representation' : 'resolution=ignore-duplicates,return=representation',
       },
       body,
-    });
-  } catch {
-    return backUpToCloud(); // a browser that won't send this kind of request: the usual way, best effort
-  }
+    },
+  );
   if (!res.ok) throw new CloudError('Couldn’t back up to the cloud.');
-  remember(LAST_CLOUD_KEY, updatedAt);
-  remember(LINKED_KEY, session.user.id);
-  recordSync(true, { copy: madeHere(updatedAt) });
-  return updatedAt;
+  // The rows written come back: none means the cloud copy changed since this device saw it (or, for a first
+  // backup, one already exists) — nothing was replaced.
+  const rows = (await res.json().catch(() => [])) as unknown[];
+  if (!Array.isArray(rows) || rows.length === 0) return 'conflict';
+  remember(LAST_CLOUD_KEY, prep.at);
+  remember(LINKED_KEY, prep.userId);
+  recordSync(true, { copy: madeHere(prep.at) });
+  return 'saved';
 }
 
 /**

@@ -17,8 +17,6 @@ import { onLocalWrite } from './db';
 import { SETTINGS_SAVED } from './settings';
 import { notifyDataChanged } from './dataEvents';
 import {
-  backUpToCloud,
-  backUpToCloudOnClose,
   cloudAvailable,
   cloudBackupInfo,
   fetchCloudBackup,
@@ -27,7 +25,10 @@ import {
   isRecovering,
   markRestoredFromCloud,
   onSessionChange,
+  prepareBackup,
   recordSync,
+  uploadBackup,
+  type PreparedBackup,
 } from './cloud';
 import { applySync, deviceHasOwnData, planSync, takeNewerSettings } from './merge';
 
@@ -35,11 +36,13 @@ import { applySync, deviceHasOwnData, planSync, takeNewerSettings } from './merg
 export const SYNCED_IN = 'thrive:synced-in';
 
 /** A burst of edits makes one backup, this long after the last one. */
-const QUIET_MS = 4000;
+const QUIET_MS = 2500;
+/** A backup is built ahead this long after a change, so leaving the app can send it instantly. */
+const PREPARE_MS = 250;
 /** While the app is open and in front, look for the other device's changes this often. */
-const CHECK_EVERY_MS = 2 * 60 * 1000;
-/** Coming back to the app looks again if it's been at least this long. */
-const RECHECK_AFTER_MS = 30 * 1000;
+const CHECK_EVERY_MS = 45 * 1000;
+/** Coming back to the app (or its tab) looks again if it's been at least this long. */
+const RECHECK_AFTER_MS = 5 * 1000;
 
 let started = false;
 let userId: string | null = null;
@@ -77,6 +80,33 @@ let applying = false;
 let timer: number | undefined;
 let backingUp: Promise<void> | null = null;
 let again = false;
+/** Counts changes, so a backup knows whether it included the latest one. */
+let changeCount = 0;
+/** The latest change, already built into a backup (sent at once when the app is left). */
+let prepared: { prep: PreparedBackup; count: number } | null = null;
+let prepareTimer: number | undefined;
+
+function prepareSoon() {
+  window.clearTimeout(prepareTimer);
+  prepareTimer = window.setTimeout(async () => {
+    const count = changeCount;
+    try {
+      const prep = await prepareBackup();
+      if (prep && prep.userId === userId) prepared = { prep, count };
+    } catch {
+      /* the regular backup still runs */
+    }
+  }, PREPARE_MS);
+}
+
+/** After a backup reached the cloud: this device has seen it, and the changes it included are safe. */
+function savedUp(prep: PreparedBackup, count: number) {
+  seenCloudAt = prep.at;
+  if (count === changeCount) {
+    dirty = false;
+    writePending(false);
+  }
+}
 
 /**
  * Fetches the cloud copy and merges it in. Returns true when this device is now up to date with the cloud
@@ -108,6 +138,9 @@ function mergeFromCloud(): Promise<boolean> {
         }
         // Settings: the set changed most recently wins, as a whole (never field by field).
         takeNewerSettings(copy.backup);
+        // A backup built before this merge doesn't include it: build it again.
+        prepared = null;
+        if (dirty) prepareSoon();
         await markRestoredFromCloud(copy.updatedAt);
       }
       if (userId !== who) return false; // logged out (or switched) meanwhile
@@ -124,6 +157,7 @@ function mergeFromCloud(): Promise<boolean> {
       // merge brought in is already in the cloud, so it alone never causes a backup — no ping-pong.)
       if (!copy || firstWithOwnData || dirty) {
         dirty = true;
+        prepareSoon();
         schedule();
       }
       return true;
@@ -169,11 +203,21 @@ async function backUp(closing: boolean): Promise<void> {
   }
   backingUp = (async () => {
     try {
-      // First take in anything the other device backed up meanwhile, so this backup includes it.
-      if (!(await catchUp())) throw new Error('not up to date');
-      dirty = false;
-      seenCloudAt = closing ? await backUpToCloudOnClose() : await backUpToCloud();
-      if (!dirty) writePending(false);
+      // Twice at most: if the other device backed up in between, take that in first, then try again.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        // First take in anything the other device backed up meanwhile, so this backup includes it.
+        if (!(await catchUp())) throw new Error('not up to date');
+        const count = changeCount;
+        const prep = await prepareBackup();
+        if (!prep) throw new Error('signed out');
+        // Only written over the cloud copy this device has seen: never over unmerged changes from elsewhere.
+        if ((await uploadBackup(prep, seenCloudAt, closing)) === 'saved') {
+          savedUp(prep, count);
+          return;
+        }
+        lastCheck = 0; // the cloud changed: look again
+      }
+      throw new Error('conflict');
     } catch {
       dirty = true; // the changes are still here on the device; the next change, return or open tries again
       writePending(true);
@@ -193,15 +237,38 @@ async function backUp(closing: boolean): Promise<void> {
 function changed() {
   if (!userId || applying) return; // guest mode, or the merge's own writes: nothing to send
   dirty = true;
+  changeCount += 1;
   writePending(true);
-  if (mergedFor === userId) schedule();
+  if (mergedFor === userId) {
+    prepareSoon();
+    schedule();
+  }
 }
 
-/** Going into the background or closing: back up now if anything is waiting. */
+/**
+ * Going into the background or closing: send the backup that's already built, at once, as a keepalive request,
+ * so it can arrive even after the app is gone (a phone freezes a closed app almost immediately). It's only
+ * written over the cloud copy this device has seen, so it never replaces another device's newer changes; if
+ * it can't be sent or the cloud changed, the changes stay marked here and go up next time.
+ */
 function leaving() {
   if (!userId || !dirty || mergedFor !== userId) return;
   window.clearTimeout(timer);
-  void backUp(true);
+  const ready = prepared && prepared.prep.userId === userId ? prepared : null;
+  if (!ready) {
+    void backUp(true); // a change from the last split second: best effort
+    return;
+  }
+  prepared = null;
+  const latest = ready.count === changeCount;
+  void uploadBackup(ready.prep, seenCloudAt, true)
+    .then((r) => {
+      if (r === 'saved') savedUp(ready.prep, ready.count);
+      else lastCheck = 0;
+      // A change from the last split second wasn't in it: send that too while the app is still around.
+      if (!latest) void backUp(true);
+    })
+    .catch(() => undefined); // still marked: it goes up when the app is back
 }
 
 /** Back in front (or a regular look while open): bring in the other device's changes. */
