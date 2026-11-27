@@ -254,6 +254,22 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
+/* A quiet "something was saved" signal, so the automatic cloud backup knows when to run (lib/autoSync.ts). */
+const writeListeners = new Set<() => void>();
+export function onLocalWrite(cb: () => void): () => void {
+  writeListeners.add(cb);
+  return () => writeListeners.delete(cb);
+}
+function wrote() {
+  for (const cb of writeListeners) {
+    try {
+      cb();
+    } catch {
+      /* a listener never breaks saving */
+    }
+  }
+}
+
 function run<T>(
   storeName: string,
   mode: IDBTransactionMode,
@@ -264,7 +280,10 @@ function run<T>(
       new Promise<T>((resolve, reject) => {
         const tx = db.transaction(storeName, mode);
         const req = action(tx.objectStore(storeName));
-        tx.oncomplete = () => resolve(req.result as T);
+        tx.oncomplete = () => {
+          resolve(req.result as T);
+          if (mode === 'readwrite') wrote();
+        };
         tx.onerror = () => reject(tx.error ?? req.error);
         tx.onabort = () => reject(tx.error ?? new Error('Saving was interrupted.'));
       }),
@@ -294,7 +313,10 @@ export function idbReplaceAll<T>(storeName: string, values: T[]): Promise<void> 
         const store = tx.objectStore(storeName);
         store.clear();
         for (const v of values) store.put(v);
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+          resolve();
+          wrote();
+        };
         tx.onerror = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
         tx.onabort = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
       }),
@@ -313,7 +335,10 @@ export function idbReplaceStores(contents: Record<string, unknown[]>): Promise<v
           store.clear();
           for (const v of contents[name]) store.put(v);
         }
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+          resolve();
+          wrote();
+        };
         tx.onerror = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
         tx.onabort = () => reject(tx.error ?? new Error('Restoring was interrupted.'));
       }),
@@ -332,7 +357,10 @@ export function idbPutMany(contents: Record<string, unknown[]>): Promise<void> {
           const store = tx.objectStore(name);
           for (const v of contents[name]) store.put(v);
         }
-        tx.oncomplete = () => resolve();
+        tx.oncomplete = () => {
+          resolve();
+          wrote();
+        };
         tx.onerror = () => reject(tx.error ?? new Error('Adding was interrupted.'));
         tx.onabort = () => reject(tx.error ?? new Error('Adding was interrupted.'));
       }),

@@ -25,9 +25,23 @@ import {
   isLinkedDevice,
   markRestoredFromCloud,
   onSessionChange,
+  onSyncStatus,
+  readSyncStatus,
+  type SyncStatus,
 } from '../lib/cloud';
 
 /** A short backup date, "Nov 23, 2026 at 4:05 PM", so backup lines stay short on a phone. */
+/** "today at 9:41 PM", "yesterday at 8:02 AM", or "Nov 3, 2026 at 9:41 PM". */
+function syncWhen(iso: string): string {
+  const d = new Date(iso);
+  const day = (x: Date) => `${x.getFullYear()}-${x.getMonth()}-${x.getDate()}`;
+  const now = new Date();
+  const yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+  if (day(d) === day(now)) return `today at ${formatTime(iso)}`;
+  if (day(d) === day(yesterday)) return `yesterday at ${formatTime(iso)}`;
+  return backupWhen(iso);
+}
+
 export const backupWhen = (iso: string) =>
   `${new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} at ${formatTime(iso)}`;
 
@@ -39,8 +53,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 /**
  * Settings → My data, as two cards: "On this device" (the backup file actions) and "Cloud backup" (only when
- * logged in: Back up to cloud and Restore from cloud). Merging a cloud backup is offered only by the new-device
- * prompt, never here. Short, kind wording throughout.
+ * logged in: Back up to cloud and Restore from cloud, plus one quiet line saying when it last synced — the
+ * automatic sync in lib/autoSync.ts does the rest on its own). Short, kind wording throughout.
  */
 export default function MyDataSection({ onRestored }: { onRestored: () => void }) {
   const [busy, setBusy] = useState<'backup' | 'readable' | 'reading' | 'restoring' | 'merge-reading' | 'merging' | null>(null);
@@ -52,6 +66,8 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
   // Cloud backup (only when logged in)
   const [signedIn, setSignedIn] = useState(false);
   const [lastCloud, setLastCloud] = useState<string | null>(getLastCloudBackupAt);
+  const [sync, setSync] = useState<SyncStatus | null>(readSyncStatus);
+  useEffect(() => onSyncStatus(() => setSync(readSyncStatus())), []);
   const [cloudBusy, setCloudBusy] = useState<null | 'backup' | 'reading'>(null);
   const [cloudMessage, setCloudMessage] = useState<Message>(null);
   const [confirmCloudReplace, setConfirmCloudReplace] = useState<string | null>(null);
@@ -272,7 +288,15 @@ export default function MyDataSection({ onRestored }: { onRestored: () => void }
           <h2 id="cloud-heading" className="settings-heading">
             Cloud backup
           </h2>
-          <p className="data-status">{lastCloud ? `Last backed up: ${backupWhen(lastCloud)}.` : 'No cloud backup yet.'}</p>
+          <p className="data-status" role="status">
+            {sync && !sync.ok
+              ? 'Couldn’t sync last time, will try again.'
+              : sync
+                ? `Last synced: ${syncWhen(sync.at)}${sync.added > 0 ? ` · ${sync.added} ${sync.added === 1 ? 'entry' : 'entries'} added from your backup` : ''}`
+                : lastCloud
+                  ? `Last synced: ${syncWhen(lastCloud)}`
+                  : 'No cloud backup yet.'}
+          </p>
           <div className="data-actions">
             <button type="button" className="btn-primary" onClick={() => void handleCloudBackup()} disabled={cloudBusy !== null || busy !== null}>
               {cloudBusy === 'backup' ? 'Backing up…' : 'Back up to cloud'}

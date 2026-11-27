@@ -2,19 +2,23 @@
   Daily Sprout: small, named changes to one day's record (see health.ts — the same record the Health Journey
   shows). Both the Daily Sprout page and the voice assistant use these, so a change made either way is identical.
 */
-import { LISTS_STORE, idbDelete, idbGetAll } from './db';
-import { LIMITS, getQuickEntry, saveQuickEntry, todayKey, type Mood } from './journal';
+import { JOURNAL_STORE, LISTS_STORE, idbDelete, idbGetAll } from './db';
+import { noteRecord } from './undo';
+import { LIMITS, getQuickEntry, quickId, saveQuickEntry, todayKey, type Mood } from './journal';
 import { notifyDataChanged } from './dataEvents';
 import {
   FOOD_CALORIES_MAX,
   NUTRIENT_MAX,
+  PORTION_MAX,
   WATER_MAX,
+  listHealthDays,
   newFoodLog,
   newTodo,
   updateHealthDay,
   type FoodLog,
   type HealthDraft,
   type Medication,
+  type Todo,
 } from './health';
 import type { UserList } from './listParts';
 
@@ -37,6 +41,22 @@ export const setTodoDone = (date: string, id: string, done: boolean) =>
 export const deleteTodo = (date: string, id: string) => change(date, (d) => ({ ...d, todos: d.todos.filter((t) => t.id !== id) }));
 
 /** Moves a day's to-dos to another day (the open ones, or all). Returns how many moved. */
+/** Moves one to-do (added to `to`, taken off `from`). Returns it, or null if it wasn't on `from`. */
+export async function moveTodo(from: string, to: string, id: string): Promise<Todo | null> {
+  if (from === to) return null;
+  let picked: Todo | null = null;
+  await updateHealthDay(from, (d) => {
+    picked = d.todos.find((t) => t.id === id) ?? null;
+    return picked ? { ...d, todos: d.todos.filter((t) => t.id !== id) } : d;
+  });
+  const moved = picked as Todo | null;
+  if (moved) {
+    await updateHealthDay(to, (d) => (d.todos.some((t) => t.id === moved.id) ? d : { ...d, todos: [...d.todos, moved] }));
+    notifyDataChanged();
+  }
+  return moved;
+}
+
 export async function moveTodos(from: string, to: string, which: 'open' | 'all' = 'open'): Promise<number> {
   if (from === to) return 0;
   let picked: Day['todos'] = [];
@@ -56,7 +76,16 @@ export async function moveTodos(from: string, to: string, which: 'open' | 'all' 
 
 /* ---------- Foods ---------- */
 
-export type FoodDraft = { name: string; calories: number | null; protein: number | null; sugar: number | null; addedSugar: number | null };
+export type FoodDraft = {
+  name: string;
+  calories: number | null;
+  protein: number | null;
+  sugar: number | null;
+  addedSugar: number | null;
+  /** Ask Thrive estimated some of the numbers. */
+  estimate?: boolean;
+  portion?: string;
+};
 
 const grams = (v: number | null) => (v === null || !Number.isFinite(v) || v < 0 || v > NUTRIENT_MAX ? null : Math.round(v * 10) / 10);
 
@@ -67,13 +96,64 @@ export function cleanFood(f: FoodDraft): Omit<FoodLog, 'id' | 'createdAt'> {
     protein: grams(f.protein),
     sugar: grams(f.sugar),
     addedSugar: grams(f.addedSugar),
+    ...(f.estimate ? { estimate: true as const, ...(f.portion?.trim() ? { portion: f.portion.trim().slice(0, PORTION_MAX) } : {}) } : {}),
   };
 }
+
+/**
+ * Foods I've logged before with my own numbers (never estimates), newest first, one per name — so a food I eat
+ * often (a brand bar, "my shortbread") can be logged with my exact numbers instead of an estimate.
+ */
+export async function knownFoods(limit = 80): Promise<FoodLog[]> {
+  const days = await listHealthDays();
+  const seen = new Map<string, FoodLog>();
+  const all = days.flatMap((d) => d.foods ?? []).filter((f) => !f.estimate && f.calories !== null && f.name.trim());
+  all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  for (const f of all) {
+    const key = foodKey(f.name);
+    if (key && !seen.has(key)) seen.set(key, f);
+    if (seen.size >= limit) break;
+  }
+  return [...seen.values()];
+}
+
+/** Every food name I've logged before (newest first, one per name), so a misheard name can match the real one. */
+export async function allFoodNames(limit = 150): Promise<string[]> {
+  const all = (await listHealthDays()).flatMap((d) => d.foods ?? []).filter((f) => f.name.trim());
+  all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const seen = new Map<string, string>();
+  for (const f of all) {
+    const key = foodKey(f.name);
+    if (key && !seen.has(key)) seen.set(key, f.name);
+    if (seen.size >= limit) break;
+  }
+  return [...seen.values()];
+}
+
+/** "A Barebells bar" / "my barebells bar." → "barebells bar", for matching names. */
+export const foodKey = (name: string) =>
+  name.toLowerCase().replace(/[^\p{L}\p{N} ]+/gu, ' ').replace(/^\s*(a|an|one|my|the|some)\s+/, '').replace(/\s+/g, ' ').trim();
 
 export const addFood = (date: string, food: FoodDraft) =>
   change(date, (d) => ({ ...d, foods: [...d.foods, newFoodLog(cleanFood(food))] }));
 
 export const deleteFood = (date: string, id: string) => change(date, (d) => ({ ...d, foods: d.foods.filter((f) => f.id !== id) }));
+
+/** Changes one food in place (same place in the list, same id): new numbers, a new count, or a different food. */
+export const replaceFood = (date: string, id: string, food: FoodDraft & { count?: number }) =>
+  change(date, (d) => ({
+    ...d,
+    foods: d.foods.map((f) => {
+      if (f.id !== id) return f;
+      const clean = cleanFood(food);
+      const count = food.count && food.count > 1 ? Math.min(50, Math.round(food.count)) : undefined;
+      return { id: f.id, createdAt: f.createdAt, ...clean, name: clean.name.trim().slice(0, 60), ...(count ? { count } : {}) };
+    }),
+  }));
+
+/** Changes a to-do's words (same place, same tick). */
+export const renameTodo = (date: string, id: string, text: string) =>
+  change(date, (d) => ({ ...d, todos: d.todos.map((t) => (t.id === id ? { ...t, text: text.trim().slice(0, 140) } : t)) }));
 
 /* ---------- Movement, water, medications ---------- */
 
@@ -167,6 +247,7 @@ export async function updateQuickEntry(
   const fresh = !!add && !current.includes(add);
   const joined = !add ? (existing?.note ?? '') : current && fresh ? `${current} ${add}` : current || add;
   const intention = parts.intention?.trim();
+  await noteRecord(JOURNAL_STORE, quickId(date)); // for Ask Thrive's Undo
   await saveQuickEntry(
     date,
     {

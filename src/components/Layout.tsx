@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
 import BottomNav from './BottomNav';
-import NewDeviceSync from './NewDevicePrompt';
 import VoiceAssistant, { mainPageName } from './VoiceAssistant';
 import { GearIcon, HelpIcon } from './icons';
 
@@ -45,7 +44,6 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
-      <NewDeviceSync />
       <VoiceAssistant />
       <BottomNav />
     </div>

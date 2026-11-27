@@ -152,7 +152,15 @@ function CalorieField({ foods, typed, onTyped, onFoods }: CalorieFieldProps) {
           {shown.map((f) => (
             <li key={f.id} className="food-item">
               <span className="food-main">
-                <span className="food-name">{f.name || 'Something to eat'}</span>
+                <span className="food-name">
+                  {f.name || 'Something to eat'}
+                  {f.count && f.count > 1 ? ` × ${f.count}` : ''}
+                  {f.estimate && (
+                    <span className="food-est" title={f.portion ? `Estimated for ${f.portion}` : 'Estimated'}>
+                      est.
+                    </span>
+                  )}
+                </span>
                 {nutrientLine(f) && <span className="hint">{nutrientLine(f)}</span>}
               </span>
               <span className="food-kcal">{f.calories === null ? '— kcal' : `${f.calories.toLocaleString()} kcal`}</span>

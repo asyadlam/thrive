@@ -6,6 +6,9 @@ import { PET_ART, useCelebration } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
 import { useBook } from '../lib/book';
 import { loadSettings } from '../lib/settings';
+import { getHealthDay, INTENTION_MAX } from '../lib/health';
+import { setIntention, shiftDay } from '../lib/sprout';
+import { todayKey } from '../lib/journal';
 import { MEMORY_MAX, addMemory, listMemories, repeatsExistingNote } from '../lib/memory';
 import {
   MAX_CHAT_MESSAGES,
@@ -29,6 +32,13 @@ type Summary =
   | { state: 'saving'; text: string; proposals: Proposal[] }
   | { state: 'saved'; notesSaved: number }
   | { state: 'declined' };
+
+/**
+ * The talk-to-tomorrow bridge: when the goodbye offers something to try tomorrow, the companion asks once whether
+ * to make it tomorrow's little sprout. Nothing is saved unless I say yes.
+ */
+type Bridge = { state: 'none' } | { state: 'asking'; sprout: string } | { state: 'saving'; sprout: string } | { state: 'done' };
+const BRIDGE_QUESTION = 'Want that as tomorrow’s little sprout?';
 
 /** A memory note the companion suggested after a talk: kept only if it stays checked when I save. */
 type Proposal = { text: string; keep: boolean };
@@ -67,6 +77,7 @@ export default function TalkChatPage() {
   const [waiting, setWaiting] = useState(false);
   const [problem, setProblem] = useState<{ text: string; retry: TalkMode | null; detail?: string } | null>(null);
   const [summary, setSummary] = useState<Summary>({ state: 'idle' });
+  const [bridge, setBridge] = useState<Bridge>({ state: 'none' });
   // Header pet: listening while the chat is open, thinking while a reply is on its way, a short celebration after saving a summary.
   const [restPose, celebrate] = useCelebration('listening');
 
@@ -123,11 +134,17 @@ export default function TalkChatPage() {
     request.current = controller;
     try {
       const opening = mode === 'open' ? openingRequest() : undefined;
-      const { reply, crisis, builtIn } = await askCompanion(mode, entryText, toApi(history), controller.signal, opening, memoryForChat);
+      const { reply, crisis, builtIn, sprout } = await askCompanion(mode, entryText, toApi(history), controller.signal, opening, memoryForChat);
       if (opening) rememberOpening(opening, reply, builtIn);
       const lastUser = [...history].reverse().find((m) => m.role === 'user');
       const showHelp = mode !== 'open' && (crisis || (!!lastUser && soundsLikeCrisis(lastUser.content)));
-      setMessages([...history, { role: 'assistant', content: reply, crisis: showHelp }]);
+      const closingAsk = mode === 'close' && sprout && bridge.state === 'none' && !showHelp;
+      setMessages([
+        ...history,
+        { role: 'assistant', content: reply, crisis: showHelp },
+        ...(closingAsk ? [{ role: 'assistant' as const, content: BRIDGE_QUESTION }] : []),
+      ]);
+      if (closingAsk) setBridge({ state: 'asking', sprout });
       if (mode === 'close') setPhase('ended');
     } catch (e) {
       if (controller.signal.aborted) return;
@@ -182,6 +199,30 @@ export default function TalkChatPage() {
     request.current?.abort();
     if (messages.length === 0) return navigate(backTo, { state: backState });
     void ask('close', messages);
+  }
+
+  /** Yes: tomorrow's little sprout becomes the closing's intention (in their words). No: nothing is saved. */
+  async function answerBridge(yes: boolean) {
+    if (bridge.state !== 'asking') return;
+    const { sprout } = bridge;
+    setMessages((m) => [...m, { role: 'user', content: yes ? 'Yes' : 'No thanks' }]);
+    if (!yes) {
+      setBridge({ state: 'done' });
+      setMessages((m) => [...m, { role: 'assistant', content: 'All good — nothing saved. Sleep on it.' }]);
+      return;
+    }
+    setBridge({ state: 'saving', sprout });
+    try {
+      const tomorrow = shiftDay(todayKey(), 1);
+      const before = (await getHealthDay(tomorrow))?.intention?.trim() ?? '';
+      const text = sprout.slice(0, INTENTION_MAX);
+      await setIntention(tomorrow, text);
+      const replaced = before && before !== text ? ` (it replaced “${before}”)` : '';
+      setMessages((m) => [...m, { role: 'assistant', content: `Done. Tomorrow’s little sprout: I’ll try ${text.replace(/[.!]+$/, '')}.${replaced}` }]);
+    } catch {
+      setMessages((m) => [...m, { role: 'assistant', content: 'That didn’t save just now. You can add it on tomorrow’s Daily Sprout page.' }]);
+    }
+    setBridge({ state: 'done' });
   }
 
   async function writeSummary() {
@@ -349,6 +390,16 @@ export default function TalkChatPage() {
             </button>
           )}
 
+          {phase === 'ended' && (bridge.state === 'asking' || bridge.state === 'saving') && (
+            <div className="chat-bridge" role="group" aria-label={BRIDGE_QUESTION}>
+              <button type="button" className="btn-primary btn-small" disabled={bridge.state === 'saving'} onClick={() => void answerBridge(true)}>
+                {bridge.state === 'saving' ? 'Saving…' : 'Yes, add it'}
+              </button>
+              <button type="button" className="btn-secondary btn-small" disabled={bridge.state === 'saving'} onClick={() => void answerBridge(false)}>
+                No thanks
+              </button>
+            </div>
+          )}
           {phase === 'ended' && (
             <div className="chat-after">
               {id && summary.state === 'idle' && (

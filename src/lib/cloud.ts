@@ -19,7 +19,6 @@ const TABLE = 'cloud_backups';
 const LAST_CLOUD_KEY = 'thrive.lastCloudBackupAt';
 /** The account this device has backed up to or restored from — automatic backups only run for that account. */
 const LINKED_KEY = 'thrive.cloudLinkedUser';
-const DAY_MS = 24 * 60 * 60 * 1000;
 /** The one-time Welcome choice on this device: 'account' (logged in here at least once) or 'local'. */
 const WELCOME_KEY = 'thrive.welcomeChoice';
 /** Set right after an explicit Log out or Delete account: the Welcome screen shows (once) as a doorway. */
@@ -164,6 +163,7 @@ export async function logOut(): Promise<void> {
   try {
     localStorage.removeItem(LAST_CLOUD_KEY);
     localStorage.removeItem(LINKED_KEY);
+    localStorage.removeItem(SYNC_KEY);
   } catch {
     /* nothing to forget */
   }
@@ -220,6 +220,7 @@ export async function backUpToCloud(): Promise<string> {
   if (error) throw friendly(error, 'Couldn’t back up to the cloud. Your data is safe on this device — please try again.');
   remember(LAST_CLOUD_KEY, updatedAt);
   remember(LINKED_KEY, userId);
+  recordSync(true);
   return updatedAt;
 }
 
@@ -246,22 +247,76 @@ export async function markRestoredFromCloud(updatedAt: string): Promise<void> {
   remember(LAST_CLOUD_KEY, updatedAt);
 }
 
-/**
- * The quiet daily backup, run when the app opens while logged in. To never overwrite a good cloud copy with an
- * empty or unrelated device, it only runs on a device that has already backed up to, or restored from, this
- * same account — and only when the last cloud backup is more than a day old. Never shows anything.
- */
-export async function autoCloudBackup(): Promise<void> {
+/* ---------------- Sync status (the one quiet line on the Cloud backup card) ---------------- */
+
+const SYNC_KEY = 'thrive.cloudSync';
+const SYNC_EVENT = 'thrive:cloud-sync-status';
+/** The last sync: when, whether it worked, and how many things a merge on open added (shown for a day). */
+export type SyncStatus = { at: string; ok: boolean; added: number; addedAt?: string };
+
+export function readSyncStatus(): SyncStatus | null {
   try {
-    if (!recall(LINKED_KEY)) return; // never linked on this device: don't even load the account code
-    const session = await getSession();
-    if (!session || recall(LINKED_KEY) !== session.user.id) return;
-    const last = recall(LAST_CLOUD_KEY);
-    if (last && Date.now() - Date.parse(last) < DAY_MS) return;
-    await backUpToCloud();
+    const v = JSON.parse(recall(SYNC_KEY) ?? 'null') as Partial<SyncStatus> | null;
+    if (!v || typeof v.at !== 'string' || typeof v.ok !== 'boolean') return null;
+    const fresh = typeof v.addedAt === 'string' && Date.now() - Date.parse(v.addedAt) < 24 * 60 * 60 * 1000;
+    return { at: v.at, ok: v.ok, added: fresh ? Number(v.added) || 0 : 0, ...(fresh ? { addedAt: v.addedAt } : {}) };
   } catch {
-    /* quiet: it tries again next time the app opens */
+    return null;
   }
+}
+
+/** Records a sync result. `added` is only given by a merge on open; otherwise the last merge's count is kept. */
+export function recordSync(ok: boolean, added?: number): void {
+  const before = readSyncStatus();
+  const now = new Date().toISOString();
+  // A merge that added things is mentioned for a day (later opens that add nothing don't hide it).
+  const kept = added && added > 0 ? { added, addedAt: now } : { added: before?.added ?? 0, ...(before?.addedAt ? { addedAt: before.addedAt } : {}) };
+  const next: SyncStatus = ok ? { at: now, ok: true, ...kept } : { at: before?.at ?? now, ok: false, ...kept }; // keep when it last worked
+  remember(SYNC_KEY, JSON.stringify(next));
+  window.dispatchEvent(new Event(SYNC_EVENT));
+}
+
+export function onSyncStatus(cb: () => void): () => void {
+  window.addEventListener(SYNC_EVENT, cb);
+  return () => window.removeEventListener(SYNC_EVENT, cb);
+}
+
+/** Keepalive requests (they can finish after the page closes) are limited to about 64 KB by browsers. */
+const KEEPALIVE_MAX = 60 * 1024;
+
+/**
+ * The backup for when the app is closing: the same full copy as Back up to cloud, sent as a keepalive request
+ * when it's small enough to be allowed one (so it can still arrive after the page is gone); otherwise sent the
+ * usual way, as best effort.
+ */
+export async function backUpToCloudOnClose(): Promise<string> {
+  const session = await getSession();
+  if (!session || !URL || !ANON_KEY) throw new CloudError('Please log in first.');
+  const backup = await buildBackup();
+  const updatedAt = new Date().toISOString();
+  const body = JSON.stringify({ user_id: session.user.id, data: backup, updated_at: updatedAt });
+  if (body.length > KEEPALIVE_MAX) return backUpToCloud();
+  let res: Response;
+  try {
+    res = await fetch(`${URL.replace(/\/+$/, '')}/rest/v1/${TABLE}?on_conflict=user_id`, {
+      method: 'POST',
+      keepalive: true,
+      headers: {
+        apikey: ANON_KEY,
+        authorization: `Bearer ${session.access_token}`,
+        'content-type': 'application/json',
+        prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body,
+    });
+  } catch {
+    return backUpToCloud(); // a browser that won't send this kind of request: the usual way, best effort
+  }
+  if (!res.ok) throw new CloudError('Couldn’t back up to the cloud.');
+  remember(LAST_CLOUD_KEY, updatedAt);
+  remember(LINKED_KEY, session.user.id);
+  recordSync(true);
+  return updatedAt;
 }
 
 /**

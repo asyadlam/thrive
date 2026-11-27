@@ -4,7 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App';
 import { ensureEntryMetadata } from './lib/journal';
-import { autoCloudBackup, cloudAvailable } from './lib/cloud';
+import { startAutoSync } from './lib/autoSync';
 import { moveOldTodoList } from './lib/sprout';
 import './index.css';
 
@@ -16,8 +16,9 @@ ensureEntryMetadata().catch(() => undefined);
 // To-dos live on Daily Sprout now: the old My Life "To do" list's items move onto today (nothing is lost).
 moveOldTodoList().catch(() => undefined);
 
-// Logged in? Quietly back up to the cloud once a day when the app opens (never a popup; see lib/cloud.ts).
-if (cloudAvailable()) window.setTimeout(() => void autoCloudBackup(), 4000);
+// Signed in? Quietly merge the cloud backup in once per session, then back up after changes and on close
+// (never a popup; see lib/autoSync.ts). Guest mode: does nothing.
+startAutoSync();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

@@ -5,6 +5,7 @@
 */
 import { HEALTH_STORE, MEDICATIONS_STORE, idbDelete, idbGet, idbGetAll, idbPut } from './db';
 import { isIsoTime, newId } from './journal';
+import { noteRecord } from './undo';
 
 /** The default water target (glasses). The real target is a setting (see dailyTargets in settings.ts). */
 export const WATER_GLASSES = 8;
@@ -32,7 +33,15 @@ export type FoodLog = {
   addedSugar: number | null;
   protein: number | null;
   createdAt: string;
+  /** How many of it, when more than one ("2 cookies"); the numbers are for all of them together. */
+  count?: number;
+  /** True when Ask Thrive estimated some of the numbers (shown with a small "est." tag). Never set for numbers I gave. */
+  estimate?: true;
+  /** For an estimate: the portion it assumed, e.g. "1 medium cookie". */
+  portion?: string;
 };
+
+export const PORTION_MAX = 60;
 
 /** Totals for a day's logs; a nutrient total is null when no log has that nutrient. */
 export function foodTotals(foods: FoodLog[]) {
@@ -181,6 +190,7 @@ export async function saveHealthDay(date: string, draft: HealthDraft, existing?:
  * through this, so every place showing the day sees the same data.
  */
 export async function updateHealthDay(date: string, change: (d: Required<HealthDraft>) => Required<HealthDraft>): Promise<HealthDay | null> {
+  await noteRecord(HEALTH_STORE, healthId(date)); // for Ask Thrive's Undo (does nothing outside a recording)
   const current = await getHealthDay(date);
   return saveHealthDay(date, change(draftOf(current)), current);
 }
@@ -211,6 +221,10 @@ export function healthDayFromBackup(raw: unknown): HealthDay | null {
             addedSugar: grams(f.addedSugar),
             protein: grams(f.protein),
             createdAt: isIsoTime(f.createdAt) ? f.createdAt : created,
+            ...(typeof f.count === 'number' && Number.isInteger(f.count) && f.count > 1 && f.count <= 50 ? { count: f.count } : {}),
+            ...(f.estimate === true
+              ? { estimate: true as const, ...(typeof f.portion === 'string' && f.portion.trim() ? { portion: f.portion.trim().slice(0, PORTION_MAX) } : {}) }
+              : {}),
           },
         ];
       })

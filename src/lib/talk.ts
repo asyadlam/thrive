@@ -96,7 +96,7 @@ export async function askCompanion(
   opening?: { angle: OpeningAngle; avoidOpener: string },
   /** Companion memory notes included in this chat; and, for a summary, whether to suggest new notes. */
   memory?: { notes: string[]; proposeNotes?: boolean },
-): Promise<{ reply: string; crisis: boolean; builtIn: boolean; notes: string[] }> {
+): Promise<{ reply: string; crisis: boolean; builtIn: boolean; notes: string[]; sprout: string }> {
   let res: Response;
   try {
     res = await fetch('/api/talk', {
@@ -120,6 +120,7 @@ export async function askCompanion(
     crisis?: unknown;
     builtIn?: unknown;
     notes?: unknown;
+    sprout?: unknown;
     error?: unknown;
     providerStatus?: unknown;
     providerCode?: unknown;
@@ -139,5 +140,7 @@ export async function askCompanion(
   const notes = Array.isArray(data.notes)
     ? data.notes.filter((n): n is string => typeof n === 'string' && !!n.trim()).slice(0, 2)
     : [];
-  return { reply: data.reply.trim(), crisis: data.crisis === true, builtIn: data.builtIn === true, notes };
+  // Closing only: the small intention for tomorrow, when the goodbye really offers one.
+  const sprout = mode === 'close' && typeof data.sprout === 'string' ? data.sprout.trim().slice(0, 140) : '';
+  return { reply: data.reply.trim(), crisis: data.crisis === true, builtIn: data.builtIn === true, notes, sprout };
 }

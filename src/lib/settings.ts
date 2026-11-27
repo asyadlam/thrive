@@ -183,10 +183,14 @@ export function loadSettings(): AppSettings {
   }
 }
 
+/** Fired after settings are saved (the automatic cloud backup listens). */
+export const SETTINGS_SAVED = 'thrive:settings-saved';
+
 /** Returns false if the browser refused to save (e.g. storage blocked). */
 export function saveSettings(settings: AppSettings): boolean {
   try {
     localStorage.setItem(KEY, JSON.stringify(settings));
+    window.dispatchEvent(new Event(SETTINGS_SAVED)); // the automatic cloud backup follows changes here too
     return true;
   } catch {
     return false;

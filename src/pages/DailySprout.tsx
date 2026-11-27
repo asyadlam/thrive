@@ -157,7 +157,15 @@ function FoodCard({ date, foods }: { date: string; foods: FoodLog[] }) {
           {foods.map((f) => (
             <li key={f.id} className="sprout-food">
               <span className="sprout-food-main">
-                <span className="sprout-food-name">{f.name || 'Something to eat'}</span>
+                <span className="sprout-food-name">
+                  {f.name || 'Something to eat'}
+                  {f.count && f.count > 1 ? ` × ${f.count}` : ''}
+                  {f.estimate && (
+                    <span className="food-est" title={f.portion ? `Estimated for ${f.portion}` : 'Estimated'}>
+                      est.
+                    </span>
+                  )}
+                </span>
                 <span className="sprout-food-nutrients">
                   Protein {g(f.protein)} · Sugar {g(f.sugar)} · Added sugar {g(f.addedSugar)}
                 </span>
