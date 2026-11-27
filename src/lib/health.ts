@@ -93,6 +93,11 @@ export type HealthDay = {
   todos?: Todo[];
   /** Daily Sprout: "Little sprout for the day" — the rest of "Today I'll try…" ('' or missing if none). */
   intention?: string;
+  /**
+   * Ids of foods and to-dos taken off this day (deleted, or moved to another day). Automatic sync between devices
+   * uses it so a removal travels too, instead of the other device's older copy bringing the item back.
+   */
+  removedIds?: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -109,6 +114,8 @@ export type HealthDraft = Pick<HealthDay, 'calories' | 'exercise' | 'steps' | 'w
 };
 
 const now = () => new Date().toISOString();
+/** How many removed ids a day remembers (the newest ones). */
+export const REMOVED_IDS_MAX = 300;
 export const healthId = (date: string) => `health-${date}`;
 const isDayKey = (v: unknown): v is string =>
   typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T12:00:00`));
@@ -164,6 +171,11 @@ export async function saveHealthDay(date: string, draft: HealthDraft, existing?:
     if (existing || (await getHealthDay(date))) await idbDelete(HEALTH_STORE, healthId(date));
     return null;
   }
+  // Foods and to-dos that were on this day and aren't any more: remembered, so sync doesn't bring them back.
+  const before = existing ?? (await getHealthDay(date));
+  const keepIds = new Set([...draft.foods, ...(draft.todos ?? [])].map((x) => x.id));
+  const gone = [...(before?.foods ?? []), ...(before?.todos ?? [])].map((x) => x.id).filter((id) => !keepIds.has(id));
+  const removedIds = [...new Set([...(before?.removedIds ?? []), ...gone])].filter((id) => !keepIds.has(id)).slice(-REMOVED_IDS_MAX);
   const t = now();
   const day: HealthDay = {
     id: healthId(date),
@@ -178,6 +190,7 @@ export async function saveHealthDay(date: string, draft: HealthDraft, existing?:
     ...(draft.stretch ? { stretch: true } : {}),
     ...(draft.todos && draft.todos.length ? { todos: draft.todos } : {}),
     ...(draft.intention?.trim() ? { intention: draft.intention.trim().slice(0, INTENTION_MAX) } : {}),
+    ...(removedIds.length ? { removedIds } : {}),
     createdAt: existing?.createdAt ?? t,
     updatedAt: t,
   };
@@ -255,6 +268,9 @@ export function healthDayFromBackup(raw: unknown): HealthDay | null {
     ...(d.stretch === true ? { stretch: true } : {}),
     ...(typeof d.intention === 'string' && d.intention.trim() ? { intention: d.intention.trim().slice(0, INTENTION_MAX) } : {}),
     ...(todos.length ? { todos } : {}),
+    ...(Array.isArray(d.removedIds) && d.removedIds.length
+      ? { removedIds: d.removedIds.filter((x): x is string => typeof x === 'string').map((x) => x.slice(0, 80)).slice(-REMOVED_IDS_MAX) }
+      : {}),
     createdAt: created,
     updatedAt: isIsoTime(d.updatedAt) ? d.updatedAt : created,
   };

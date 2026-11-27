@@ -254,6 +254,54 @@ function openDb(): Promise<IDBDatabase> {
   return dbPromise;
 }
 
+/*
+  Deleted records, remembered (store, id and when) so automatic sync can carry a deletion to other devices
+  instead of another device's copy bringing the record back. Kept in this browser's storage (newest ones only);
+  each backup carries them. Putting a record with the same id again forgets its deletion.
+*/
+export type Tombstone = { store: string; id: string; at: string };
+const TOMBSTONES_KEY = 'thrive.deleted';
+const TOMBSTONES_MAX = 2000;
+export function readTombstones(): Tombstone[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(TOMBSTONES_KEY) ?? '[]') as unknown;
+    return Array.isArray(v)
+      ? v.filter((t): t is Tombstone => !!t && typeof t.store === 'string' && typeof t.id === 'string' && typeof t.at === 'string')
+      : [];
+  } catch {
+    return [];
+  }
+}
+function writeTombstones(list: Tombstone[]) {
+  try {
+    localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(list.slice(-TOMBSTONES_MAX)));
+  } catch {
+    /* only a convenience for sync */
+  }
+}
+/** Adds deletions (from here, or from another device's backup); the newest time wins per record. */
+export function addTombstones(more: Tombstone[]): void {
+  if (!more.length) return;
+  const byKey = new Map(readTombstones().map((t) => [`${t.store}\u0000${t.id}`, t]));
+  for (const t of more) {
+    const k = `${t.store}\u0000${t.id}`;
+    const had = byKey.get(k);
+    if (!had || had.at < t.at) {
+      byKey.delete(k);
+      byKey.set(k, t);
+    }
+  }
+  writeTombstones([...byKey.values()]);
+}
+function forgetTombstones(store: string, ids: string[]) {
+  const list = readTombstones();
+  if (!list.length || !ids.length) return;
+  const gone = new Set(ids);
+  const next = list.filter((t) => t.store !== store || !gone.has(t.id));
+  if (next.length !== list.length) writeTombstones(next);
+}
+const idOf = (v: unknown) => (v && typeof v === 'object' && typeof (v as { id?: unknown }).id === 'string' ? (v as { id: string }).id : null);
+
 /* A quiet "something was saved" signal, so the automatic cloud backup knows when to run (lib/autoSync.ts). */
 const writeListeners = new Set<() => void>();
 export function onLocalWrite(cb: () => void): () => void {
@@ -294,13 +342,20 @@ export const idbGet = <T>(storeName: string, key: IDBValidKey) =>
   run<T | undefined>(storeName, 'readonly', (s) => s.get(key));
 
 export const idbPut = <T>(storeName: string, value: T) =>
-  run<IDBValidKey>(storeName, 'readwrite', (s) => s.put(value));
+  run<IDBValidKey>(storeName, 'readwrite', (s) => s.put(value)).then((key) => {
+    const id = idOf(value);
+    if (id) forgetTombstones(storeName, [id]); // here again: no longer deleted
+    return key;
+  });
 
 export const idbGetAllFromIndex = <T>(storeName: string, indexName: string, query: IDBValidKey | IDBKeyRange) =>
   run<T[]>(storeName, 'readonly', (s) => s.index(indexName).getAll(query));
 
 export const idbDelete = (storeName: string, key: IDBValidKey) =>
-  run<undefined>(storeName, 'readwrite', (s) => s.delete(key));
+  run<undefined>(storeName, 'readwrite', (s) => s.delete(key)).then((r) => {
+    if (typeof key === 'string') addTombstones([{ store: storeName, id: key, at: new Date().toISOString() }]);
+    return r;
+  });
 
 export const idbGetAll = <T>(storeName: string) => run<T[]>(storeName, 'readonly', (s) => s.getAll());
 
@@ -314,6 +369,7 @@ export function idbReplaceAll<T>(storeName: string, values: T[]): Promise<void> 
         store.clear();
         for (const v of values) store.put(v);
         tx.oncomplete = () => {
+          forgetTombstones(storeName, values.map(idOf).filter((x): x is string => !!x)); // restored: not deleted
           resolve();
           wrote();
         };
@@ -336,6 +392,7 @@ export function idbReplaceStores(contents: Record<string, unknown[]>): Promise<v
           for (const v of contents[name]) store.put(v);
         }
         tx.oncomplete = () => {
+          for (const name of names) forgetTombstones(name, contents[name].map(idOf).filter((x): x is string => !!x)); // restored
           resolve();
           wrote();
         };
@@ -358,6 +415,7 @@ export function idbPutMany(contents: Record<string, unknown[]>): Promise<void> {
           for (const v of contents[name]) store.put(v);
         }
         tx.oncomplete = () => {
+          for (const name of names) forgetTombstones(name, contents[name].map(idOf).filter((x): x is string => !!x));
           resolve();
           wrote();
         };

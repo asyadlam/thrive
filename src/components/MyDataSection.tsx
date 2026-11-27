@@ -34,7 +34,7 @@ import {
 /** A short backup date, "Nov 23, 2026 at 4:05 PM", so backup lines stay short on a phone. */
 /**
  * The one quiet line: "Last backup: today at 9:41 PM · from this device", "… · from another device (Chrome on
- * Mac) · 3 entries added here", or, after a failed try, "Couldn't sync last time, will try again".
+ * Mac) · 3 entries added or updated here", or, after a failed try, "Couldn't sync last time, will try again".
  */
 function syncLine(sync: SyncStatus | null, lastCloud: string | null): string {
   if (sync && !sync.ok) return 'Couldn’t sync last time, will try again.';
@@ -45,7 +45,7 @@ function syncLine(sync: SyncStatus | null, lastCloud: string | null): string {
     : sync.backupDeviceId === deviceId()
       ? ' · from this device'
       : ` · from another device${sync.backupDeviceLabel ? ` (${sync.backupDeviceLabel})` : ''}`;
-  const added = sync && sync.added > 0 ? ` · ${sync.added} ${sync.added === 1 ? 'entry' : 'entries'} added here` : '';
+  const added = sync && sync.added > 0 ? ` · ${sync.added} ${sync.added === 1 ? 'entry' : 'entries'} added or updated here` : '';
   return `Last backup: ${syncWhen(at)}${from}${added}`;
 }
 

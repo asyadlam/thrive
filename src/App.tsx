@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import Welcome from './pages/Welcome';
 import ResetPassword from './pages/ResetPassword';
 import { SETTINGS_SYNCED } from './lib/settings';
+import { SYNCED_IN } from './lib/autoSync';
 import { WELCOME_EVENT, completeGoogleSignIn, finishRecovery, hasGooglePending, needsWelcome, recoveryAtLaunch } from './lib/cloud';
 import Layout from './components/Layout';
 import Home from './pages/Home';
@@ -47,10 +48,36 @@ export default function App() {
   }, [returning]);
   // Settings that arrived from another device (name, pet, targets…): pages re-read them quietly.
   const [settingsVersion, setSettingsVersion] = useState(0);
+  // Changes merged in from another device: the same quiet re-read — but never while I'm typing (it waits until
+  // I leave the box, so nothing half-written is lost).
   useEffect(() => {
-    const bump = () => setSettingsVersion((v) => v + 1);
+    let waiting = false;
+    const bump = () => {
+      const el = document.activeElement as HTMLElement | null;
+      const typing = !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
+      // Ask Thrive listening or working: try again in a moment.
+      if (document.querySelector('.assistant-fab.listening, .assistant-fab.working')) {
+        window.setTimeout(bump, 3000);
+        return;
+      }
+      if (!typing) return setSettingsVersion((v) => v + 1);
+      if (waiting) return;
+      waiting = true;
+      el.addEventListener(
+        'blur',
+        () => {
+          waiting = false;
+          window.setTimeout(() => setSettingsVersion((v) => v + 1), 300);
+        },
+        { once: true },
+      );
+    };
     window.addEventListener(SETTINGS_SYNCED, bump);
-    return () => window.removeEventListener(SETTINGS_SYNCED, bump);
+    window.addEventListener(SYNCED_IN, bump);
+    return () => {
+      window.removeEventListener(SETTINGS_SYNCED, bump);
+      window.removeEventListener(SYNCED_IN, bump);
+    };
   }, []);
   // Log out / Delete account bring the Welcome screen back straight away (local data untouched).
   useEffect(() => {

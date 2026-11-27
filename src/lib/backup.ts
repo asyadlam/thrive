@@ -37,6 +37,8 @@ import {
   ROUTINE_STORE,
   WISHLIST_STORE,
   BUCKETLIST_STORE,
+  readTombstones,
+  type Tombstone,
   idbReplaceStores,
 } from './db';
 import {
@@ -100,6 +102,8 @@ export type Backup = typeof FORMAT & {
   settings: AppSettings;
   /** When the settings were last changed on the device that made this backup ("last changed wins"). */
   settingsUpdatedAt: string | null;
+  /** Records deleted on that device (store, id, when), so automatic sync carries deletions too. */
+  deleted: Tombstone[];
   entries: JournalEntry[];
   dreams: JournalEntry[];
   health: HealthDay[];
@@ -123,6 +127,7 @@ export async function buildBackup(): Promise<Backup> {
     meta: backupMeta(),
     settings: loadSettings(),
     settingsUpdatedAt: getSettingsUpdatedAt(),
+    deleted: readTombstones(),
     entries: (await listAllEntries()).map((e) => (e.type === 'talk' ? withSummaryList(e) : e)), // summaries as a list
     health: await listHealthDays(),
     medications: await listMedications(),
@@ -216,6 +221,7 @@ export type CheckedBackup = {
   meta: BackupMeta | null;
   settings: AppSettings;
   settingsUpdatedAt: string | null;
+  deleted: Tombstone[];
   entries: JournalEntry[];
   quickCount: number;
   talkCount: number;
@@ -449,6 +455,12 @@ export function checkBackup(data: unknown): CheckedBackup {
     meta: readBackupMeta(d.meta),
     settings: normalizeSettings(d.settings),
     settingsUpdatedAt: isIsoTime(d.settingsUpdatedAt) ? d.settingsUpdatedAt : null,
+    deleted: Array.isArray(d.deleted)
+      ? d.deleted
+          .filter((t): t is Tombstone => !!t && typeof t.store === 'string' && typeof t.id === 'string' && isIsoTime(t.at))
+          .map((t) => ({ store: t.store.slice(0, 40), id: t.id.slice(0, 120), at: t.at }))
+          .slice(-2000)
+      : [],
     entries,
     quickCount: entries.filter((e) => e.type === 'quick').length,
     talkCount: entries.filter((e) => e.type === 'talk').length,
