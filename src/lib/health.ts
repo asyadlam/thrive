@@ -39,6 +39,11 @@ export type FoodLog = {
   estimate?: true;
   /** For an estimate: the portion it assumed, e.g. "1 medium cookie". */
   portion?: string;
+  /**
+   * Worked out from my own numbers for a different amount ("150 g is 60 cal, I had 135 g"): exact, not an
+   * estimate, but not my usual portion either, so it's never remembered as this food's numbers.
+   */
+  scaled?: string;
 };
 
 export const PORTION_MAX = 60;
@@ -235,6 +240,7 @@ export function healthDayFromBackup(raw: unknown): HealthDay | null {
             protein: grams(f.protein),
             createdAt: isIsoTime(f.createdAt) ? f.createdAt : created,
             ...(typeof f.count === 'number' && Number.isInteger(f.count) && f.count > 1 && f.count <= 50 ? { count: f.count } : {}),
+            ...(typeof f.scaled === 'string' && f.scaled.trim() ? { scaled: f.scaled.trim().slice(0, PORTION_MAX) } : {}),
             ...(f.estimate === true
               ? { estimate: true as const, ...(typeof f.portion === 'string' && f.portion.trim() ? { portion: f.portion.trim().slice(0, PORTION_MAX) } : {}) }
               : {}),

@@ -52,7 +52,7 @@ Actions (dates are "YYYY-MM-DD"):
 - {"type":"set_todo_done","date":D,"id":"<to-do id>","done":true|false}
 - {"type":"move_todos","from":D,"to":D,"when":"<their words for the target day>","which":"open"|"all"}   ("move my to-dos to next Friday" → from today, when "next Friday", "open". Ticked to-dos only move if they clearly say to include the finished/done/checked ones → "all".)
 - {"type":"move_todo","from":D,"to":D,"when":"<their words for the target day>","id":"<to-do id>","text":"<the to-do's words>"}   (one named to-do: "move the email one to December 15th", "move call grandma back to today" — pick the id whose text matches, from the "from" day's to-dos; "move this/it to…" means the to-do just talked about. "Back to today" means from tomorrow to today.)
-- {"type":"add_food","date":D,"name":"...","calories":N,"protein":N,"sugar":N,"addedSugar":N,"estimate":true|false,"portion":"..."}   (one action per food; see FOOD below)
+- {"type":"add_food","date":D,"name":"...","calories":N,"protein":N,"sugar":N,"addedSugar":N,"estimate":true|false,"portion":"...","base":{…},"eaten":{…},"fraction":N}   (one action per food; see FOOD below — "base"/"eaten"/"fraction" only for portion maths)
 - {"type":"copy_food","from":D,"to":D,"id":"<food id>"}   ("copy yesterday's breakfast", "I had the same oatmeal as yesterday": copy each matching food from that day's foods to today — one action per food)
 CORRECTIONS (about entries already there — never add a second entry for a correction):
 - "recent" in the context lists what their LAST recording added or changed (newest last), wherever it landed. "That", "it", "this" mean the newest item in "recent" of the right kind; if "recent" is empty, the newest matching entry on the context day.
@@ -87,6 +87,12 @@ FOOD:
 - Numbers they didn't say but you estimated still count as an estimate: "a 200 calorie bar" → calories 200, protein/sugar/added sugar estimated, "estimate": true.
 - Sugar is ALWAYS two separate numbers: "sugar" = total sugar, "addedSugar" = added sugar only (fruit, plain milk and plain vegetables have 0 added sugar). Never merge them, and added sugar is never more than total sugar.
 - Calories are whole numbers; grams may have one decimal.
+- PORTION MATH: when their numbers are for one amount but they ate a different amount, DON'T do the maths yourself. Send their numbers exactly as said (for the stated amount), "estimate": false, plus:
+    • "base": {"amount": N, "unit": "g"|"ml"|"oz"|"kg"|"l"|"piece"|"slice"|…} — the amount their numbers are for ("150 grams", "per 100 grams" → 100 g), and
+    • "eaten": {"amount": N, "unit": "…"} — how much they actually had ("I only had 135 grams"), OR
+    • "fraction": N instead of "eaten" when they ate a share of it or a number of them: half 0.5, a third 0.333, a quarter 0.25, two thirds 0.667, three quarters 0.75, "80 percent" 0.8, "two of them" 2.
+  Examples: "my yogurt is 150 grams and that's 60 calories, 12 grams of protein and zero sugar, but I only had 135 grams" → {"type":"add_food","name":"Yogurt","calories":60,"protein":12,"sugar":0,"addedSugar":0,"estimate":false,"base":{"amount":150,"unit":"g"},"eaten":{"amount":135,"unit":"g"}}. "The whole pack is 400 calories, I ate half" → calories 400, "fraction":0.5. "I had half a Barebells bar" (a food in knownFoods, no numbers said) → name "Barebells bar", "fraction":0.5, no numbers. The app scales every number and shows the maths.
+  If they give numbers but no different amount eaten, it's a normal add_food with their numbers. An amount eaten with no numbers at all is the normal estimate.
 - "name" is the food as they said it, without the portion: "Cookie", "Banana", "Pasta", "Barebells bar".
 
 POSITIVES ARE NOT YOURS: you only fill the Daily Sprout page. Never create a Positive, however lovely something sounds — a nice moment about their day goes in the Quick entry note, in their words. If they explicitly ask you to add something to their positives, put exactly "positives are added by hand in Growth" in "cannot".

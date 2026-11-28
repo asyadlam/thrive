@@ -85,6 +85,8 @@ export type FoodDraft = {
   /** Ask Thrive estimated some of the numbers. */
   estimate?: boolean;
   portion?: string;
+  /** Scaled from my own numbers for another amount: how ("135 g of 150 g"). */
+  scaled?: string;
 };
 
 const grams = (v: number | null) => (v === null || !Number.isFinite(v) || v < 0 || v > NUTRIENT_MAX ? null : Math.round(v * 10) / 10);
@@ -96,6 +98,7 @@ export function cleanFood(f: FoodDraft): Omit<FoodLog, 'id' | 'createdAt'> {
     protein: grams(f.protein),
     sugar: grams(f.sugar),
     addedSugar: grams(f.addedSugar),
+    ...(f.scaled?.trim() ? { scaled: f.scaled.trim().slice(0, PORTION_MAX) } : {}),
     ...(f.estimate ? { estimate: true as const, ...(f.portion?.trim() ? { portion: f.portion.trim().slice(0, PORTION_MAX) } : {}) } : {}),
   };
 }
@@ -107,7 +110,7 @@ export function cleanFood(f: FoodDraft): Omit<FoodLog, 'id' | 'createdAt'> {
 export async function knownFoods(limit = 80): Promise<FoodLog[]> {
   const days = await listHealthDays();
   const seen = new Map<string, FoodLog>();
-  const all = days.flatMap((d) => d.foods ?? []).filter((f) => !f.estimate && f.calories !== null && f.name.trim());
+  const all = days.flatMap((d) => d.foods ?? []).filter((f) => !f.estimate && !f.scaled && f.calories !== null && f.name.trim());
   all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   for (const f of all) {
     const key = foodKey(f.name);

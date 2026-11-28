@@ -330,6 +330,98 @@ function statedNutrients(text: string): { calories: number | null; protein: numb
 }
 
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
+/* ------------------------------------------ portion math ------------------------------------------ */
+
+/** Units that can be compared, in a base unit per kind (weight in grams, volume in ml). */
+const UNITS: Record<string, { kind: 'weight' | 'volume'; factor: number; label: string }> = {
+  g: { kind: 'weight', factor: 1, label: 'g' }, gram: { kind: 'weight', factor: 1, label: 'g' }, grams: { kind: 'weight', factor: 1, label: 'g' },
+  kg: { kind: 'weight', factor: 1000, label: 'kg' }, oz: { kind: 'weight', factor: 28.349523125, label: 'oz' }, ounce: { kind: 'weight', factor: 28.349523125, label: 'oz' }, ounces: { kind: 'weight', factor: 28.349523125, label: 'oz' },
+  lb: { kind: 'weight', factor: 453.59237, label: 'lb' }, ml: { kind: 'volume', factor: 1, label: 'ml' }, l: { kind: 'volume', factor: 1000, label: 'l' }, cl: { kind: 'volume', factor: 10, label: 'cl' },
+  'fl oz': { kind: 'volume', factor: 29.5735295625, label: 'fl oz' },
+};
+
+/** Fractions said in words or as a percentage: "half" 1/2, "a third" 1/3, "80 percent" 0.8 (exact, never rounded). */
+function fractionsSaid(text: string): Map<number, string> {
+  const t = text.toLowerCase();
+  const out = new Map<number, string>();
+  const add = (re: RegExp, v: number, label: string) => re.test(t) && out.set(v, label);
+  add(/\bhalf\b|\bhalves\b/, 1 / 2, 'half');
+  add(/\b(a|one|1)\s+third\b|\b1\/3\b/, 1 / 3, 'a third');
+  add(/\b(two|2)\s+thirds\b|\b2\/3\b/, 2 / 3, 'two thirds');
+  add(/\b(a|one|1)\s+quarter\b|\b1\/4\b|\ba fourth\b/, 1 / 4, 'a quarter');
+  add(/\b(three|3)\s+quarters\b|\b3\/4\b/, 3 / 4, 'three quarters');
+  add(/\b(a|one|1)\s+fifth\b|\b1\/5\b/, 1 / 5, 'a fifth');
+  for (const m of t.matchAll(/(\d+(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/g)) out.set(Number(m[1]) / 100, `${m[1]}%`);
+  return out;
+}
+
+type Base = { calories: number | null; protein: number | null; sugar: number | null; addedSugar: number | null };
+
+/**
+ * Works out how much of the stated amount was eaten, and the numbers it scales. My numbers must be ones I said
+ * (or my remembered numbers for that food); the amounts too. Anything that doesn't add up is said, not guessed.
+ */
+function portionMath(
+  a: Record<string, unknown>,
+  said: string,
+  numbers: Set<number>,
+  knownFood: FoodLog | null,
+): { ratio: number; base: Base; eatenLabel: string; fromLabel: string; name?: string } | { error: string } {
+  const about = /\b(about|around|roughly|approximately|approx|nearly|almost|like)\b/i.test(said) ? 'about ' : '';
+  const said1 = (v: unknown) => {
+    const n = num(v);
+    return n !== null && numbers.has(n) ? n : null;
+  };
+  // The base numbers: the ones I said now, or my usual numbers for this food.
+  const spoken: Base = { calories: said1(a.calories), protein: said1(a.protein), sugar: said1(a.sugar), addedSugar: said1(a.addedSugar) };
+  const saidAny = Object.values(spoken).some((v) => v !== null);
+  const base: Base = saidAny
+    ? spoken
+    : knownFood
+      ? { calories: knownFood.calories, protein: knownFood.protein, sugar: knownFood.sugar, addedSugar: knownFood.addedSugar }
+      : spoken;
+  if (!saidAny && !knownFood) return { error: 'I didn’t hear the numbers to scale from' };
+
+  // A share of it ("half", "a third", "80 percent", or "two of them").
+  if (a.fraction !== undefined && a.fraction !== null && !a.eaten) {
+    const f = num(a.fraction);
+    if (f === null || f <= 0 || f > 20) return { error: 'I couldn’t tell how much of it you had' };
+    const words = fractionsSaid(said);
+    const match = [...words.entries()].find(([v]) => Math.abs(v - f) < 0.011);
+    const whole = Number.isInteger(f) && numbers.has(f) ? f : null;
+    if (!match && whole === null) return { error: 'I couldn’t tell how much of it you had' };
+    const ratio = match ? match[0] : whole!;
+    const eatenLabel = match ? `, ${about}${match[1]}` : ` × ${whole}`;
+    return { ratio, base, eatenLabel, fromLabel: saidAny ? 'the whole' : `your usual ${knownFood!.name}`, ...(saidAny ? {} : { name: knownFood!.name }) };
+  }
+
+  // Amounts: "150 g … I had 135 g", "per 100 g … I had 250 g".
+  const amount = (v: unknown) => {
+    const o = (v ?? {}) as Record<string, unknown>;
+    const n = num(o.amount);
+    const unitWord = str(o.unit, 12).toLowerCase().replace(/\.$/, '');
+    return { n: n !== null && numbers.has(n) ? n : null, unitWord, unit: UNITS[unitWord] ?? null };
+  };
+  const eaten = amount(a.eaten);
+  const of = amount(a.base);
+  if (eaten.n === null || eaten.n <= 0) return { error: 'I didn’t catch how much you had' };
+  if (!saidAny) return { error: `I only know your usual ${knownFood!.name}, not how much it weighs, so I can’t scale it by weight` };
+  if (of.n === null || of.n <= 0) return { error: 'I didn’t catch the amount your numbers are for' };
+  let ratio: number;
+  if (eaten.unit && of.unit) {
+    if (eaten.unit.kind !== of.unit.kind) return { error: `I can’t compare ${eaten.unitWord} with ${of.unitWord}` };
+    ratio = (eaten.n * eaten.unit.factor) / (of.n * of.unit.factor);
+  } else if (eaten.unitWord && eaten.unitWord === of.unitWord) {
+    ratio = eaten.n / of.n; // pieces, slices, cups… the same unit on both sides
+  } else if (!eaten.unitWord && !of.unitWord) {
+    ratio = eaten.n / of.n;
+  } else return { error: `I can’t compare ${eaten.unitWord || 'that'} with ${of.unitWord || 'that'}` };
+  if (!(ratio > 0) || ratio > 50) return { error: 'the amounts didn’t add up' };
+  const label = (x: { n: number | null; unitWord: string; unit: (typeof UNITS)[string] | null }) =>
+    `${x.n}${x.unit ? (x.unit.label.length <= 2 ? x.unit.label : ` ${x.unit.label}`) : x.unitWord ? ` ${x.unitWord}` : ''}`;
+  return { ratio, base, eatenLabel: ` ${about}${label(eaten)}`, fromLabel: label(of) };
+}
 const kcalText = (n: number) => n.toLocaleString();
 
 /**
@@ -520,6 +612,37 @@ async function runActions(
           const matchedNote = nearName ? ` (matched to your “${nearName}”)` : '';
           const knownFood = known.find((f) => foodKey(f.name) === foodKey(name)) ?? null;
           const wantsEstimate = a.estimate === true;
+          // Portion math: my numbers are for one amount, I ate another ("150 g is 60 cal, I had 135 g",
+          // "half a Barebells bar"). Every number is scaled by the same ratio — exact, never an estimate.
+          if (a.eaten || a.fraction !== undefined && a.fraction !== null) {
+            const math = portionMath(a, latest, numbers, knownFood);
+            if ('error' in math) { out.push(`Couldn’t do: log ${name.toLowerCase()} — ${math.error}.`); break; }
+            const { ratio, base, eatenLabel, fromLabel } = math;
+            const scale = (v: number | null, whole: boolean) => (v === null ? null : whole ? Math.round(v * ratio) : Math.round(v * ratio * 10) / 10);
+            const food = {
+              name: math.name ?? name,
+              calories: scale(base.calories, true),
+              protein: scale(base.protein, false),
+              sugar: scale(base.sugar, false),
+              addedSugar: scale(base.addedSugar, false),
+              scaled: `${eatenLabel.replace(/^,?\s*/, '')} (scaled from ${fromLabel})`,
+            };
+            if (food.sugar !== null && food.addedSugar !== null && food.addedSugar > food.sugar) food.addedSugar = food.sugar;
+            const saved = await addFood(date, food);
+            if (saved?.foods?.length) touch('food', date, saved.foods.at(-1)!.id);
+            await countSame(date, food.name);
+            const nums = [
+              food.calories === null ? null : `${kcalText(food.calories)} cal`,
+              food.protein === null ? null : `${food.protein}g protein`,
+              food.sugar === null ? null : `${food.sugar}g sugar`,
+              food.addedSugar === null || food.sugar === null ? (food.addedSugar === null ? null : `${food.addedSugar}g added sugar`) : `(${food.addedSugar}g added)`,
+            ].filter(Boolean);
+            const again = rep(date, food.name);
+            out.push(
+              `${cap(food.name)}${eatenLabel}: ${nums.length ? nums.join(', ').replace(', (', ' (') : 'no numbers'} (scaled from ${fromLabel}${again})${date === day ? '' : ` ${forDay(date)}`}.`,
+            );
+            break;
+          }
           // A food logged before with my own numbers: those numbers, exactly (unless I said new ones now).
           if (knownFood && wantsEstimate && stated.calories === null && stated.protein === null) {
             const { calories, protein, sugar, addedSugar } = knownFood;
