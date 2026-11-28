@@ -2109,6 +2109,8 @@ select.input { appearance: auto; }
 .sprout-link { color: var(--green-700); font-weight: 600; font-size: 0.9rem; }
 .sprout-label { display: block; font-weight: 600; margin-bottom: 6px; }
 .sprout-add { align-self: flex-start; }
+/* Daily Sprout: "See all" sits right after "+ Add food", clear of the floating mic */
+.sprout-food-links { justify-content: flex-start; column-gap: 20px; }
 
 .sprout-ring-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .sprout-ring { width: clamp(130px, 40vw, 160px); height: auto; }

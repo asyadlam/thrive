@@ -83,7 +83,7 @@ function CalorieField({ foods, typed, onTyped, onFoods }: CalorieFieldProps) {
   const [error, setError] = useState<string | null>(null);
   const totals = foodTotals(foods);
   const newestFirst = [...foods].reverse();
-  const shown = showAll ? newestFirst : newestFirst.slice(0, 1);
+  const shown = showAll ? newestFirst : newestFirst.slice(0, 3); // the latest three, like Daily Sprout
 
   function reset() {
     setName('');
@@ -148,7 +148,7 @@ function CalorieField({ foods, typed, onTyped, onFoods }: CalorieFieldProps) {
       )}
 
       {foods.length > 0 && (
-        <ul className="food-list" aria-label={showAll ? 'All calorie logs, newest first' : 'Latest calorie log'}>
+        <ul className="food-list" aria-label={showAll ? 'All calorie logs, newest first' : 'Latest calorie logs'}>
           {shown.map((f) => (
             <li key={f.id} className="food-item">
               <span className="food-main">
@@ -211,9 +211,9 @@ function CalorieField({ foods, typed, onTyped, onFoods }: CalorieFieldProps) {
           <button type="button" className="saving-toggle" onClick={() => setAdding(true)}>
             + Add a calorie log
           </button>
-          {foods.length > 1 && (
+          {foods.length > 3 && (
             <button type="button" className="saving-toggle food-toggle" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)}>
-              {showAll ? 'Show only the latest' : `See all ${foods.length} logs`}
+              {showAll ? 'Show fewer' : `See all ${foods.length} logs`}
             </button>
           )}
         </div>

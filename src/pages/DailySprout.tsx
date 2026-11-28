@@ -116,8 +116,14 @@ function IntentionLine({ date, intention }: { date: string; intention: string })
   );
 }
 
+/** How many foods show before "See all": the newest ones, so what I just added is always in view. */
+const FOODS_SHOWN = 3;
+
 function FoodCard({ date, foods }: { date: string; foods: FoodLog[] }) {
   const [adding, setAdding] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const hidden = showAll ? 0 : Math.max(0, foods.length - FOODS_SHOWN);
+  const shownFoods = foods.slice(hidden);
   const [name, setName] = useState('');
   const [kcal, setKcal] = useState('');
   const [protein, setProtein] = useState('');
@@ -153,8 +159,8 @@ function FoodCard({ date, foods }: { date: string; foods: FoodLog[] }) {
       </h2>
       <CalorieRing foods={foods} />
       {foods.length > 0 && (
-        <ul className="sprout-foods">
-          {foods.map((f) => (
+        <ul className="sprout-foods" aria-label={hidden ? `The latest ${FOODS_SHOWN} of ${foods.length} foods` : 'Foods'}>
+          {shownFoods.map((f) => (
             <li key={f.id} className="sprout-food">
               <span className="sprout-food-main">
                 <span className="sprout-food-name">
@@ -229,9 +235,16 @@ function FoodCard({ date, foods }: { date: string; foods: FoodLog[] }) {
           </div>
         </form>
       ) : (
-        <button type="button" className="saving-toggle sprout-add" onClick={() => setAdding(true)}>
-          + Add food
-        </button>
+        <div className="food-links sprout-food-links">
+          <button type="button" className="saving-toggle sprout-add" onClick={() => setAdding(true)}>
+            + Add food
+          </button>
+          {foods.length > FOODS_SHOWN && (
+            <button type="button" className="saving-toggle food-toggle" aria-expanded={showAll} onClick={() => setShowAll((v) => !v)}>
+              {showAll ? 'Show fewer' : `See all ${foods.length} foods`}
+            </button>
+          )}
+        </div>
       )}
     </section>
   );
