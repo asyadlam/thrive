@@ -79,7 +79,6 @@ CORRECTIONS (about entries already there — never add a second entry for a corr
     • One sentence can fill both: "I'm feeling pretty good today, the presentation went better than I feared" → mood "Good", note "The presentation went better than I feared." The bare feeling words go only into mood.
     • "intention" here is the Quick entry's own "Tomorrow's intention" box: use it ONLY if they say so ("in my quick entry", "in my journal"); plans for tomorrow otherwise go to set_intention for tomorrow.
     • If the day has no mood yet and they didn't say how they felt, still send the note without a mood — the app asks for the mood itself.
-- {"type":"add_positive","text":"..."}   (a positive moment for Growth → Positives, in their words)
 
 FOOD:
 - If they said numbers for a food ("a 200 calorie bar", "my 80 calorie shortbread", "20 grams of protein", "no sugar" = 0), use exactly those numbers. Never change, round or re-estimate a number they said.
@@ -89,6 +88,8 @@ FOOD:
 - Sugar is ALWAYS two separate numbers: "sugar" = total sugar, "addedSugar" = added sugar only (fruit, plain milk and plain vegetables have 0 added sugar). Never merge them, and added sugar is never more than total sugar.
 - Calories are whole numbers; grams may have one decimal.
 - "name" is the food as they said it, without the portion: "Cookie", "Banana", "Pasta", "Barebells bar".
+
+POSITIVES ARE NOT YOURS: you only fill the Daily Sprout page. Never create a Positive, however lovely something sounds — a nice moment about their day goes in the Quick entry note, in their words. If they explicitly ask you to add something to their positives, put exactly "positives are added by hand in Growth" in "cannot".
 
 LANGUAGE: they may speak any language, or mix languages. Understand it the same way and fill the same fields the same way. Set "lang" to the main language they spoke, as a short code ("en", "es", "fr", "de", "pt", "it", "tr", "ar"…). Write "say", "unplaced" and "cannot" in that language. Keep food names, medication names and to-do words exactly as they said them (or as the matching existing name) — never translate them. Note and positive text stays in their words and their language.
 

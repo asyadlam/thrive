@@ -12,6 +12,11 @@ type Props = {
   label: string;
   /** The field's own label, shown on the same row as the mic (optional). */
   children?: ReactNode;
+  /**
+   * A small round mic that sits inside a message box (Talk about this): no label row; while it listens the
+   * status ("Listening… 0:12") floats just above the box.
+   */
+  compact?: boolean;
 };
 
 type Phase = 'idle' | 'starting' | 'recording' | 'writing';
@@ -27,7 +32,7 @@ function clock(ms: number): string {
  * A small mic button for a text field: tap to record, tap Stop, and the words are added to the field.
  * Hidden if the browser can't record. Never touches text that's already there.
  */
-export default function DictationButton({ value, onChange, maxLength, label, children }: Props) {
+export default function DictationButton({ value, onChange, maxLength, label, children, compact = false }: Props) {
   const [supported] = useState(canDictate);
   const [phase, setPhase] = useState<Phase>('idle');
   const [elapsed, setElapsed] = useState(0);
@@ -161,6 +166,42 @@ export default function DictationButton({ value, onChange, maxLength, label, chi
 
   const recording = phase === 'recording';
   const busy = phase === 'starting' || phase === 'writing';
+
+  if (compact) {
+    return (
+      <>
+        <p className="chat-dictation-status" role="status" aria-live="polite">
+          {recording && (
+            <span className="dictation-recording">
+              <span className="dictation-dot" aria-hidden="true" />
+              Listening… {clock(elapsed)} · tap ■ when you’re done
+            </span>
+          )}
+          {phase === 'writing' && <span className="dictation-writing">Writing that down…</span>}
+          {phase === 'idle' && note && <span className="dictation-note">{note}</span>}
+        </p>
+        <button
+          type="button"
+          className={`chat-mic${recording ? ' listening' : ''}`}
+          onClick={recording ? stop : () => void start()}
+          disabled={busy}
+          aria-label={recording ? 'Stop and put the words in the box' : `Dictate ${label}`}
+          aria-pressed={recording}
+          title={recording ? 'Stop' : 'Dictate'}
+        >
+          {recording ? (
+            <span className="dictation-stop-square" aria-hidden="true" />
+          ) : (
+            <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="3" width="6" height="11" rx="3" />
+              <path d="M5.5 11a6.5 6.5 0 0 0 13 0" />
+              <path d="M12 17.5V21" />
+            </svg>
+          )}
+        </button>
+      </>
+    );
+  }
 
   return (
     <div className="dictation">

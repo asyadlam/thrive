@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import ConfirmDialog from '../components/ConfirmDialog';
+import DictationButton from '../components/DictationButton';
 import { PET_ART, useCelebration } from '../components/PetCompanion';
 import { getTalkEntry, saveTalkSummary, talkEntryLabel, type TalkEntry } from '../lib/journal';
 import { useBook } from '../lib/book';
@@ -377,6 +378,8 @@ export default function TalkChatPage() {
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={onKeyDown}
               />
+              {/* Voice in, text out: the words land in the box to read and edit; nothing is sent until Send. */}
+              <DictationButton value={draft} onChange={setDraft} maxLength={2000} label="your message" compact />
               <button type="submit" className="chat-send" disabled={!draft.trim() || waiting} aria-label="Send">
                 <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M5 12h13M13 6l6 6-6 6" />

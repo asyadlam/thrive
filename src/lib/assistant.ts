@@ -8,10 +8,9 @@ import { isValidDayKey } from './calendar';
 import { ONE_YEAR_DAYS, daysBetween, fullDate, resolveSpokenDate } from './spokenDate';
 import { beginUndo, endUndo, noteCreated, type UndoSnapshot } from './undo';
 import { closest, kShorthand, likeness, negated, numbersIn, ordinal, spelledAlike } from './voiceText';
-import { MEDICATIONS_STORE, POSITIVES_STORE } from './db';
+import { MEDICATIONS_STORE } from './db';
 import { LIMITS, MOODS, getQuickEntry, todayKey, type Mood } from './journal';
 import { INTENTION_MAX, MED_NAME_MAX, MED_TIMING_MAX, addMedication, getHealthDay, listMedications, type FoodLog, type Medication } from './health';
-import { addStandalonePositive } from './positives';
 import { notifyDataChanged } from './dataEvents';
 import {
   addFood,
@@ -238,10 +237,11 @@ export async function askAssistant(
   }
   // They spoke another language: the confirmations follow it (names, quotes and numbers stay as they are).
   const lang = typeof data.lang === 'string' && /^[a-z]{2,3}(-[a-z0-9]{2,8})?$/i.test(data.lang) ? data.lang.toLowerCase() : 'en';
-  let shown = lines;
+  let shown = [...new Set(lines)]; // the same line twice (e.g. an action and a "cannot" about one thing) shows once
   if (!lang.startsWith('en')) {
-    shown = await translateLines(lines, lang, signal);
-    if (question) question = shown[lines.indexOf(question)] ?? question;
+    const english = shown;
+    shown = await translateLines(english, lang, signal);
+    if (question) question = shown[english.indexOf(question)] ?? question;
   }
   return { lines: shown, question, held, undo, recent: run.touched.length ? run.touched : null, lang };
 }
@@ -794,15 +794,10 @@ async function runActions(
           out.push(`Set the little sprout for ${dateLabel(date)}: I’ll try ${text.replace(/[.!]+$/, '')}.`);
           break;
         }
-        case 'add_positive': {
-          const text = str(a.text, 300);
-          if (!text) { out.push('Couldn’t do: add the positive, because I didn’t catch its words.'); break; }
-          const positive = await addStandalonePositive(text);
-          noteCreated(POSITIVES_STORE, positive.id);
-          notifyDataChanged();
-          out.push(`Added a positive: “${text}”.`);
+        case 'add_positive':
+          // Ask Thrive only fills Daily Sprout: positives are only ever added by hand.
+          out.push('Couldn’t do: positives are added by hand in Growth.');
           break;
-        }
         default:
           out.push('Couldn’t do: one part, because it isn’t something I can do here.');
       }

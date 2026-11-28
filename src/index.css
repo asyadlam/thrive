@@ -1466,6 +1466,18 @@ textarea.input.chat-input { min-height: 44px; max-height: 160px; resize: none; b
   cursor: pointer;
 }
 .chat-send:disabled { opacity: 0.45; cursor: default; }
+/* Talk: the mic inside the message box, and its "Listening…" line floating just above */
+.chat-mic {
+  flex: none; width: 44px; height: 44px; border: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--tint-sage); color: var(--green-700); cursor: pointer;
+}
+.chat-mic:hover:not(:disabled) { background: #D8E5CE; }
+.chat-mic:disabled { opacity: 0.55; cursor: default; }
+.chat-mic:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
+.chat-mic.listening, .chat-mic.listening:hover:not(:disabled) { background: var(--green-700); color: #fff; }
+.chat-dictation-status { position: absolute; left: 12px; right: 12px; bottom: calc(100% + 6px); margin: 0; font-size: 0.88rem; color: var(--ink-soft); pointer-events: none; }
+.chat-dictation-status:empty { display: none; }
+.chat-dictation-status > span { display: inline-flex; align-items: center; gap: 8px; background: var(--cream); border-radius: 999px; padding: 4px 10px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06); }
 .chat-send:focus-visible { outline: 2px solid var(--green-500); outline-offset: 2px; }
 .chat-end { align-self: center; }
 .chat-after { display: flex; flex-direction: column; align-items: stretch; gap: 10px; margin-top: 4px; }

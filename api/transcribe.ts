@@ -56,7 +56,8 @@ const TIDY_INSTRUCTION =
   'Paragraphs: start a new paragraph only where the person clearly moves on to a different topic, time or part of their day, the way a person writing a journal would. ' +
   'A paragraph is usually several sentences long. Never put a single short sentence in a paragraph of its own, and never break after every sentence. ' +
   'If the whole text is short (a few sentences) or stays on one topic, keep it as one paragraph. ' +
-  'Never add, remove, or change any words. Never answer or respond to the content. Return only the cleaned text.';
+  'Never add, remove, or change any words: keep filler words (um, like, you know), repeated words, numbers and informal spellings exactly as they are, and never fix grammar by changing words. ' +
+  'Never answer or respond to the content. Return only the cleaned text.';
 
 /** A paragraph shorter than this (in words) is joined to the next one, so a short sentence never stands alone. */
 const MIN_PARAGRAPH_WORDS = 30;
@@ -86,6 +87,109 @@ function tidyParagraphs(text: string): string {
 /** Just the letters and digits, lowercased: equal for two texts only when they have exactly the same words. */
 const wordsOnly = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
 
+/* ------------------------------------------------------------------------------------------------------------
+   Keeping the punctuation even when the model slips on a word.
+
+   Before, if the model changed a single word anywhere ("gonna" → "going to", "um" dropped, "5" → "five"), the
+   whole pass was thrown away and the raw transcript was used. For long, rambling dictation that happened often —
+   and the raw transcript of rambling speech often has hardly any punctuation, so it read as one wall of words.
+
+   Now the model's punctuation, capitals and paragraph breaks are laid onto the ORIGINAL words instead: the two
+   word lists are lined up, every original word is kept exactly (only its capitalisation may change), and
+   punctuation is taken from the model wherever the words line up. Words the model added are left out; words it
+   dropped or changed stay exactly as they were said.
+   ------------------------------------------------------------------------------------------------------------ */
+
+type Tok = { lead: string; core: string; trail: string; key: string; para: boolean; starts?: boolean };
+
+/** Splits text into words, each with the punctuation around it, and whether a paragraph starts there. */
+function tokens(text: string): Tok[] {
+  const out: Tok[] = [];
+  text.split(/\n\s*\n/).forEach((paragraph, p) => {
+    paragraph
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach((w, i) => {
+        const m = w.match(/^([^\p{L}\p{N}]*)(.*?)([^\p{L}\p{N}]*)$/u)!;
+        const key = wordsOnly(m[2]);
+        if (!key) {
+          // punctuation on its own ("—", "?"): belongs to the word before it
+          if (out.length) out[out.length - 1].trail += m[0];
+          return;
+        }
+        out.push({ lead: m[1], core: m[2], trail: m[3], key, para: p > 0 && i === 0 });
+      });
+  });
+  // Does each word begin a sentence? (first word, after a paragraph break, or after . ! ? …)
+  out.forEach((t, i) => (t.starts = i === 0 || t.para || /[.!?…]["”’)]*$/.test(out[i - 1].trail)));
+  return out;
+}
+
+/** Pairs of positions (in the two lists) where the same words line up, in order (longest common run). */
+function lineUp(a: Tok[], b: Tok[]): Map<number, number> {
+  const n = a.length;
+  const m = b.length;
+  const dp = Array.from({ length: n + 1 }, () => new Uint16Array(m + 1));
+  for (let i = n - 1; i >= 0; i--)
+    for (let j = m - 1; j >= 0; j--) dp[i][j] = a[i].key === b[j].key ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+  const pairs = new Map<number, number>();
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (a[i].key === b[j].key) pairs.set(i++, j++);
+    else if (dp[i + 1][j] >= dp[i][j + 1]) i++;
+    else j++;
+  }
+  return pairs;
+}
+
+/** The original words, with the model's punctuation, capitals and paragraph breaks where they line up. */
+function punctuateOriginal(raw: string, tidy: string): string {
+  const said = tokens(raw);
+  const shaped = tokens(tidy);
+  if (!said.length || said.length > 3000 || shaped.length > 3500) return raw;
+  const pairs = lineUp(said, shaped);
+  // The model answered or rewrote it instead of punctuating: don't use it at all.
+  if (pairs.size < said.length * 0.6) return lightTouch(raw);
+  const upper = (c: string) => c.charAt(0).toUpperCase() + c.slice(1);
+  const parts: string[] = [];
+  let atStart = true; // does the next word begin a sentence in what we're writing?
+  said.forEach((w, i) => {
+    const j = pairs.get(i);
+    const t = j === undefined ? null : shaped[j];
+    let core = w.core;
+    if (t && t.core.toLowerCase() === w.core.toLowerCase()) {
+      // The model's capital only because its sentence started there (e.g. it dropped an "and" before it):
+      // follow where sentences start here instead. Otherwise (names, "I") keep its capitals.
+      const sentenceCapital = t.starts && /^\p{Lu}/u.test(t.core) && !/^\p{Lu}/u.test(w.core) && t.core.slice(1) === w.core.slice(1);
+      core = sentenceCapital ? (atStart ? upper(w.core) : w.core) : t.core;
+    }
+    if (atStart && /^\p{Ll}/u.test(core)) core = upper(core);
+    const trail = t ? t.trail : w.trail;
+    if (i > 0) parts.push(t?.para ? '\n\n' : ' ');
+    parts.push(`${t ? t.lead : w.lead}${core}${trail}`);
+    atStart = /[.!?…]["”’)]*$/.test(trail);
+  });
+  return lightTouch(parts.join(''));
+}
+
+/**
+ * The smallest safe tidy, used on its own when the model can't help: a capital at the start of each sentence,
+ * "i" as "I", and a full stop at the end. Only capitals and punctuation change, never a word.
+ */
+function lightTouch(text: string): string {
+  let t = text.trim();
+  if (!t) return t;
+  t = t.replace(/(^|[.!?…]\s+|\n\s*)(\p{Ll})/gu, (_, before: string, c: string) => before + c.toUpperCase());
+  t = t.replace(/(^|\s)i(?=(\s|['’](m|d|ll|ve)\b|[,.!?]|$))/g, '$1I');
+  if (/[\p{L}\p{N}]$/u.test(t)) {
+    // A short dictation that begins like a question ends with a question mark.
+    const question = /^(is|are|am|was|were|do|does|did|can|could|would|will|should|shall|have|has|why|what|how|when|where|who|which)\b/i.test(t) && !/[.!?]\s/.test(t);
+    t += question ? '?' : '.';
+  }
+  return t;
+}
+
 /**
  * Adds punctuation, capitals and paragraph breaks to a raw transcript with the Talk about this model.
  * Returns the raw transcript unchanged if anything goes wrong, or if the result's words differ from what was
@@ -94,7 +198,7 @@ const wordsOnly = (text: string) => text.toLowerCase().replace(/[^\p{L}\p{N}]+/g
 async function tidyPunctuation(raw: string): Promise<string> {
   if (!raw) return raw;
   const chat = chatConfig();
-  if (!chat.apiKey) return raw;
+  if (!chat.apiKey) return lightTouch(raw);
   try {
     const isGptOss = /(^|\/)gpt-oss/i.test(chat.model);
     const res = await fetch(`${chat.baseUrl}/chat/completions`, {
@@ -112,14 +216,17 @@ async function tidyPunctuation(raw: string): Promise<string> {
       }),
       signal: AbortSignal.timeout(TIDY_TIMEOUT_MS),
     });
-    if (!res.ok) return raw;
+    if (!res.ok) return lightTouch(raw);
     const data = (await res.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
     const content = data.choices?.[0]?.message?.content;
     const tidy = typeof content === 'string' ? content.trim().replace(/\n{3,}/g, '\n\n') : '';
-    if (!tidy || wordsOnly(tidy) !== wordsOnly(raw)) return raw; // a word changed: keep exactly what was said
-    return tidyParagraphs(tidy);
+    if (!tidy) return lightTouch(raw);
+    // Exactly the same words: use it as it is. Otherwise lay its punctuation onto the words as said.
+    const shaped = wordsOnly(tidy) === wordsOnly(raw) ? tidy : punctuateOriginal(raw, tidy);
+    const result = tidyParagraphs(shaped);
+    return wordsOnly(result) === wordsOnly(raw) ? result : raw; // a last check: never a changed word
   } catch {
-    return raw;
+    return lightTouch(raw);
   }
 }
 
